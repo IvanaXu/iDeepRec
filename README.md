@@ -166,4 +166,113 @@ Join the Official Discussion Group on DingTalk
 
 [Apache License 2.0](LICENSE)
 
-## Test
+## iDeepRec
+```
+├── cache
+│   ├── bazel
+│   └── pip
+├── dev
+│   └── iDeepRec
+├── pkg
+│   └── tensorflow_pkg
+├── pro
+│   ├── DeepRec
+│   ├── pro_log
+│   ├── pro.sh
+│   └── run.sh
+└── rcmd.sh
+```
+* cache, cache for configure
+* dev, git pull this code branch
+```shell
+git pull
+```
+* pkg, result pkg after run
+* pro, copy branch for configure&run
+```shell
+# pro.sh
+sh /pro/run.sh|tee /pro/pro_log/run_$(date "+%Y%m%d-%H%M%S").log
+```
+```shell
+# run.sh
+
+#
+echo 
+echo "> Run"
+
+#
+echo
+echo ">> STEP@1"
+cd /pro/DeepRec
+ls -l
+
+# 
+echo
+echo ">> STEP@2"
+./configure
+
+# 
+echo
+echo ">> STEP@3"
+bazel build  -c opt --config=opt  --config=mkl_threadpool --define build_with_mkl_dnn_v1_only=true //tensorflow/tools/pip_package:build_pip_package
+
+echo
+echo ">> STEP@4"
+./bazel-bin/tensorflow/tools/pip_package/build_pip_package /pkg/tensorflow_pkg
+
+echo
+echo ">> STEP@5"
+pip uninstall tensorflow -y
+pip install /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
+
+echo 
+echo ">> STEP@6"
+cd /pro/DeepRec/tianchi
+python run_models.py
+
+#
+echo "> Run"
+
+```
+* rcmd.sh, main shell
+```shell
+# rcmd.sh
+
+#
+echo 
+echo "> Run"
+
+#
+echo
+echo ">> STEP@1"
+cd /pro/DeepRec
+ls -l
+
+# 
+echo
+echo ">> STEP@2"
+./configure
+
+# 
+echo
+echo ">> STEP@3"
+bazel build  -c opt --config=opt  --config=mkl_threadpool --define build_with_mkl_dnn_v1_only=true //tensorflow/tools/pip_package:build_pip_package
+
+echo
+echo ">> STEP@4"
+./bazel-bin/tensorflow/tools/pip_package/build_pip_package /pkg/tensorflow_pkg
+
+echo
+echo ">> STEP@5"
+pip uninstall tensorflow -y
+pip install /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
+
+echo 
+echo ">> STEP@6"
+cd /pro/DeepRec/tianchi
+python run_models.py
+
+#
+echo "> Run"
+
+```
