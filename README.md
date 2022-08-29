@@ -238,41 +238,70 @@ echo "> Run"
 ```shell
 # rcmd.sh
 
-#
-echo 
-echo "> Run"
+clear
 
-#
+mainp=/root/proj/code/DeepRec-CTR
+
+# 
+echo "> Git"
+cd dev/iDeepRec
+git pull
+
+# 
+echo 
+echo "> Start"
+cd $mainp
+rm -rf pro/DeepRec
+cp -r dev/iDeepRec pro/DeepRec
+tree -L 2
+
+
+# docker
 echo
-echo ">> STEP@1"
-cd /pro/DeepRec
+echo "> Docker"
+docker stop tianchi_test
+docker rm tianchi_test
+
+
+# docker run -ti \
+#     --name=tianchi_test \
+#     --net=host \
+#     -v $mainp/pro:/pro \
+#     -v $mainp/pkg:/pkg \
+#     -v $mainp/cache:/root/.cache/ \
+#     alideeprec/deeprec-tianchi:deeprec-cpu-py36-ubuntu18.04 \
+#     bash
+
+# docker run -ti \
+#     --name=tianchi_test \
+#     --net=host \
+#     -v $mainp/pro:/pro \
+#     -v $mainp/pkg:/pkg \
+#     alideeprec/deeprec-tianchi:deeprec-cpu-py36-ubuntu18.04 \
+#     bash /pro/pro.sh
+
+# docker run -ti \
+#     --name=tianchi_test \
+#     --net=host \
+#     -v $mainp/pro:/pro \
+#     -v $mainp/pkg:/pkg \
+#     -v $mainp/cache:/root/.cache/ \
+#     alideeprec/deeprec-tianchi:deeprec-cpu-py36-ubuntu18.04 \
+#     bash /pro/pro.sh
+
+echo $(date "+%Y-%m-%d %H:%M:%S")
+
+
+# zip
+echo 
+echo "> result"
+cd pkg/tensorflow_pkg
+# zip whl_$(date "+%Y%m%d-%H%M%S").zip tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
 ls -l
 
-# 
-echo
-echo ">> STEP@2"
-./configure
-
-# 
-echo
-echo ">> STEP@3"
-bazel build  -c opt --config=opt  --config=mkl_threadpool --define build_with_mkl_dnn_v1_only=true //tensorflow/tools/pip_package:build_pip_package
-
-echo
-echo ">> STEP@4"
-./bazel-bin/tensorflow/tools/pip_package/build_pip_package /pkg/tensorflow_pkg
-
-echo
-echo ">> STEP@5"
-pip uninstall tensorflow -y
-pip install /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
-
-echo 
-echo ">> STEP@6"
-cd /pro/DeepRec/tianchi
-python run_models.py
 
 #
-echo "> Run"
+echo 
+echo "> END"
 
 ```
