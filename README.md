@@ -289,6 +289,14 @@ docker rm tianchi_test
 #     alideeprec/deeprec-tianchi:deeprec-cpu-py36-ubuntu18.04 \
 #     bash /pro/pro.sh
 
+docker run -ti \
+    --name=tianchi_test \
+    --net=host \
+    -v $mainp/pro:/pro \
+    -v $mainp/pkg:/pkg \
+    alideeprec/deeprec-tianchi-bazel-cache:deeprec-cpu-py36-ubuntu18.04 \
+    bash /pro/pro.sh
+
 echo $(date "+%Y-%m-%d %H:%M:%S")
 
 
