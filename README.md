@@ -240,11 +240,12 @@ echo "> Run"
 
 clear
 
-mainp=/root/proj/code/DeepRec-CTR
+devp=/root/data/code/iDeepRec
+mainp=/root/data/code/DeepRec
 
 # 
 echo "> Git"
-cd dev/iDeepRec
+cd $devp
 git pull
 
 # 
@@ -252,8 +253,9 @@ echo
 echo "> Start"
 cd $mainp
 rm -rf pro/DeepRec
-cp -r dev/iDeepRec pro/DeepRec
+cp -r $devp pro/DeepRec
 tree -L 2
+
 
 
 # docker
