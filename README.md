@@ -168,15 +168,13 @@ Join the Official Discussion Group on DingTalk
 
 ## iDeepRec
 ```
-├── cache
-│   ├── bazel
-│   └── pip
-├── dev
-│   └── iDeepRec
+code/iDeepRec/ (git dev)
+
+code/DeepRec/
 ├── pkg
 │   └── tensorflow_pkg
 ├── pro
-│   ├── DeepRec
+│   ├── DeepRec (dev`copy pro)
 │   ├── pro_log
 │   ├── pro.sh
 │   └── run.sh
