@@ -110,7 +110,7 @@ Status ModelConfigFactory::Create(const char* model_config, ModelConfig** config
     (*config)->intra_threads =
       json_config["intra_op_parallelism_threads"].asInt();
   } else {
-    (*config)->intra_threads = schedule_threads / (8/4); // 2
+    (*config)->intra_threads = schedule_threads / (8/8); // 2
   }
 
   if (!json_config["init_timeout_minutes"].isNull()) {
