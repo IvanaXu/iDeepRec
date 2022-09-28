@@ -103,7 +103,7 @@ Status ModelConfigFactory::Create(const char* model_config, ModelConfig** config
     (*config)->inter_threads =
       json_config["inter_op_parallelism_threads"].asInt();
   } else {
-    (*config)->inter_threads = schedule_threads / (8/7); // 2
+    (*config)->inter_threads = schedule_threads / (8/1); // 2
   }
 
   if (!json_config["intra_op_parallelism_threads"].isNull()) {
