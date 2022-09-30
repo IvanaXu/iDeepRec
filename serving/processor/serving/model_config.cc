@@ -103,14 +103,14 @@ Status ModelConfigFactory::Create(const char* model_config, ModelConfig** config
     (*config)->inter_threads =
       json_config["inter_op_parallelism_threads"].asInt();
   } else {
-    (*config)->inter_threads = schedule_threads / (8/3); // 2
+    (*config)->inter_threads = schedule_threads / (8/2); // 2
   }
 
   if (!json_config["intra_op_parallelism_threads"].isNull()) {
     (*config)->intra_threads =
       json_config["intra_op_parallelism_threads"].asInt();
   } else {
-    (*config)->intra_threads = schedule_threads / (8/3); // 2
+    (*config)->intra_threads = schedule_threads / (8/2); // 2
   }
 
   if (!json_config["init_timeout_minutes"].isNull()) {
