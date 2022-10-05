@@ -551,6 +551,8 @@ def main(tf_config=None, server=None):
 
     # Session config
     sess_config = tf.ConfigProto()
+    if tf_config:
+        sess_config.device_filters.append("/job:ps")
     sess_config.inter_op_parallelism_threads = args.inter
     sess_config.intra_op_parallelism_threads = args.intra
 
@@ -817,4 +819,5 @@ if __name__ == '__main__':
         main()
     else:
         tf_config, server, tf_device = generate_cluster_info(TF_CONFIG)
-        main(tf_config, server)
+        with tf_device:
+            main(tf_config, server)

@@ -31,7 +31,7 @@ namespace tensorflow {
 namespace processor {
 
 const int MANAGER_MAX_THREAD_NUM = 96; // 96
-const int MANAGER_MAX_UPDATE_THREAD_NUM = 96; // 16
+const int MANAGER_MAX_UPDATE_THREAD_NUM = 16; // 16
 
 // TODO: should offered later
 struct SparseTask {
