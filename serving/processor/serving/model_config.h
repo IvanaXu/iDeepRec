@@ -2,6 +2,7 @@
 #define SERVING_PROCESSOR_SERVING_MODEL_CONFIG_H
 
 #include <string>
+#include "tensorflow/core/framework/embedding/config.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 
 namespace tensorflow {
@@ -9,6 +10,7 @@ namespace processor {
 struct ModelConfig {
 
   // Model Info
+  bool enable_incr_model_update = true;
   std::string checkpoint_dir;
   std::string savedmodel_dir;
   std::string signature_name;
@@ -45,15 +47,20 @@ struct ModelConfig {
 
   // session num of session group,
   // default num is 1
-  int session_num = 1; // 1
+  int session_num = 1;
   // In multi-session mode, we have two policy for
   // select session for each thread.
   // "RR": Round-Robin policy, threads will use all sessions in Round-Robin way
   // "MOD": Thread select session according unique id, uid % session_num
-  std::string select_session_policy = "MOD"; // MOD
+  std::string select_session_policy = "MOD";
 
   // session use self-owned thread pool
   bool use_per_session_threads = false;
+
+  // EmbeddingVariable Config
+  embedding::StorageType storage_type = embedding::StorageType::INVALID;
+  std::string storage_path;
+  std::vector<int64> storage_size;
 };
 
 class ModelConfigFactory {
