@@ -9,7 +9,7 @@ result_dir = "/tmp/tianchi/result/"
 def run_models():
     models_dir = '/tianchi/models/'
     models_name = ['DIEN', 'DIN', 'DLRM', 'DeepFM', 'MMoE', 'WDL']
-    models_name = ['DIEN']
+    # models_name = ['DIEN']
     model_standard_auc =  {
                   'DIEN': 0.745,
                   'DIN': 0.707,
