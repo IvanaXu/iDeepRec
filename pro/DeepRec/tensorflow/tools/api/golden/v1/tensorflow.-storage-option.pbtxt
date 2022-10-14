@@ -1,0 +1,9 @@
+path: "tensorflow.StorageOption"
+tf_class {
+  is_instance: "<class \'tensorflow.python.ops.variables.StorageOption\'>"
+  is_instance: "<type \'object\'>"
+  member_method {
+    name: "__init__"
+    argspec: "args=[\'self\', \'storage_type\', \'storage_path\', \'storage_size\'], varargs=None, keywords=None, defaults=[\'None\', \'None\', \'[1073741824, 1073741824, 1073741824, 1073741824]\'], "
+  }
+}
