@@ -7,7 +7,7 @@ mainp=/root/data/code/iDeepRec
 
 # 
 echo "> Git"
-cd $devp
+cd $mainp
 git pull
 
 # 
