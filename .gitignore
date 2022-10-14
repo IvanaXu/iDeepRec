@@ -1,3 +1,4 @@
 # 
-pkg/tensorflow_pkg
+pkg/tensorflow_pkg/*.whl
+pkg/tensorflow_pkg/*.zip
 
