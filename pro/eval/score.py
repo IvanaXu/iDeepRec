@@ -5,7 +5,7 @@ N = 5
 result = []
 for n in range(1, N+1):
     _r = "{}"
-    with open(f"../log/run-whl-epoch{n}.log", "r") as f:
+    with open(f"/pro/log/run-whl-epoch{n}.log", "r") as f:
         for i in f:
             i = i.strip("\n")
             if "score" in i:
