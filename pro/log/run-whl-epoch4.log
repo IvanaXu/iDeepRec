@@ -46,30 +46,30 @@ Uninstalling tensorflow-1.15.5+deeprec2206:
   Successfully uninstalled tensorflow-1.15.5+deeprec2206
 Looking in indexes: http://mirrors.aliyun.com/pypi/simple/
 Processing /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
-Requirement already satisfied: opt-einsum>=2.3.2 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (3.3.0)
+Requirement already satisfied: astunparse==1.6.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.6.3)
 Requirement already satisfied: protobuf>=3.6.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (4.21.0)
-Requirement already satisfied: keras-preprocessing>=1.0.5 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.2)
-Requirement already satisfied: keras-applications>=1.0.8 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.0.8)
-Requirement already satisfied: tensorboard<1.16.0,>=1.15.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.0)
+Requirement already satisfied: wrapt>=1.11.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.14.1)
 Requirement already satisfied: grpcio>=1.8.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.47.0)
 Requirement already satisfied: wheel>=0.26 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.37.1)
-Requirement already satisfied: astor==0.8.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.8.1)
-Requirement already satisfied: termcolor>=1.1.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
-Requirement already satisfied: numpy<1.19.0,>=1.16.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.18.5)
-Requirement already satisfied: wrapt>=1.11.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.14.1)
-Requirement already satisfied: astunparse==1.6.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.6.3)
-Requirement already satisfied: h5py<=2.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (2.10.0)
-Requirement already satisfied: google-pasta>=0.1.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.2.0)
-Requirement already satisfied: gast==0.3.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.3.3)
-Requirement already satisfied: six>=1.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.16.0)
-Requirement already satisfied: absl-py>=0.9.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
 Requirement already satisfied: tensorflow-estimator<1.15.5,>=1.15.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.2)
-Requirement already satisfied: werkzeug>=0.11.15 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (2.0.3)
+Requirement already satisfied: keras-preprocessing>=1.0.5 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.2)
+Requirement already satisfied: tensorboard<1.16.0,>=1.15.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.0)
+Requirement already satisfied: h5py<=2.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (2.10.0)
+Requirement already satisfied: opt-einsum>=2.3.2 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (3.3.0)
+Requirement already satisfied: termcolor>=1.1.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
+Requirement already satisfied: keras-applications>=1.0.8 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.0.8)
+Requirement already satisfied: gast==0.3.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.3.3)
+Requirement already satisfied: numpy<1.19.0,>=1.16.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.18.5)
+Requirement already satisfied: absl-py>=0.9.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
+Requirement already satisfied: astor==0.8.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.8.1)
+Requirement already satisfied: six>=1.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.16.0)
+Requirement already satisfied: google-pasta>=0.1.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.2.0)
 Requirement already satisfied: markdown>=2.6.8 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.3.7)
+Requirement already satisfied: werkzeug>=0.11.15 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (2.0.3)
 Requirement already satisfied: setuptools>=41.0.0 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (59.6.0)
 Requirement already satisfied: importlib-metadata>=4.4 in /home/pai/lib/python3.6/site-packages (from markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (4.8.3)
-Requirement already satisfied: zipp>=0.5 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.6.0)
 Requirement already satisfied: typing-extensions>=3.6.4 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (4.1.1)
+Requirement already satisfied: zipp>=0.5 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.6.0)
 Requirement already satisfied: dataclasses in /home/pai/lib/python3.6/site-packages (from werkzeug>=0.11.15->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (0.8)
 Installing collected packages: tensorflow
 Successfully installed tensorflow-1.15.5+deeprec2206
@@ -81,13 +81,13 @@ Numbers of training dataset is 1086120
 Numbers of test dataset is 121216
 The training steps is 2700
 The testing steps is 237
-Saving model checkpoints to ./result/model_DIEN_1665806973
+Saving model checkpoints to ./result/model_DIEN_1665812903
 Training completed.
 Evaluation complate:[100/237]
 Evaluation complate:[200/237]
 Evaluation complate:[237/237]
-ACC = 0.6794235110282898
-AUC = 0.7513569593429565
-Total Time: 395.13760324800387 (s)
-{'DIEN (s)': '395.13760324800387', 'DIEN_auc': '0.75135696', 'score': '395.13760324800387'}
+ACC = 0.6791760325431824
+AUC = 0.7512194514274597
+Total Time: 393.14544891100377 (s)
+{'DIEN (s)': '393.14544891100377', 'DIEN_auc': '0.75121945', 'score': '393.14544891100377'}
 > Run
