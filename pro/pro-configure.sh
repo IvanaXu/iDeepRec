@@ -1,1 +1,1 @@
-sh /pro/run-configure.sh|tee /pro/pro_log/run-configure.log
+sh /pro/run-configure.sh|tee /pro/log/run-configure.log
