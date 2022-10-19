@@ -52,7 +52,7 @@ struct ModelConfig {
   // select session for each thread.
   // "RR": Round-Robin policy, threads will use all sessions in Round-Robin way
   // "MOD": Thread select session according unique id, uid % session_num
-  std::string select_session_policy = "RR";
+  std::string select_session_policy = "MOD";
 
   // session use self-owned thread pool
   bool use_per_session_threads = false;
