@@ -1,0 +1,43 @@
+
+> Run
+
+>> STEP@1
+total 236
+-rw-r--r--  1 root root  2219 Oct 19 09:04 ACKNOWLEDGMENTS
+-rw-r--r--  1 root root   542 Oct 19 09:04 ADOPTERS.md
+-rw-r--r--  1 root root   349 Oct 19 09:04 AUTHORS
+-rw-r--r--  1 root root   122 Oct 19 09:04 BUILD
+-rw-r--r--  1 root root  5293 Oct 19 09:04 CODE_OF_CONDUCT.md
+-rw-r--r--  1 root root  9339 Oct 19 09:04 CONTRIBUTING.md
+-rw-r--r--  1 root root   598 Oct 19 09:04 ISSUES.md
+-rw-r--r--  1 root root  2088 Oct 19 09:04 ISSUE_TEMPLATE.md
+-rw-r--r--  1 root root 11419 Oct 19 09:04 LICENSE
+-rw-r--r--  1 root root 11642 Oct 19 09:04 README.md
+-rw-r--r--  1 root root  1666 Oct 19 09:04 RELEASE.md
+-rw-r--r--  1 root root 11443 Oct 19 09:04 WORKSPACE
+-rw-r--r--  1 root root  1218 Oct 19 09:04 arm_compiler.BUILD
+lrwxrwxrwx  1 root root    87 Oct 19 09:04 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
+lrwxrwxrwx  1 root root   108 Oct 19 09:04 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx  1 root root   108 Oct 19 09:04 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx  1 root root    97 Oct 19 09:04 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
+lrwxrwxrwx  1 root root   113 Oct 19 09:04 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
+drwxr-xr-x  6 root root  4096 Oct 19 09:04 cibuild
+-rwxr-xr-x  1 root root   380 Oct 19 09:04 configure
+-rw-r--r--  1 root root   780 Oct 19 09:04 configure.cmd
+-rw-r--r--  1 root root 58216 Oct 19 09:04 configure.py
+drwxr-xr-x 16 root root  4096 Oct 19 09:04 docs
+-rw-r--r--  1 root root     8 Oct 19 09:04 git_pull.sh
+-rw-r--r--  1 root root    55 Oct 19 09:04 git_reset_pull.sh
+-rw-r--r--  1 root root   328 Oct 19 09:04 models.BUILD
+drwxr-xr-x 19 root root  4096 Oct 19 09:04 modelzoo
+drwxr-xr-x  2 root root  4096 Oct 19 09:04 scripts
+drwxr-xr-x  6 root root  4096 Oct 19 09:04 serving
+drwxr-xr-x  9 root root  4096 Oct 19 09:04 sparse_operation_kit
+drwxr-xr-x 18 root root  4096 Oct 19 09:04 tensorflow
+drwxr-xr-x  3 root root  4096 Oct 19 09:04 tests
+drwxr-xr-x 43 root root  4096 Oct 19 09:04 third_party
+drwxr-xr-x  8 root root  4096 Oct 19 09:04 tianchi
+drwxr-xr-x  3 root root  4096 Oct 19 09:04 tools
+drwxr-xr-x  2 root root  4096 Oct 19 09:04 triton
+
+>> STEP@5
