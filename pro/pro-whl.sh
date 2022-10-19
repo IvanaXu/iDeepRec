@@ -7,4 +7,4 @@ sh /pro/run-whl.sh|tee /pro/log/run-whl-epoch4-$1.log
 sh /pro/run-whl.sh|tee /pro/log/run-whl-epoch5-$1.log
 
 # 
-python /pro/eval/score.py
+python /pro/eval/score.py $1
