@@ -59,7 +59,7 @@ docker run -ti \
     -v $mainp/pro:/pro \
     -v $mainp/pkg:/pkg \
     alideeprec/deeprec-tianchi-bazel-cache:deeprec-cpu-py36-ubuntu18.04 \
-    bash /pro/pro-whl.sh
+    bash /pro/pro-whl.sh $1
 
 echo $(date "+%Y-%m-%d %H:%M:%S")
 
