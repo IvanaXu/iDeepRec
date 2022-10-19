@@ -2,43 +2,43 @@
 > Run
 
 >> STEP@1
-total 236
--rw-r--r--  1 root root  2219 Oct 14 14:54 ACKNOWLEDGMENTS
--rw-r--r--  1 root root   542 Oct 14 14:54 ADOPTERS.md
--rw-r--r--  1 root root   349 Oct 14 14:54 AUTHORS
--rw-r--r--  1 root root   122 Oct 14 14:54 BUILD
--rw-r--r--  1 root root  5293 Oct 14 14:54 CODE_OF_CONDUCT.md
--rw-r--r--  1 root root  9339 Oct 14 14:54 CONTRIBUTING.md
--rw-r--r--  1 root root   598 Oct 14 14:54 ISSUES.md
--rw-r--r--  1 root root  2088 Oct 14 14:54 ISSUE_TEMPLATE.md
--rw-r--r--  1 root root 11419 Oct 14 14:54 LICENSE
--rw-r--r--  1 root root 11642 Oct 14 14:54 README.md
--rw-r--r--  1 root root  1666 Oct 14 14:54 RELEASE.md
--rw-r--r--  1 root root 11443 Oct 14 14:54 WORKSPACE
--rw-r--r--  1 root root  1218 Oct 14 14:54 arm_compiler.BUILD
-lrwxrwxrwx  1 root root    87 Oct 14 15:13 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
-lrwxrwxrwx  1 root root   108 Oct 14 15:13 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
-lrwxrwxrwx  1 root root   108 Oct 14 15:13 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
-lrwxrwxrwx  1 root root    97 Oct 14 15:13 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
-lrwxrwxrwx  1 root root   113 Oct 14 15:13 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
-drwxr-xr-x  6 root root  4096 Oct 14 14:54 cibuild
--rwxr-xr-x  1 root root   380 Oct 14 14:54 configure
--rw-r--r--  1 root root   780 Oct 14 14:54 configure.cmd
--rw-r--r--  1 root root 58216 Oct 14 14:54 configure.py
-drwxr-xr-x 16 root root  4096 Oct 14 14:54 docs
--rw-r--r--  1 root root     8 Oct 14 14:54 git_pull.sh
--rw-r--r--  1 root root    55 Oct 14 14:54 git_reset_pull.sh
--rw-r--r--  1 root root   328 Oct 14 14:54 models.BUILD
-drwxr-xr-x 19 root root  4096 Oct 14 14:54 modelzoo
-drwxr-xr-x  2 root root  4096 Oct 14 14:54 scripts
-drwxr-xr-x  6 root root  4096 Oct 14 14:54 serving
-drwxr-xr-x  9 root root  4096 Oct 14 14:54 sparse_operation_kit
-drwxr-xr-x 18 root root  4096 Oct 14 14:54 tensorflow
-drwxr-xr-x  3 root root  4096 Oct 14 14:54 tests
-drwxr-xr-x 43 root root  4096 Oct 14 14:54 third_party
-drwxr-xr-x  8 root root  4096 Oct 15 06:26 tianchi
-drwxr-xr-x  3 root root  4096 Oct 14 15:12 tools
-drwxr-xr-x  2 root root  4096 Oct 14 14:54 triton
+total 196
+-rw-r--r--  1 root root  2219 Oct 19 13:44 ACKNOWLEDGMENTS
+-rw-r--r--  1 root root   542 Oct 19 13:44 ADOPTERS.md
+-rw-r--r--  1 root root   349 Oct 19 13:44 AUTHORS
+-rw-r--r--  1 root root   122 Oct 19 13:44 BUILD
+-rw-r--r--  1 root root  5293 Oct 19 13:44 CODE_OF_CONDUCT.md
+-rw-r--r--  1 root root  9339 Oct 19 13:44 CONTRIBUTING.md
+-rw-r--r--  1 root root   598 Oct 19 13:44 ISSUES.md
+-rw-r--r--  1 root root  2088 Oct 19 13:44 ISSUE_TEMPLATE.md
+-rw-r--r--  1 root root 11419 Oct 19 13:44 LICENSE
+-rw-r--r--  1 root root 11642 Oct 19 13:44 README.md
+-rw-r--r--  1 root root  1666 Oct 19 13:44 RELEASE.md
+-rw-r--r--  1 root root 11443 Oct 19 13:44 WORKSPACE
+-rw-r--r--  1 root root  1218 Oct 19 13:44 arm_compiler.BUILD
+lrwxrwxrwx  1 root root    87 Oct 19 13:44 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
+lrwxrwxrwx  1 root root   108 Oct 19 13:44 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx  1 root root   108 Oct 19 13:44 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx  1 root root    97 Oct 19 13:44 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
+lrwxrwxrwx  1 root root   113 Oct 19 13:44 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
+drwxr-xr-x  6 root root  4096 Oct 19 13:44 cibuild
+-rwxr-xr-x  1 root root   380 Oct 19 13:44 configure
+-rw-r--r--  1 root root   780 Oct 19 13:44 configure.cmd
+-rw-r--r--  1 root root 58216 Oct 19 13:44 configure.py
+drwxr-xr-x 16 root root  4096 Oct 19 13:44 docs
+-rw-r--r--  1 root root     8 Oct 19 13:44 git_pull.sh
+-rw-r--r--  1 root root    55 Oct 19 13:44 git_reset_pull.sh
+-rw-r--r--  1 root root   328 Oct 19 13:44 models.BUILD
+drwxr-xr-x 19 root root  4096 Oct 19 13:44 modelzoo
+drwxr-xr-x  2 root root    42 Oct 19 13:44 scripts
+drwxr-xr-x  6 root root    99 Oct 19 13:44 serving
+drwxr-xr-x  9 root root  4096 Oct 19 13:44 sparse_operation_kit
+drwxr-xr-x 18 root root  4096 Oct 19 13:44 tensorflow
+drwxr-xr-x  3 root root    29 Oct 19 13:44 tests
+drwxr-xr-x 43 root root  4096 Oct 19 13:44 third_party
+drwxr-xr-x  8 root root    99 Oct 19 13:44 tianchi
+drwxr-xr-x  3 root root    87 Oct 19 13:44 tools
+drwxr-xr-x  2 root root   118 Oct 19 13:44 triton
 
 >> STEP@2
 You have bazel 0.26.1 installed.
@@ -79,11 +79,11 @@ Configuration finished
 >> STEP@3
 
 >> STEP@4
-Tue Oct 18 21:25:36 UTC 2022 : === Preparing sources in dir: /tmp/tmp.BnRrEGJMEC
+Wed Oct 19 14:47:11 UTC 2022 : === Preparing sources in dir: /tmp/tmp.4TfDU4yGZ4
 /pro/DeepRec /pro/DeepRec
 /pro/DeepRec
-/tmp/tmp.BnRrEGJMEC/tensorflow/include /pro/DeepRec
+/tmp/tmp.4TfDU4yGZ4/tensorflow/include /pro/DeepRec
 /pro/DeepRec
-Tue Oct 18 21:25:42 UTC 2022 : === Building wheel
-Tue Oct 18 21:26:05 UTC 2022 : === Output wheel file is in: /pkg/tensorflow_pkg
+Wed Oct 19 14:47:20 UTC 2022 : === Building wheel
+Wed Oct 19 14:47:49 UTC 2022 : === Output wheel file is in: /pkg/tensorflow_pkg
 > Run
