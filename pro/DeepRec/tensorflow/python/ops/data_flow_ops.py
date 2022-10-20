@@ -14,13 +14,18 @@
 #==============================================================================
 """Data Flow Operations."""
 # pylint: disable=g-bad-name
-import functools
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import hashlib
 import threading
 
+import six
+
+from tensorflow.python.compat import compat
 from tensorflow.python.eager import context
 from tensorflow.python.framework import dtypes as _dtypes
-from tensorflow.python.framework import indexed_slices
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import tensor_shape
@@ -69,18 +74,17 @@ def _as_shape_list(shapes,
     shapes = [shapes]
   if not isinstance(shapes, (tuple, list)):
     raise TypeError(
-        "Shapes must be a TensorShape or a list or tuple of TensorShapes, "
-        f"got {type(shapes)} instead.")
+        "shapes must be a TensorShape or a list or tuple of TensorShapes.")
   if all(shape is None or isinstance(shape, int) for shape in shapes):
     # We have a single shape.
     shapes = [shapes]
   shapes = [tensor_shape.as_shape(shape) for shape in shapes]
   if not unknown_dim_allowed:
     if any(not shape.is_fully_defined() for shape in shapes):
-      raise ValueError(f"All shapes must be fully defined: {shapes}")
+      raise ValueError("All shapes must be fully defined: %s" % shapes)
   if not unknown_rank_allowed:
-    if any(shape.dims is None for shape in shapes):
-      raise ValueError(f"All shapes must have a defined rank: {shapes}")
+    if any([shape.dims is None for shape in shapes]):
+      raise ValueError("All shapes must have a defined rank: %s" % shapes)
 
   return shapes
 
@@ -92,8 +96,7 @@ def _as_name_list(names, dtypes):
     names = [names]
   if len(names) != len(dtypes):
     raise ValueError("List of names must have the same length as the list "
-                     f"of dtypes, received len(names)={len(names)},"
-                     f"len(dtypes)={len(dtypes)}")
+                     "of dtypes")
   return list(names)
 
 
@@ -114,7 +117,7 @@ def _shape_common(s1, s2):
 @tf_export("queue.QueueBase",
            v1=["queue.QueueBase", "io.QueueBase", "QueueBase"])
 @deprecation.deprecated_endpoints(["io.QueueBase", "QueueBase"])
-class QueueBase:
+class QueueBase(object):
   """Base class for queue implementations.
 
   A queue is a TensorFlow data structure that stores tensors across
@@ -158,22 +161,18 @@ class QueueBase:
     self._dtypes = dtypes
     if shapes is not None:
       if len(shapes) != len(dtypes):
-        raise ValueError("Queue shapes must have the same length as dtypes, "
-                         f"received len(shapes)={len(shapes)}, "
-                         f"len(dtypes)={len(dtypes)}")
+        raise ValueError("Queue shapes must have the same length as dtypes")
       self._shapes = [tensor_shape.TensorShape(s) for s in shapes]
     else:
       self._shapes = [tensor_shape.unknown_shape() for _ in self._dtypes]
     if names is not None:
       if len(names) != len(dtypes):
-        raise ValueError("Queue names must have the same length as dtypes,"
-                         f"received len(names)={len(names)},"
-                         f"len {len(dtypes)}")
+        raise ValueError("Queue names must have the same length as dtypes")
       self._names = names
     else:
       self._names = None
     self._queue_ref = queue_ref
-    if isinstance(queue_ref, ops.EagerTensor):
+    if context.executing_eagerly():
       if context.context().scope_name:
         self._name = context.context().scope_name
       else:
@@ -213,7 +212,7 @@ class QueueBase:
 
     queue_shapes = [q.shapes for q in queues]
     reduced_shapes = [
-        functools.reduce(_shape_common, s) for s in zip(*queue_shapes)
+        six.moves.reduce(_shape_common, s) for s in zip(*queue_shapes)
     ]
 
     queue_refs = array_ops.stack([x.queue_ref for x in queues])
@@ -276,8 +275,8 @@ class QueueBase:
         raise ValueError("Queue must have names to enqueue a dictionary")
       if sorted(self._names, key=str) != sorted(vals.keys(), key=str):
         raise ValueError("Keys in dictionary to enqueue do not match "
-                         f"names of Queue.  Dictionary: {sorted(vals.keys())},"
-                         f"Queue: {sorted(self._names)}")
+                         "names of Queue.  Dictionary: (%s), Queue: (%s)" %
+                         (sorted(vals.keys()), sorted(self._names)))
       # The order of values in `self._names` indicates the order in which the
       # tensors in the dictionary `vals` must be listed.
       vals = [vals[k] for k in self._names]
@@ -756,92 +755,14 @@ class FIFOQueue(QueueBase):
     dtypes = _as_type_list(dtypes)
     shapes = _as_shape_list(shapes, dtypes)
     names = _as_name_list(names, dtypes)
-    with ops.init_scope(), ops.device("CPU"):
-      queue_ref = gen_data_flow_ops.fifo_queue_v2(
-          component_types=dtypes,
-          shapes=shapes,
-          capacity=capacity,
-          shared_name=_shared_name(shared_name),
-          name=name)
+    queue_ref = gen_data_flow_ops.fifo_queue_v2(
+        component_types=dtypes,
+        shapes=shapes,
+        capacity=capacity,
+        shared_name=_shared_name(shared_name),
+        name=name)
 
     super(FIFOQueue, self).__init__(dtypes, shapes, names, queue_ref)
-
-
-# TODO(allenl): If GPU-compatible queues turn out to be useful, we should
-# implement GPU kernels for EnqueueMany and DequeueMany so we can make the
-# public FIFOQueue GPU-compatible and remove this internal version.
-class GPUCompatibleFIFOQueue(QueueBase):
-  """A queue implementation that dequeues elements in first-in first-out order.
-
-  GPUCompatibleFIFOQueue is like FIFOQueue, but the queue resource may be placed
-  either on a CPU or on a GPU. It is not cross-device: enqueues and dequeues
-  will be colocated with the queue resource. GPUCompatibleFIFOQueue only
-  supports enqueue and dequeue at the moment, not enqueue_many or dequeue_many.
-
-  See `tf.queue.QueueBase` for a description of the methods on this class.
-  """
-
-  def __init__(self,
-               capacity,
-               dtypes,
-               shapes=None,
-               names=None,
-               shared_name=None,
-               name="fifo_queue"):
-    """Creates a queue that dequeues elements in a first-in first-out order.
-
-    A `FIFOQueue` has bounded capacity; supports multiple concurrent
-    producers and consumers; and provides exactly-once delivery.
-
-    A `FIFOQueue` holds a list of up to `capacity` elements. Each
-    element is a fixed-length tuple of tensors whose dtypes are
-    described by `dtypes`, and whose shapes are optionally described
-    by the `shapes` argument.
-
-    If the `shapes` argument is specified, each component of a queue
-    element must have the respective fixed shape. If it is
-    unspecified, different queue elements may have different shapes,
-    but the use of `dequeue_many` is disallowed.
-
-    Args:
-      capacity: An integer. The upper bound on the number of elements
-        that may be stored in this queue.
-      dtypes:  A list of `DType` objects. The length of `dtypes` must equal
-        the number of tensors in each queue element.
-      shapes: (Optional.) A list of fully-defined `TensorShape` objects
-        with the same length as `dtypes`, or `None`.
-      names: (Optional.) A list of string naming the components in the queue
-        with the same length as `dtypes`, or `None`.  If specified the dequeue
-        methods return a dictionary with the names as keys.
-      shared_name: (Optional.) If non-empty, this queue will be shared under
-        the given name across multiple sessions.
-      name: Optional name for the queue operation.
-    """
-    dtypes = _as_type_list(dtypes)
-    shapes = _as_shape_list(shapes, dtypes)
-    names = _as_name_list(names, dtypes)
-    with ops.init_scope():
-      queue_ref = gen_data_flow_ops.fifo_queue_v2(
-          component_types=dtypes,
-          shapes=shapes,
-          capacity=capacity,
-          shared_name=_shared_name(shared_name),
-          name=name)
-
-    super(GPUCompatibleFIFOQueue, self).__init__(
-        dtypes, shapes, names, queue_ref)
-
-  def enqueue_many(self, vals, name=None):
-    """enqueue_many is not supported on GPUCompatibleFIFOQueue."""
-    raise NotImplementedError(
-        "GPUCompatibleFIFOQueue does not support enqueue_many or dequeue_many, "
-        "only enqueue and dequeue.")
-
-  def dequeue_many(self, n, name=None):
-    """dequeue_many is not supported on GPUCompatibleFIFOQueue."""
-    raise NotImplementedError(
-        "GPUCompatibleFIFOQueue does not support enqueue_many or dequeue_many, "
-        "only enqueue and dequeue.")
 
 
 @tf_export(
@@ -908,8 +829,9 @@ class PaddingFIFOQueue(QueueBase):
     names = _as_name_list(names, dtypes)
     if len(dtypes) != len(shapes):
       raise ValueError("Shapes must be provided for all components, "
-                       f"but received {len(dtypes)} dtypes and "
-                       f"{len(shapes)} shapes.")
+                       "but received %d dtypes and %d shapes." % (len(dtypes),
+                                                                  len(shapes)))
+
     queue_ref = gen_data_flow_ops.padding_fifo_queue_v2(
         component_types=dtypes,
         shapes=shapes,
@@ -992,7 +914,7 @@ class PriorityQueue(QueueBase):
 # TODO(josh11b): class BatchQueue(QueueBase):
 
 
-class Barrier:
+class Barrier(object):
   """Represents a key-value map that persists across graph executions."""
 
   def __init__(self, types, shapes=None, shared_name=None, name="barrier"):
@@ -1061,7 +983,7 @@ class Barrier:
       for i, shape in enumerate(self._shapes):
         if shape.num_elements() == 0:
           raise ValueError("Empty tensors are not supported, but received "
-                           f"shape '{shape}' at index {i}")
+                           "shape '%s' at index %d" % (shape, i))
     else:
       self._shapes = [tensor_shape.unknown_shape() for _ in self._types]
 
@@ -1238,7 +1160,7 @@ class Barrier:
 
 
 @tf_export(v1=["ConditionalAccumulatorBase"])
-class ConditionalAccumulatorBase:
+class ConditionalAccumulatorBase(object):
   """A conditional accumulator for aggregating gradients.
 
   Up-to-date gradients (i.e., time step at which gradient was computed is
@@ -1295,7 +1217,11 @@ class ConditionalAccumulatorBase:
     if name is None:
       name = "%s_NumAccumulated" % self._name
 
-    return gen_data_flow_ops.resource_accumulator_num_accumulated(
+    if compat.forward_compatible(2019, 8, 8):
+      return gen_data_flow_ops.resource_accumulator_num_accumulated(
+          self._accumulator_ref, name=name)
+
+    return gen_data_flow_ops.accumulator_num_accumulated(
         self._accumulator_ref, name=name)
 
   def set_global_step(self, new_global_step, name=None):
@@ -1311,7 +1237,13 @@ class ConditionalAccumulatorBase:
     Returns:
       Operation that sets the accumulator's time step.
     """
-    return gen_data_flow_ops.resource_accumulator_set_global_step(
+    if compat.forward_compatible(2019, 8, 8):
+      return gen_data_flow_ops.resource_accumulator_set_global_step(
+          self._accumulator_ref,
+          math_ops.cast(ops.convert_to_tensor(new_global_step), _dtypes.int64),
+          name=name)
+
+    return gen_data_flow_ops.accumulator_set_global_step(
         self._accumulator_ref,
         math_ops.cast(ops.convert_to_tensor(new_global_step), _dtypes.int64),
         name=name)
@@ -1344,15 +1276,23 @@ class ConditionalAccumulator(ConditionalAccumulatorBase):
       name: Optional name for the accumulator.
       reduction_type: Reduction type to use when taking the gradient.
     """
-    accumulator_ref = gen_data_flow_ops.resource_conditional_accumulator(
-        dtype=dtype,
-        shape=shape,
-        shared_name=shared_name,
-        name=name,
-        reduction_type=reduction_type)
-    if context.executing_eagerly():
-      self._resource_deleter = resource_variable_ops.EagerResourceDeleter(
-          handle=accumulator_ref, handle_device=context.context().device_name)
+    if compat.forward_compatible(2019, 8, 8):
+      accumulator_ref = gen_data_flow_ops.resource_conditional_accumulator(
+          dtype=dtype,
+          shape=shape,
+          shared_name=shared_name,
+          name=name,
+          reduction_type=reduction_type)
+      if context.executing_eagerly():
+        self._resource_deleter = resource_variable_ops.EagerResourceDeleter(
+            handle=accumulator_ref, handle_device=context.context().device_name)
+    else:
+      accumulator_ref = gen_data_flow_ops.conditional_accumulator(
+          dtype=dtype,
+          shape=shape,
+          shared_name=shared_name,
+          name=name,
+          reduction_type=reduction_type)
 
     super(ConditionalAccumulator, self).__init__(dtype, shape, accumulator_ref)
 
@@ -1377,7 +1317,13 @@ class ConditionalAccumulator(ConditionalAccumulatorBase):
     grad.get_shape().assert_is_compatible_with(self._shape)
     local_step = math_ops.cast(ops.convert_to_tensor(local_step), _dtypes.int64)
 
-    return gen_data_flow_ops.resource_accumulator_apply_gradient(
+    if compat.forward_compatible(2019, 8, 8):
+      return gen_data_flow_ops.resource_accumulator_apply_gradient(
+          self._accumulator_ref,
+          local_step=local_step,
+          gradient=grad,
+          name=name)
+    return gen_data_flow_ops.accumulator_apply_gradient(
         self._accumulator_ref, local_step=local_step, gradient=grad, name=name)
 
   def take_grad(self, num_required, name=None):
@@ -1402,8 +1348,12 @@ class ConditionalAccumulator(ConditionalAccumulatorBase):
     Raises:
       InvalidArgumentError: If num_required < 1
     """
-    out = gen_data_flow_ops.resource_accumulator_take_gradient(
-        self._accumulator_ref, num_required, dtype=self._dtype, name=name)
+    if compat.forward_compatible(2019, 8, 8):
+      out = gen_data_flow_ops.resource_accumulator_take_gradient(
+          self._accumulator_ref, num_required, dtype=self._dtype, name=name)
+    else:
+      out = gen_data_flow_ops.accumulator_take_gradient(
+          self._accumulator_ref, num_required, dtype=self._dtype, name=name)
     out.set_shape(self._shape)
     return out
 
@@ -1435,13 +1385,22 @@ class SparseConditionalAccumulator(ConditionalAccumulatorBase):
                shape=None,
                shared_name=None,
                name="sparse_conditional_accumulator",
-               reduction_type="MEAN"):
-    accumulator_ref = gen_data_flow_ops.sparse_conditional_accumulator(
-        dtype=dtype,
-        shape=shape,
-        shared_name=shared_name,
-        name=name,
-        reduction_type=reduction_type)
+               reduction_type="MEAN",
+               accumulator_type="multi_map"):
+    if accumulator_type == "multi_map":
+      accumulator_ref = gen_data_flow_ops.sparse_conditional_accumulator_multi_map(
+          dtype=dtype,
+          shape=shape,
+          shared_name=shared_name,
+          name=name,
+          reduction_type=reduction_type)
+    else:
+      accumulator_ref = gen_data_flow_ops.sparse_conditional_accumulator(
+          dtype=dtype,
+          shape=shape,
+          shared_name=shared_name,
+          name=name,
+          reduction_type=reduction_type)
     super(SparseConditionalAccumulator, self).__init__(dtype, shape,
                                                        accumulator_ref)
 
@@ -1564,7 +1523,7 @@ class SparseConditionalAccumulator(ConditionalAccumulatorBase):
     """
     return_val = gen_data_flow_ops.sparse_accumulator_take_gradient(
         self._accumulator_ref, num_required, dtype=self._dtype, name=name)
-    return indexed_slices.IndexedSlices(
+    return ops.IndexedSlices(
         indices=return_val.indices,
         values=return_val.values,
         dense_shape=return_val.shape)
@@ -1604,7 +1563,7 @@ class SparseConditionalAccumulator(ConditionalAccumulatorBase):
         name=name)
 
 
-class BaseStagingArea:
+class BaseStagingArea(object):
   """Base class for Staging Areas."""
   _identifier = 0
   _lock = threading.Lock()
@@ -1619,10 +1578,10 @@ class BaseStagingArea:
     if shared_name is None:
       self._name = (
           ops.get_default_graph().unique_name(self.__class__.__name__))
-    elif isinstance(shared_name, str):
+    elif isinstance(shared_name, six.string_types):
       self._name = shared_name
     else:
-      raise ValueError(f"shared_name must be a string, got {shared_name}")
+      raise ValueError("shared_name must be a string")
 
     self._dtypes = dtypes
 
@@ -1700,7 +1659,7 @@ class BaseStagingArea:
 
     Returns:
       A (tensors, indices) tuple where `tensors` is a list of `Tensor` objects
-      and `indices` is a list of indices associated with the tensors.
+      and `indices` is a list of indices associed with the tensors.
 
     Raises:
       ValueError: If `vals` or `indices` is invalid.
@@ -1711,8 +1670,8 @@ class BaseStagingArea:
             "Staging areas must have names to enqueue a dictionary")
       if not set(vals.keys()).issubset(self._names):
         raise ValueError("Keys in dictionary to put do not match names "
-                         f"of staging area. Dictionary: {sorted(vals.keys())}"
-                         f"Queue: {sorted(self._names)}")
+                         "of staging area. Dictionary: (%s), Queue: (%s)" %
+                         (sorted(vals.keys()), sorted(self._names)))
       # The order of values in `self._names` indicates the order in which the
       # tensors in the dictionary `vals` must be listed.
       vals, indices, _ = zip(*[(vals[k], i, k)
@@ -1728,8 +1687,8 @@ class BaseStagingArea:
                          "of tensors")
 
       if len(indices) != len(vals):
-        raise ValueError(f"Number of indices {len(indices)} doesn't match "
-                         f"number of values {len(vals)}")
+        raise ValueError("Number of indices '%s' doesn't match "
+                         "number of values '%s'")
 
       if not isinstance(vals, (list, tuple)):
         vals = [vals]
@@ -1737,8 +1696,8 @@ class BaseStagingArea:
 
     # Sanity check number of values
     if not len(vals) <= len(self._dtypes):
-      raise ValueError(f"Unexpected number of inputs {len(vals)} vs "
-                       f"{len(self._dtypes)}")
+      raise ValueError("Unexpected number of inputs '%s' vs '%s'" %
+                       (len(vals), len(self._dtypes)))
 
     tensors = []
 
@@ -1746,9 +1705,9 @@ class BaseStagingArea:
       dtype, shape = self._dtypes[i], self._shapes[i]
       # Check dtype
       if val.dtype != dtype:
-        raise ValueError(f"Datatypes do not match. "
-                         f"Received val.dtype {str(val.dtype)} and "
-                         f"dtype {str(dtype)}")
+        raise ValueError("Datatypes do not match. '%s' != '%s'" %
+                         (str(val.dtype), str(dtype)))
+
       # Check shape
       val.get_shape().assert_is_compatible_with(shape)
 
@@ -1920,7 +1879,7 @@ class StagingArea(BaseStagingArea):
         values = [values]
 
       # Hard-code indices for this staging area
-      indices = list(range(len(values)))
+      indices = list(six.moves.range(len(values)))
       vals, _ = self._check_put_dtypes(values, indices)
 
       with ops.colocate_with(self._coloc_op):
@@ -1937,7 +1896,7 @@ class StagingArea(BaseStagingArea):
     with ops.colocate_with(self._coloc_op):
       ret = get_fn()
 
-    indices = list(range(len(self._dtypes)))  # Hard coded
+    indices = list(six.moves.range(len(self._dtypes)))  # Hard coded
     return self._get_return_value(ret, indices)
 
   def get(self, name=None):
@@ -2207,29 +2166,29 @@ class MapStagingArea(BaseStagingArea):
 
   def _get_indices_and_dtypes(self, indices=None):
     if indices is None:
-      indices = list(range(len(self._dtypes)))
+      indices = list(six.moves.range(len(self._dtypes)))
 
     if not isinstance(indices, (tuple, list)):
-      raise TypeError(f"Invalid indices type {type(indices)}")
+      raise TypeError("Invalid indices type '%s'" % type(indices))
 
     if len(indices) == 0:
       raise ValueError("Empty indices")
 
     if all(isinstance(i, str) for i in indices):
       if self._names is None:
-        raise ValueError(f"String indices provided {indices}, but "
-                         "this Staging Area was not created with names.")
+        raise ValueError("String indices provided '%s', but this Staging Area "
+                         "was not created with names." % indices)
 
       try:
         indices = [self._names.index(n) for n in indices]
       except ValueError:
-        raise ValueError(f"Named index not in "
-                         f"Staging Area names {self._names}")
+        raise ValueError("Named index '%s' not in "
+                         "Staging Area names '%s'" % (n, self._names))
     elif all(isinstance(i, int) for i in indices):
       pass
     else:
-      raise TypeError(f"Mixed types in indices {indices}. "
-                      "May only be str or int")
+      raise TypeError("Mixed types in indices '%s'. "
+                      "May only be str or int" % indices)
 
     dtypes = [self._dtypes[i] for i in indices]
 
@@ -2428,7 +2387,7 @@ class MapStagingArea(BaseStagingArea):
         memory_limit=self._memory_limit)
 
 
-class RecordInput:
+class RecordInput(object):
   """RecordInput asynchronously reads and randomly yields TFRecords.
 
   A RecordInput Op will continuously read a batch of records asynchronously
@@ -2509,7 +2468,7 @@ class RecordInput:
       return records
     else:
       with ops.name_scope(self._name):
-        batch_list = [[] for _ in range(self._batches)]
+        batch_list = [[] for _ in six.moves.range(self._batches)]
         records = array_ops.split(records, self._batch_size, 0)
         for index, protobuf in enumerate(records):
           batch_index = index % self._batches
