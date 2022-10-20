@@ -79,11 +79,11 @@ Configuration finished
 >> STEP@3
 
 >> STEP@4
-Wed Oct 19 14:47:11 UTC 2022 : === Preparing sources in dir: /tmp/tmp.4TfDU4yGZ4
+Thu Oct 20 18:58:39 UTC 2022 : === Preparing sources in dir: /tmp/tmp.SpzWwySXUQ
 /pro/DeepRec /pro/DeepRec
 /pro/DeepRec
-/tmp/tmp.4TfDU4yGZ4/tensorflow/include /pro/DeepRec
+/tmp/tmp.SpzWwySXUQ/tensorflow/include /pro/DeepRec
 /pro/DeepRec
-Wed Oct 19 14:47:20 UTC 2022 : === Building wheel
-Wed Oct 19 14:47:49 UTC 2022 : === Output wheel file is in: /pkg/tensorflow_pkg
+Thu Oct 20 18:58:48 UTC 2022 : === Building wheel
+Thu Oct 20 18:59:18 UTC 2022 : === Output wheel file is in: /pkg/tensorflow_pkg
 > Run
