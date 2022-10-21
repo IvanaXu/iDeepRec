@@ -46,30 +46,30 @@ Uninstalling tensorflow-1.15.5+deeprec2206:
   Successfully uninstalled tensorflow-1.15.5+deeprec2206
 Looking in indexes: http://mirrors.aliyun.com/pypi/simple/
 Processing /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
-Requirement already satisfied: tensorflow-estimator<1.15.5,>=1.15.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.2)
-Requirement already satisfied: astunparse==1.6.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.6.3)
 Requirement already satisfied: astor==0.8.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.8.1)
-Requirement already satisfied: keras-applications>=1.0.8 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.0.8)
+Requirement already satisfied: opt-einsum>=2.3.2 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (3.3.0)
+Requirement already satisfied: astunparse==1.6.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.6.3)
+Requirement already satisfied: keras-preprocessing>=1.0.5 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.2)
+Requirement already satisfied: tensorflow-estimator<1.15.5,>=1.15.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.2)
+Requirement already satisfied: six>=1.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.16.0)
 Requirement already satisfied: numpy<1.19.0,>=1.16.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.18.5)
 Requirement already satisfied: termcolor>=1.1.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
-Requirement already satisfied: protobuf>=3.6.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (4.21.0)
-Requirement already satisfied: google-pasta>=0.1.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.2.0)
-Requirement already satisfied: wrapt>=1.11.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.14.1)
-Requirement already satisfied: grpcio>=1.8.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.47.0)
-Requirement already satisfied: six>=1.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.16.0)
-Requirement already satisfied: keras-preprocessing>=1.0.5 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.2)
-Requirement already satisfied: wheel>=0.26 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.37.1)
-Requirement already satisfied: opt-einsum>=2.3.2 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (3.3.0)
-Requirement already satisfied: absl-py>=0.9.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
-Requirement already satisfied: gast==0.3.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.3.3)
 Requirement already satisfied: tensorboard<1.16.0,>=1.15.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.0)
 Requirement already satisfied: h5py<=2.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (2.10.0)
-Requirement already satisfied: setuptools>=41.0.0 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (59.6.0)
+Requirement already satisfied: grpcio>=1.8.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.47.0)
+Requirement already satisfied: absl-py>=0.9.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
+Requirement already satisfied: gast==0.3.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.3.3)
+Requirement already satisfied: google-pasta>=0.1.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.2.0)
+Requirement already satisfied: wrapt>=1.11.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.14.1)
+Requirement already satisfied: wheel>=0.26 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.37.1)
+Requirement already satisfied: keras-applications>=1.0.8 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.0.8)
+Requirement already satisfied: protobuf>=3.6.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (4.21.0)
 Requirement already satisfied: markdown>=2.6.8 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.3.7)
+Requirement already satisfied: setuptools>=41.0.0 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (59.6.0)
 Requirement already satisfied: werkzeug>=0.11.15 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (2.0.3)
 Requirement already satisfied: importlib-metadata>=4.4 in /home/pai/lib/python3.6/site-packages (from markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (4.8.3)
-Requirement already satisfied: zipp>=0.5 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.6.0)
 Requirement already satisfied: typing-extensions>=3.6.4 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (4.1.1)
+Requirement already satisfied: zipp>=0.5 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.6.0)
 Requirement already satisfied: dataclasses in /home/pai/lib/python3.6/site-packages (from werkzeug>=0.11.15->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (0.8)
 Installing collected packages: tensorflow
 Successfully installed tensorflow-1.15.5+deeprec2206
@@ -81,31 +81,31 @@ Numbers of training dataset is 1086120
 Numbers of test dataset is 121216
 The training steps is 2700
 The testing steps is 237
-Saving model checkpoints to ./result/model_DIEN_1666214004
+Saving model checkpoints to ./result/model_DIEN_1666302092
 Training completed.
 Evaluation complate:[100/237]
 Evaluation complate:[200/237]
 Evaluation complate:[237/237]
-ACC = 0.6829626560211182
-AUC = 0.7557283639907837
+ACC = 0.6795472502708435
+AUC = 0.7530845403671265
 Using TensorFlow version 1.15.5
 Checking dataset...
 Numbers of training dataset is 1086120
 Numbers of test dataset is 121216
 The training steps is 16000
 The testing steps is 237
-Saving model checkpoints to ./result/model_DIN_1666214451
+Saving model checkpoints to ./result/model_DIN_1666302538
 Training completed.
 Evaluation complate:[100/237]
 Evaluation complate:[200/237]
 Evaluation complate:[237/237]
-ACC = 0.6754719018936157
-AUC = 0.7129868268966675
+ACC = 0.6736156940460205
+AUC = 0.714846670627594
 Using TensorFlow version 1.15.5
 Checking dataset...
 The training steps is 11600
 The testing steps is 977
-Saving model checkpoints to ./result/model_DLRM_1666214832
+Saving model checkpoints to ./result/model_DLRM_1666302918
 Training completed.
 Evaluation complate:[100/977]
 Evaluation complate:[200/977]
@@ -117,13 +117,13 @@ Evaluation complate:[700/977]
 Evaluation complate:[800/977]
 Evaluation complate:[900/977]
 Evaluation complate:[977/977]
-ACC = 0.7655400037765503
-AUC = 0.547884464263916
+ACC = 0.7500240206718445
+AUC = 0.5450012683868408
 Using TensorFlow version 1.15.5
 Checking dataset...
 The training steps is 700
 The testing steps is 977
-Saving model checkpoints to ./result/model_DeepFM_1666215224
+Saving model checkpoints to ./result/model_DeepFM_1666303311
 Training completed.
 Evaluation complate:[100/977]
 Evaluation complate:[200/977]
@@ -135,15 +135,15 @@ Evaluation complate:[700/977]
 Evaluation complate:[800/977]
 Evaluation complate:[900/977]
 Evaluation complate:[977/977]
-ACC = 0.8065199851989746
-AUC = 0.5251734256744385
+ACC = 0.806518018245697
+AUC = 0.5234982371330261
 Using TensorFlow version 1.15.5
 Checking dataset...
 Number of training dataset is 50000
 Number of test dataset is 10000
 The training steps is 27700
 The testing steps is 20
-Saving model checkpoints to = ./result/model_MMOE_1666216005
+Saving model checkpoints to = ./result/model_MMOE_1666304117
 Column name =  pid  hash bucket size =  10
 Column name =  adgroup_id  hash bucket size =  100000
 Column name =  cate_id  hash bucket size =  10000
@@ -170,7 +170,7 @@ Using TensorFlow version 1.15.5
 Checking dataset...
 The training steps is 8900
 The testing steps is 977
-Saving model checkpoints to ./result/model_WIDE_AND_DEEP_1666216383
+Saving model checkpoints to ./result/model_WIDE_AND_DEEP_1666304492
 Training completed.
 Evaluation complate:[100/977]
 Evaluation complate:[200/977]
@@ -182,8 +182,8 @@ Evaluation complate:[700/977]
 Evaluation complate:[800/977]
 Evaluation complate:[900/977]
 Evaluation complate:[977/977]
-ACC = 0.741428017616272
-AUC = 0.5555341839790344
-Total Time: 2190.3931376391556 (s)
-{'DIEN (s)': '421.0754133280134', 'DIEN_auc': '0.75572836', 'DIN (s)': '358.9823042990174', 'DIN_auc': '0.7129868', 'DLRM (s)': '349.1251042690128', 'DLRM_auc': '0.54788446', 'DeepFM (s)': '345.7139514189912', 'DeepFM_auc': '0.5251734', 'MMoE (s)': '354.43822314508725', 'MMoE_auc': '0.7530705', 'WDL (s)': '361.05814117903356', 'WDL_auc': '0.5555342', 'score': '2190.3931376391556'}
+ACC = 0.7411680221557617
+AUC = 0.5554811954498291
+Total Time: 2193.0479087758576 (s)
+{'DIEN (s)': '419.5391889719758', 'DIEN_auc': '0.75308454', 'DIN (s)': '359.04495372099336', 'DIN_auc': '0.7148467', 'DLRM (s)': '349.65051040495746', 'DLRM_auc': '0.54500127', 'DeepFM (s)': '353.41271892993245', 'DeepFM_auc': '0.52349824', 'MMoE (s)': '351.70143629901577', 'MMoE_auc': '0.7530705', 'WDL (s)': '359.6991004489828', 'WDL_auc': '0.5554812', 'score': '2193.0479087758576'}
 > Run
