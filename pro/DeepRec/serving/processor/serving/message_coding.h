@@ -11,28 +11,22 @@ class Response;
 class Call;
 class BatchCall;
 class ServingModelInfo;
-class SignatureInfo;
-
 class IParser {
  public:
-  virtual Status ParseRequestFromBuf(
-      const void* input_data, int input_size, Call& call,
-      const SignatureInfo* info) = 0;
+  virtual Status ParseRequestFromBuf(const void* input_data,
+      int input_size, Call& call) = 0;
 
-  virtual Status ParseResponseToBuf(
-      const Call& call, void** output_data,
-      int* output_size, const SignatureInfo* info) = 0;
+  virtual Status ParseResponseToBuf(const Call& call,
+      void** output_data, int* output_size) = 0;
 
-  virtual Status ParseBatchRequestFromBuf(
-      const void* input_data[], int* input_size,
-      BatchCall& call, const SignatureInfo* info) {
+  virtual Status ParseBatchRequestFromBuf(const void* input_data[],
+      int* input_size, BatchCall& call) {
     // TO be implemented
     return Status::OK();
   }
 
-  virtual Status ParseBatchResponseToBuf(
-      BatchCall& call, void* output_data[],
-      int* output_size, const SignatureInfo* info) {
+  virtual Status ParseBatchResponseToBuf(BatchCall& call,
+      void* output_data[], int* output_size) {
     // TO be implemented
     return Status::OK();
   }
@@ -48,21 +42,17 @@ class ProtoBufParser : public IParser {
  public:
   explicit ProtoBufParser(int thread_num);
 
-  Status ParseRequestFromBuf(
-      const void* input_data, int input_size,
-      Call& call, const SignatureInfo* info) override;
+  Status ParseRequestFromBuf(const void* input_data,
+      int input_size, Call& call) override;
 
-  Status ParseResponseToBuf(
-      const Call& call, void** output_data,
-      int* output_size, const SignatureInfo* info) override;
+  Status ParseResponseToBuf(const Call& call,
+      void** output_data, int* output_size) override;
   
-  Status ParseBatchRequestFromBuf(
-      const void* input_data[], int* input_size,
-      BatchCall& call, const SignatureInfo* info) override;
+  Status ParseBatchRequestFromBuf(const void* input_data[],
+      int* input_size, BatchCall& call) override;
 
-  Status ParseBatchResponseToBuf(
-      BatchCall& call, void* output_data[],
-      int* output_size, const SignatureInfo* info) override;
+  Status ParseBatchResponseToBuf(BatchCall& call,
+      void* output_data[], int* output_size) override;
 
   Status ParseServingModelInfoToBuf(
       ServingModelInfo& model_info, void* output_data[],
@@ -76,30 +66,26 @@ class FlatBufferParser : public IParser {
  public:
   explicit FlatBufferParser(int thread_num);
 
-  Status ParseRequestFromBuf(
-      const void* input_data, int input_size,
-      Call& call, const SignatureInfo* info) override {
+  Status ParseRequestFromBuf(const void* input_data,
+      int input_size, Call& call) override {
     // TO be implemented
     return Status::OK();
   }
 
-  Status ParseResponseToBuf(
-      const Call& call, void** output_data,
-      int* output_size, const SignatureInfo* info) override {
+  Status ParseResponseToBuf(const Call& call,
+      void** output_data, int* output_size) override {
     // TO be implemented
     return Status::OK();
   }
   
-  Status ParseBatchRequestFromBuf(
-      const void* input_data[], int* input_size,
-      BatchCall& call, const SignatureInfo* info) override {
+  Status ParseBatchRequestFromBuf(const void* input_data[],
+      int* input_size, BatchCall& call) override {
     // TO be implemented
     return Status::OK();
   }
 
-  Status ParseBatchResponseToBuf(
-      BatchCall& call, void* output_data[],
-      int* output_size, const SignatureInfo* info) override {
+  Status ParseBatchResponseToBuf(BatchCall& call,
+      void* output_data[], int* output_size) override {
     // TO be implemented
     return Status::OK();
   }

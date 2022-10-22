@@ -356,6 +356,11 @@ class DIN():
             uid_emb, item_emb, his_item_emb, sequence_length = self._embedding_input_layer(
             )
 
+            if self.bf16:
+                uid_emb = tf.cast(uid_emb, tf.bfloat16)
+                item_emb = tf.cast(item_emb, tf.bfloat16)
+                his_item_emb = tf.cast(his_item_emb, tf.bfloat16)
+
             item_his_eb_sum = tf.reduce_sum(his_item_emb, 1)
             mask = tf.sequence_mask(sequence_length)
 
@@ -373,8 +378,6 @@ class DIN():
             att_fea
         ], 1)
 
-        if self.bf16:
-            top_input = tf.cast(top_input, tf.bfloat16)
         # Top MLP layer
         top_mlp_scope = tf.variable_scope(
             'top_mlp_layer',
@@ -709,8 +712,6 @@ def main(tf_config=None, server=None):
 
     # Session config
     sess_config = tf.ConfigProto()
-    if tf_config:
-        sess_config.device_filters.append("/job:ps")
     sess_config.inter_op_parallelism_threads = args.inter
     sess_config.intra_op_parallelism_threads = args.intra
 
@@ -982,5 +983,4 @@ if __name__ == '__main__':
         main()
     else:
         tf_config, server, tf_device = generate_cluster_info(TF_CONFIG)
-        with tf_device:
-            main(tf_config, server)
+        main(tf_config, server)

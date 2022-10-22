@@ -51,8 +51,6 @@ cc_library(
         "//tensorflow/core:framework",
         "//tensorflow/core:core_cpu",
         "//tensorflow/cc/saved_model:loader",
-        "//tensorflow/cc/saved_model:reader",
-        "//tensorflow/cc/saved_model:constants",
         "//tensorflow/cc/saved_model:signature_constants",
         "//tensorflow/cc/saved_model:tag_constants",
         ],

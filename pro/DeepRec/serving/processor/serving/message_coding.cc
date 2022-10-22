@@ -1,4 +1,3 @@
-#include "serving/processor/serving/model_message.h"
 #include "serving/processor/serving/message_coding.h"
 #include "serving/processor/serving/util.h"
 
@@ -9,46 +8,26 @@ ProtoBufParser::ProtoBufParser(int thread_num) {
       thread_num));
 }
 
-Status ProtoBufParser::ParseRequestFromBuf(
-    const void* input_data, int input_size, Call& call,
-    const SignatureInfo* signature_info) {
+Status ProtoBufParser::ParseRequestFromBuf(const void* input_data,
+    int input_size, Call& call) {
   eas::PredictRequest request;
   request.ParseFromArray(input_data, input_size);
 
   for (auto& input : request.inputs()) {
-    if (signature_info->input_key_idx.find(input.first) ==
-        signature_info->input_key_idx.end()) {
-      LOG(FATAL) << "Request contain invalid input key : " << input.first;
-    }
-    int idx = signature_info->input_key_idx.at(input.first);
-    call.request.inputs.emplace_back(
-        signature_info->input_value_name[idx],
-        util::Proto2Tensor(input.second));
+    call.request.inputs.emplace_back(input.first, util::Proto2Tensor(input.second));
   }
 
-  if (request.output_filter().size() > 0) {
-    call.request.output_tensor_names.reserve(request.output_filter().size());
-    for (auto key : request.output_filter()) {
-      if (signature_info->output_key_idx.find(key) ==
-          signature_info->output_key_idx.end()) {
-        LOG(FATAL) << "Request contain invalid output filter: " << key;
-      }
-      call.request.output_tensor_names.emplace_back(
-          signature_info->output_value_name[signature_info->output_key_idx.at(key)]);
-    }
-  } else {
-    call.request.output_tensor_names =
-        signature_info->output_value_name;
-  }
+  call.request.output_tensor_names =
+      std::vector<std::string>(request.output_filter().begin(),
+                               request.output_filter().end());
 
   return Status::OK();
 }
 
-Status ProtoBufParser::ParseResponseToBuf(
-    const Call& call, void** output_data, int* output_size,
-    const SignatureInfo* signature_info) {
+Status ProtoBufParser::ParseResponseToBuf(const Call& call,
+    void** output_data, int* output_size) {
   eas::PredictResponse response = util::Tensor2Response(call.request,
-      call.response, signature_info);
+      call.response);
   *output_size = response.ByteSize();
   *output_data = new char[*output_size];
   response.SerializeToArray(*output_data, *output_size);
@@ -56,42 +35,22 @@ Status ProtoBufParser::ParseResponseToBuf(
 }
 
 Status ProtoBufParser::ParseBatchRequestFromBuf(
-    const void* input_data[], int* input_size,
-    BatchCall& call, const SignatureInfo* signature_info) {
+    const void* input_data[], int* input_size, BatchCall& call) {
   auto size = sizeof(input_data) / sizeof(void*);
   call.call_num = size;
-  auto do_work = [&call, input_data, input_size,
-                  signature_info](size_t begin, size_t end) {
+  auto do_work = [&call, input_data, input_size](size_t begin, size_t end) {
     for (size_t i = begin; i < end; ++i) {
       eas::PredictRequest request;
       request.ParseFromArray(input_data[i], input_size[i]);
       
       for (auto& input : request.inputs()) {
-        if (signature_info->input_key_idx.find(input.first) ==
-            signature_info->input_key_idx.end()) {
-          LOG(FATAL) << "Request contain invalid input key : " << input.first;
-        }
-        int idx = signature_info->input_key_idx.at(input.first);
-        call.request[i].inputs.emplace_back(
-            signature_info->input_value_name[idx],
-            util::Proto2Tensor(input.second));
-      }
+        call.request[i].inputs.emplace_back(input.first, util::Proto2Tensor(input.second));
+      } 
  
-      if (i == 0) {
-        if (request.output_filter().size() > 0) {
-          call.request[0].output_tensor_names.reserve(request.output_filter().size());
-          for (auto key : request.output_filter()) {
-            if (signature_info->output_key_idx.find(key) ==
-                signature_info->output_key_idx.end()) {
-              LOG(FATAL) << "Request contain invalid output filter: " << key;
-            }
-            call.request[0].output_tensor_names.emplace_back(
-                signature_info->output_value_name[signature_info->output_key_idx.at(key)]);
-          }
-        } else {
-          call.request[0].output_tensor_names =
-              signature_info->output_value_name;
-        }
+      if (i == 0) { 
+        call.request[0].output_tensor_names =
+            std::vector<std::string>(request.output_filter().begin(),
+                                     request.output_filter().end());
       }
     }
   };
@@ -101,15 +60,13 @@ Status ProtoBufParser::ParseBatchRequestFromBuf(
 }
 
 Status ProtoBufParser::ParseBatchResponseToBuf(
-    BatchCall& call, void* output_data[],
-    int* output_size, const SignatureInfo* signature_info) {
+    BatchCall& call, void* output_data[], int* output_size) {
   //TF_RETURN_IF_ERROR(call.SplitResponse());
   call.SplitResponse();
-  auto do_work = [&call, output_data, output_size,
-	              signature_info](size_t begin, size_t end) {
+  auto do_work = [&call, output_data, output_size](size_t begin, size_t end) {
     for (size_t i = begin; i < end; ++i) {
       eas::PredictResponse response = util::Tensor2Response(call.request[i],
-          call.response[i], signature_info);
+          call.response[i]);
       output_size[i] = response.ByteSize();
       output_data[i] = new char[*output_size];
       response.SerializeToArray(output_data[i], output_size[i]); 

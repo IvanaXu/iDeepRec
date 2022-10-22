@@ -18,7 +18,6 @@ limitations under the License.
 
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/core/graph/graph.h"
-#include "tensorflow/core/framework/embedding/config.pb.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/node_def.pb.h"
 #include "tensorflow/core/framework/node_def_util.h"
@@ -145,11 +144,6 @@ struct GraphOptimizerOption {
   // current instance partition id
   int partition_id = -1;
   int shard_instance_count = 0;
-
-  // multi tiered embedding
-  embedding::StorageType st = embedding::StorageType::INVALID;
-  std::string path;
-  std::vector<int64> size;
 };
 
 struct SrcInfo {
@@ -263,9 +257,6 @@ class SavedModelOptimizer : public GraphOptimizer {
   Node* UpdateRestoreShardNodeInputs(
       std::unordered_map<std::string, std::vector<Node*>>& origin_import_nodes,
       std::vector<Node*>& new_kv_import_nodes);
-
-  Status RewriteEmbeddingVariableAttr(embedding::StorageType st, const std::string& path,
-                                      const std::vector<int64>& size);
 
   Node* storage_pointer_node_ = nullptr;// storage placeholder node
   Node* version_node_ = nullptr; // version placeholder node

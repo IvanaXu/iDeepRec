@@ -137,19 +137,12 @@ Status ModelStore::GetDeltaModelVersion(Version& version) {
 Status ModelStore::DetectLatestCheckpointDir() {
   TF_RETURN_IF_ERROR(file_system_->IsDirectory(checkpoint_parent_dir_));
   std::vector<string> file_names;
-  Status s = file_system_->GetMatchingPaths(
-    io::JoinPath(checkpoint_parent_dir_, "*/checkpoint"), &file_names);
-  if (!s.ok()) {
-    LOG(ERROR) << "Get matching files from file system failed, pattern is:"
-               << io::JoinPath(checkpoint_parent_dir_, "*/checkpoint")
-               << ", error is: " << s.error_message();
-    return s;
-  }
-
+  TF_RETURN_IF_ERROR(file_system_->GetMatchingPaths(
+    io::JoinPath(checkpoint_parent_dir_, "*/checkpoint"), &file_names));
   int64 latest_mtime_nsec = -1;
   for (auto fname : file_names) {
     FileStatistics stat;
-    s = file_system_->Stat(fname, &stat);
+    Status s = file_system_->Stat(fname, &stat);
     if (s.ok()) {
       if (stat.mtime_nsec > latest_mtime_nsec) {
         latest_mtime_nsec = stat.mtime_nsec;
@@ -157,9 +150,8 @@ Status ModelStore::DetectLatestCheckpointDir() {
         checkpoint_dir_ += "/";
       }
     } else {
-      LOG(ERROR) << "[Processor] Path: "<< fname
-                 << " not a valid checkpoint_path, msg:" << s.ToString();
-      return s;
+      LOG(WARNING) << "[Processor] Path: "<< fname
+                   << " not a valid checkpoint_path, meg:" << s.ToString();
     }
   }
 

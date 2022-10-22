@@ -152,15 +152,13 @@ Status ModelConfigFactory::Create(const char* model_config, ModelConfig** config
     return Status(error::Code::INVALID_ARGUMENT,
         "[TensorFlow] serialize_protocol shouldn't be empty string.");
   }
-
+  
   if (!json_config["checkpoint_dir"].isNull()) {
-    (*config)->enable_incr_model_update = true;
     (*config)->checkpoint_dir =
       json_config["checkpoint_dir"].asString();
   } else {
-    (*config)->enable_incr_model_update = false;
-    LOG(WARNING) << "[TensorFlow] Disable increment model update, "
-                 << "processor only load saved model.";
+    return Status(error::Code::NOT_FOUND,
+        "[TensorFlow] No checkpoint_dir in ModelConfig.");
   }
 
   if (!json_config["savedmodel_dir"].isNull()) {
@@ -230,9 +228,8 @@ Status ModelConfigFactory::Create(const char* model_config, ModelConfig** config
   }
 
   if ((*config)->model_store_type != "local") {
-    if (!json_config["checkpoint_dir"].isNull() &&
-        (*config)->checkpoint_dir.find((*config)->model_store_type)
-            == std::string::npos) {
+    if ((*config)->checkpoint_dir.find((*config)->model_store_type)
+        == std::string::npos) {
       return Status(error::Code::INVALID_ARGUMENT,
           "[TensorFlow] Mismatch model_store_type and checkpoint_dir.");
     }
@@ -286,11 +283,8 @@ Status ModelConfigFactory::Create(const char* model_config, ModelConfig** config
 
     TF_RETURN_IF_ERROR(AddOSSAccessPrefix(
           (*config)->savedmodel_dir, *config));
-
-    if (!json_config["checkpoint_dir"].isNull()) {
-      TF_RETURN_IF_ERROR(AddOSSAccessPrefix(
-            (*config)->checkpoint_dir, *config));
-    }
+    TF_RETURN_IF_ERROR(AddOSSAccessPrefix(
+          (*config)->checkpoint_dir, *config));
   }
 
   // timeout of distribute lock
@@ -371,30 +365,6 @@ Status ModelConfigFactory::Create(const char* model_config, ModelConfig** config
     } else {
       return Status(error::Code::INVALID_ARGUMENT,
           "[TensorFlow] Only support save timeline to local or oss now.");
-    }
-  }
-
-  if (!json_config["ev_storage_type"].isNull()) {
-    auto st = json_config["ev_storage_type"].asInt();
-    switch (st) {
-      case embedding::StorageType::INVALID:
-        break;
-      case embedding::StorageType::DRAM:
-        (*config)->storage_type = embedding::StorageType::DRAM;
-        break;
-      case embedding::StorageType::DRAM_SSDHASH:
-        (*config)->storage_type = embedding::StorageType::DRAM_SSDHASH;
-        (*config)->storage_path = json_config["ev_storage_path"].asString();
-        for (int i = 0; i < json_config["ev_storage_size"].size(); i++)
-          (*config)->storage_size.emplace_back(json_config["ev_storage_size"][i].asInt64());
-        if (json_config["ev_storage_size"].size() < 4) {
-          for (int i =  json_config["ev_storage_size"].size(); i < 4; i++)
-            (*config)->storage_size.emplace_back(1024*1024*1024);
-        }
-        break;
-      default:
-        return Status(error::Code::INVALID_ARGUMENT,
-          "[TensorFlow] Only support ev storage type {DRAM, DRAM_SSDHASH}.");
     }
   }
 

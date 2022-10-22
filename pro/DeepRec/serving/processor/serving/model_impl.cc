@@ -36,13 +36,5 @@ std::string SavedModelImpl::DebugString() {
   return instance_mgr_->DebugString();
 }
 
-SignatureDef SavedModelImpl::GetServingSignatureDef() {
-  return instance_mgr_->GetServingSignatureDef();
-}
-
-const SignatureInfo* SavedModelImpl::GetSignatureInfo() {
-  return instance_mgr_->GetSignatureInfo();
-}
-
 } // processor
 } // tensorflow
