@@ -754,7 +754,7 @@ def get_arg_parser():
     parser.add_argument('--workqueue', \
                         help='Whether to enable Work Queue. Default to False.',
                         type=boolean_string,
-                        default=False)
+                        default=True)
     return parser
 
 # parse distributed training configuration and generate cluster information

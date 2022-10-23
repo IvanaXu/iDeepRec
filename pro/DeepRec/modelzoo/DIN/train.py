@@ -888,7 +888,7 @@ def get_arg_parser():
     parser.add_argument('--workqueue', \
                         help='Whether to enable Work Queue. Default to False.',
                         type=boolean_string,
-                        default=False)
+                        default=True)
     parser.add_argument('--multihash', \
                         help='Whether to enable Multi-Hash Variable. Default to False.',
                         type=boolean_string,
