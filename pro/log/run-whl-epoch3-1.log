@@ -2,7 +2,7 @@
 > Run
 
 >> STEP@1
-total 236
+total 208
 -rw-r--r--  1 root root  2219 Oct 19 15:56 ACKNOWLEDGMENTS
 -rw-r--r--  1 root root   542 Oct 19 15:56 ADOPTERS.md
 -rw-r--r--  1 root root   349 Oct 19 15:56 AUTHORS
@@ -12,32 +12,25 @@ total 236
 -rw-r--r--  1 root root   598 Oct 19 15:56 ISSUES.md
 -rw-r--r--  1 root root  2088 Oct 19 15:56 ISSUE_TEMPLATE.md
 -rw-r--r--  1 root root 11419 Oct 19 15:56 LICENSE
--rw-r--r--  1 root root 11642 Oct 19 15:56 README.md
+-rw-r--r--  1 root root  9093 Oct 22 17:31 README.md
 -rw-r--r--  1 root root  1666 Oct 19 15:56 RELEASE.md
 -rw-r--r--  1 root root 11443 Oct 19 15:56 WORKSPACE
 -rw-r--r--  1 root root  1218 Oct 19 15:56 arm_compiler.BUILD
-lrwxrwxrwx  1 root root    87 Oct 19 15:56 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
-lrwxrwxrwx  1 root root   108 Oct 19 15:56 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
-lrwxrwxrwx  1 root root   108 Oct 19 15:56 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
-lrwxrwxrwx  1 root root    97 Oct 19 15:56 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
-lrwxrwxrwx  1 root root   113 Oct 19 15:56 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
 drwxr-xr-x  6 root root  4096 Oct 19 15:56 cibuild
 -rwxr-xr-x  1 root root   380 Oct 19 15:56 configure
 -rw-r--r--  1 root root   780 Oct 19 15:56 configure.cmd
 -rw-r--r--  1 root root 58216 Oct 19 15:56 configure.py
 drwxr-xr-x 16 root root  4096 Oct 19 15:56 docs
--rw-r--r--  1 root root     8 Oct 19 15:56 git_pull.sh
--rw-r--r--  1 root root    55 Oct 19 15:56 git_reset_pull.sh
 -rw-r--r--  1 root root   328 Oct 19 15:56 models.BUILD
-drwxr-xr-x 19 root root  4096 Oct 19 15:56 modelzoo
+drwxr-xr-x 15 root root  4096 Oct 22 17:31 modelzoo
 drwxr-xr-x  2 root root  4096 Oct 19 15:56 scripts
-drwxr-xr-x  6 root root  4096 Oct 19 15:56 serving
+drwxr-xr-x  5 root root  4096 Oct 22 17:31 serving
 drwxr-xr-x  9 root root  4096 Oct 19 15:56 sparse_operation_kit
 drwxr-xr-x 18 root root  4096 Oct 19 15:56 tensorflow
 drwxr-xr-x  3 root root  4096 Oct 19 15:56 tests
 drwxr-xr-x 43 root root  4096 Oct 19 15:56 third_party
-drwxr-xr-x  8 root root  4096 Oct 19 15:56 tianchi
-drwxr-xr-x  3 root root  4096 Oct 19 15:56 tools
+drwxr-xr-x  8 root root  4096 Oct 22 17:31 tianchi
+drwxr-xr-x  2 root root  4096 Oct 22 17:31 tools
 drwxr-xr-x  2 root root  4096 Oct 19 15:56 triton
 
 >> STEP@5
@@ -46,30 +39,30 @@ Uninstalling tensorflow-1.15.5+deeprec2206:
   Successfully uninstalled tensorflow-1.15.5+deeprec2206
 Looking in indexes: http://mirrors.aliyun.com/pypi/simple/
 Processing /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
-Requirement already satisfied: protobuf>=3.6.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (4.21.0)
-Requirement already satisfied: astor==0.8.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.8.1)
-Requirement already satisfied: wrapt>=1.11.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.14.1)
-Requirement already satisfied: astunparse==1.6.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.6.3)
-Requirement already satisfied: tensorflow-estimator<1.15.5,>=1.15.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.2)
-Requirement already satisfied: keras-applications>=1.0.8 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.0.8)
-Requirement already satisfied: google-pasta>=0.1.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.2.0)
-Requirement already satisfied: six>=1.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.16.0)
-Requirement already satisfied: h5py<=2.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (2.10.0)
-Requirement already satisfied: tensorboard<1.16.0,>=1.15.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.0)
-Requirement already satisfied: numpy<1.19.0,>=1.16.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.18.5)
-Requirement already satisfied: grpcio>=1.8.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.47.0)
-Requirement already satisfied: absl-py>=0.9.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
-Requirement already satisfied: opt-einsum>=2.3.2 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (3.3.0)
 Requirement already satisfied: termcolor>=1.1.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
 Requirement already satisfied: gast==0.3.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.3.3)
-Requirement already satisfied: wheel>=0.26 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.37.1)
+Requirement already satisfied: google-pasta>=0.1.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.2.0)
+Requirement already satisfied: protobuf>=3.6.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (4.21.0)
 Requirement already satisfied: keras-preprocessing>=1.0.5 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.2)
+Requirement already satisfied: absl-py>=0.9.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
+Requirement already satisfied: tensorflow-estimator<1.15.5,>=1.15.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.2)
+Requirement already satisfied: six>=1.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.16.0)
+Requirement already satisfied: opt-einsum>=2.3.2 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (3.3.0)
+Requirement already satisfied: numpy<1.19.0,>=1.16.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.18.5)
+Requirement already satisfied: astor==0.8.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.8.1)
+Requirement already satisfied: h5py<=2.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (2.10.0)
+Requirement already satisfied: astunparse==1.6.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.6.3)
+Requirement already satisfied: wheel>=0.26 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.37.1)
+Requirement already satisfied: keras-applications>=1.0.8 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.0.8)
+Requirement already satisfied: grpcio>=1.8.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.47.0)
+Requirement already satisfied: wrapt>=1.11.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.14.1)
+Requirement already satisfied: tensorboard<1.16.0,>=1.15.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.0)
+Requirement already satisfied: markdown>=2.6.8 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.3.7)
 Requirement already satisfied: setuptools>=41.0.0 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (59.6.0)
 Requirement already satisfied: werkzeug>=0.11.15 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (2.0.3)
-Requirement already satisfied: markdown>=2.6.8 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.3.7)
 Requirement already satisfied: importlib-metadata>=4.4 in /home/pai/lib/python3.6/site-packages (from markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (4.8.3)
-Requirement already satisfied: zipp>=0.5 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.6.0)
 Requirement already satisfied: typing-extensions>=3.6.4 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (4.1.1)
+Requirement already satisfied: zipp>=0.5 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.6.0)
 Requirement already satisfied: dataclasses in /home/pai/lib/python3.6/site-packages (from werkzeug>=0.11.15->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (0.8)
 Installing collected packages: tensorflow
 Successfully installed tensorflow-1.15.5+deeprec2206
@@ -81,11 +74,109 @@ Numbers of training dataset is 1086120
 Numbers of test dataset is 121216
 The training steps is 2700
 The testing steps is 237
-Saving model checkpoints to ./result/model_DIEN_1666307702
+Saving model checkpoints to ./result/model_DIEN_1666468358
 Training completed.
 Evaluation complate:[100/237]
 Evaluation complate:[200/237]
 Evaluation complate:[237/237]
-ACC = 0.6782850623130798
-AUC = 0.7502444982528687
+ACC = 0.6805784702301025
+AUC = 0.7511443495750427
+Using TensorFlow version 1.15.5
+Checking dataset...
+Numbers of training dataset is 1086120
+Numbers of test dataset is 121216
+The training steps is 16000
+The testing steps is 237
+Saving model checkpoints to ./result/model_DIN_1666468810
+Training completed.
+Evaluation complate:[100/237]
+Evaluation complate:[200/237]
+Evaluation complate:[237/237]
+ACC = 0.6736651659011841
+AUC = 0.7114295959472656
+Using TensorFlow version 1.15.5
+Checking dataset...
+The training steps is 11600
+The testing steps is 977
+Saving model checkpoints to ./result/model_DLRM_1666469188
+Training completed.
+Evaluation complate:[100/977]
+Evaluation complate:[200/977]
+Evaluation complate:[300/977]
+Evaluation complate:[400/977]
+Evaluation complate:[500/977]
+Evaluation complate:[600/977]
+Evaluation complate:[700/977]
+Evaluation complate:[800/977]
+Evaluation complate:[900/977]
+Evaluation complate:[977/977]
+ACC = 0.7565820217132568
+AUC = 0.5453308820724487
+Using TensorFlow version 1.15.5
+Checking dataset...
+The training steps is 700
+The testing steps is 977
+Saving model checkpoints to ./result/model_DeepFM_1666469579
+Training completed.
+Evaluation complate:[100/977]
+Evaluation complate:[200/977]
+Evaluation complate:[300/977]
+Evaluation complate:[400/977]
+Evaluation complate:[500/977]
+Evaluation complate:[600/977]
+Evaluation complate:[700/977]
+Evaluation complate:[800/977]
+Evaluation complate:[900/977]
+Evaluation complate:[977/977]
+ACC = 0.8065140247344971
+AUC = 0.529294490814209
+Using TensorFlow version 1.15.5
+Checking dataset...
+Number of training dataset is 50000
+Number of test dataset is 10000
+The training steps is 27700
+The testing steps is 20
+Saving model checkpoints to = ./result/model_MMOE_1666470390
+Column name =  pid  hash bucket size =  10
+Column name =  adgroup_id  hash bucket size =  100000
+Column name =  cate_id  hash bucket size =  10000
+Column name =  campaign_id  hash bucket size =  100000
+Column name =  customer  hash bucket size =  100000
+Column name =  brand  hash bucket size =  100000
+Column name =  user_id  hash bucket size =  100000
+Column name =  cms_segid  hash bucket size =  100
+Column name =  cms_group_id  hash bucket size =  100
+Column name =  age_level  hash bucket size =  10
+Column name =  pvalue_level  hash bucket size =  10
+Column name =  shopping_level  hash bucket size =  10
+Column name =  occupation  hash bucket size =  10
+Column name =  new_user_class_level  hash bucket size =  10
+Column name =  tag_category_list  hash bucket size =  100000
+Column name =  tag_brand_list  hash bucket size =  100000
+Adaptive emb =  False TF =  False
+self.tf =  False  self._optimizer_type =  adamasync
+Training completed.
+Evaluation complete:[20/20]
+ACC = 0.9731500148773193
+AUC = 0.7530193328857422
+Using TensorFlow version 1.15.5
+Checking dataset...
+The training steps is 8900
+The testing steps is 977
+Saving model checkpoints to ./result/model_WIDE_AND_DEEP_1666470764
+Training completed.
+Evaluation complate:[100/977]
+Evaluation complate:[200/977]
+Evaluation complate:[300/977]
+Evaluation complate:[400/977]
+Evaluation complate:[500/977]
+Evaluation complate:[600/977]
+Evaluation complate:[700/977]
+Evaluation complate:[800/977]
+Evaluation complate:[900/977]
+Evaluation complate:[977/977]
+ACC = 0.7411879897117615
+AUC = 0.555479109287262
+Total Time: 2196.996898480924 (s)
+{'DIEN (s)': '424.7647826280445', 'DIEN_auc': '0.75114435', 'DIN (s)': '356.39519588893745', 'DIN_auc': '0.7114296', 'DLRM (s)': '348.7622615910368', 'DLRM_auc': '0.5453309', 'DeepFM (s)': '354.6560776339611', 'DeepFM_auc': '0.5292945', 'MMoE (s)': '350.5957043429371', 'MMoE_auc': '0.75301933', 'WDL (s)': '361.8228763960069', 'WDL_auc': '0.5554791', 'score': '2196.996898480924'}
 > Run
