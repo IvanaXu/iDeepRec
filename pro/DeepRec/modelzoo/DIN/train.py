@@ -965,8 +965,8 @@ def set_env_for_DeepRec():
     MALLOC_CONF: On CPU platform, DeepRec can use memory optimization with the jemalloc library.
         Please preload libjemalloc.so by `LD_PRELOAD=./libjemalloc.so.2 python ...`
     '''
-    os.environ['START_STATISTIC_STEP'] = '100'
-    os.environ['STOP_STATISTIC_STEP'] = '110'
+    os.environ['START_STATISTIC_STEP'] = '200'
+    os.environ['STOP_STATISTIC_STEP'] = '500'
     os.environ['MALLOC_CONF']= \
         'background_thread:true,metadata_thp:auto,dirty_decay_ms:20000,muzzy_decay_ms:20000'
 
