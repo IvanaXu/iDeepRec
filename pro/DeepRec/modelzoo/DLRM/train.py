@@ -336,7 +336,7 @@ def build_feature_columns():
                 '''Feature Elimination of EmbeddingVariable Feature'''
                 if args.ev_elimination == 'gstep':
                     # Feature elimination based on global steps
-                    evict_opt = tf.GlobalStepEvict(steps_to_live=4000)
+                    evict_opt = tf.GlobalStepEvict(steps_to_live=2000)
                 elif args.ev_elimination == 'l2':
                     # Feature elimination based on l2 weight
                     evict_opt = tf.L2WeightEvict(l2_weight_threshold=1.0)
