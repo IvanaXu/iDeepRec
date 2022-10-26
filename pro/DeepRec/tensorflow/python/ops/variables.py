@@ -229,7 +229,7 @@ class StorageOption(object):
   def __init__(self,
                storage_type=None,
                storage_path=None,
-               storage_size=[1024*1024*1024]):
+               storage_size=[1024*1024*1024, 10*1024*1024*1024]):
     self.storage_type = storage_type
     self.storage_path = storage_path
     self.storage_size = storage_size
