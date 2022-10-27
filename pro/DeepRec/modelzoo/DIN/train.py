@@ -712,6 +712,7 @@ def main(tf_config=None, server=None):
 
     # Session config
     sess_config = tf.ConfigProto()
+    sess_config.executor_policy = tf.ExecutorPolicy.USE_COST_MODEL_EXECUTOR
     sess_config.inter_op_parallelism_threads = args.inter
     sess_config.intra_op_parallelism_threads = args.intra
 

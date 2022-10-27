@@ -490,6 +490,7 @@ def main(tf_config=None, server=None):
                 dense_layer_partitioner=dense_layer_partitioner)
 
     sess_config = tf.ConfigProto()
+    sess_config.executor_policy = tf.ExecutorPolicy.USE_COST_MODEL_EXECUTOR
     if args.inter:
         sess_config.inter_op_parallelism_threads = args.inter
     if args.intra:
