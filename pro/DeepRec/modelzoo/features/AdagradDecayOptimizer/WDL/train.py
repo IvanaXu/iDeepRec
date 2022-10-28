@@ -489,6 +489,7 @@ def main(tf_config=None, server=None):
 
     sess_config = tf.ConfigProto()
     sess_config.executor_policy = tf.ExecutorPolicy.USE_COST_MODEL_EXECUTOR
+    sess_config.graph_options.optimizer_options.micro_batch_num = 4
     if args.inter:
         sess_config.inter_op_parallelism_threads = args.inter
     if args.intra:
