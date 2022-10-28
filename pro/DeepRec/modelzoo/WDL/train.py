@@ -575,6 +575,15 @@ def main(tf_config=None, server=None):
     sess_config = tf.ConfigProto()
     sess_config.executor_policy = tf.ExecutorPolicy.USE_COST_MODEL_EXECUTOR
     sess_config.graph_options.optimizer_options.micro_batch_num = 4
+    #
+    sess_config.graph_options.optimizer_options.do_smart_stage = True
+    sess_config.graph_options.optimizer_options.do_op_fusion = True
+    sess_config.graph_options.optimizer_options.do_async_embedding = True
+    sess_config.graph_options.optimizer_options.async_embedding_threads_num = 4
+    sess_config.graph_options.optimizer_options.async_embedding_capacity = 4
+    sess_config.executor_policy = tf.ExecutorPolicy.USE_INLINE_EXECUTOR
+    sess_config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+    #
     sess_config.inter_op_parallelism_threads = args.inter
     sess_config.intra_op_parallelism_threads = args.intra
 
