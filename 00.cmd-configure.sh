@@ -1,7 +1,5 @@
 # rcmd.sh
 
-clear
-
 # devp=/root/data/code/iDeepRec
 mainp=/root/data/code/iDeepRec
 
@@ -75,4 +73,3 @@ ls -l
 #
 echo 
 echo "> END"
-
