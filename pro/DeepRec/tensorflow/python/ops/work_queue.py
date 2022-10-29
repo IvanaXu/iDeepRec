@@ -72,7 +72,7 @@ class Work(object): # pylint: disable=useless-object-inheritance
     if isinstance(url, bytes):
       url = str(url.decode())
     prefix = prefix or ''
-    fullpath = str(prefix) + str(url)
+    # fullpath = str(prefix) + str(url)
     return Work(prefix, url)
 
   def __init__(self, prefix, url):
@@ -187,14 +187,15 @@ class WorkQueue(saver.BaseSaverBuilder.SaveableObject):
     if not isinstance(works, list) or not works:
       raise ValueError(
           "WorkQueue requires works as a list of strings")
-
-    works = [
-        w.encode() if isinstance(w, string_types) else w for w in works]
-    if not all([isinstance(w, bytes) for w in works]):
-      raise ValueError(
-          "WorkQueue requires works as a list of strings not {}".format(
-              [type(w) for w in works]))
-    self._works = [w.strip() for w in works]
+    
+    self._works = []
+    for w in works:
+      iw = w.encode() if isinstance(w, string_types) else w
+      if not isinstance(iw, bytes):
+        raise ValueError("WorkQueue requires works as a list of strings not"
+      else:
+        self._works.append(iw.strip())
+    
     self._prefix = prefix
     self._num_clients = num_clients
     self._local_work_mgr = local_work_mgr
@@ -305,7 +306,6 @@ class WorkQueue(saver.BaseSaverBuilder.SaveableObject):
     """
     del preferred_shard
 
-    ckpt_ready = False
     try:
       ckpt_reader = checkpoint_utils.load_checkpoint(ckpt_dir_or_file)
       tensors_in_ckpt = ckpt_reader.get_variable_to_shape_map()
@@ -313,20 +313,16 @@ class WorkQueue(saver.BaseSaverBuilder.SaveableObject):
       del tensors_in_ckpt
       del ckpt_reader
     except:  # pylint: disable=bare-except
-      pass
+      ckpt_ready = False
 
     # If tensors found in the checkpoint, do normal restoration.
-    if ckpt_ready:
-      return [
+    return [
           io_ops.restore_v2(
               filename_tensor,
               [spec.name],
               [spec.slice_spec],
               [spec.dtype])[0]
-          for spec in self.specs]
-
-    # If no tensors found in the checkpoint, just return None.
-    return [None, None]
+          for spec in self.specs] if ckpt_ready else [None, None]
 
   def restore(self, restored_tensors, _):
     """Restores the work queue from restored_tensors.
@@ -376,8 +372,7 @@ class WorkQueue(saver.BaseSaverBuilder.SaveableObject):
                 restore_works_dir=self._local_work_mgr.restore_works_dir)
       with ops.control_dependencies([work_bak]):
         with ops.device(self._local_device):
-          local_work = array_ops.identity(taken)
-          return local_work
+          return array_ops.identity(taken)
 
     def local_take():
       """Take work from local worker."""
@@ -394,9 +389,7 @@ class WorkQueue(saver.BaseSaverBuilder.SaveableObject):
     else:
       local_work = remote_take()
 
-    if self._prefix is None:
-      return local_work
-    return string_ops.string_join([self._prefix, local_work])
+    return local_work if self._prefix is None else string_ops.string_join([self._prefix, local_work])
 
   def input_producer(self):
     """Returns a FIFOQueue as input producer.
@@ -433,9 +426,7 @@ class WorkQueue(saver.BaseSaverBuilder.SaveableObject):
     next_work = lambda _: array_ops.reshape(proxy.dequeue(), [])
     with ops.name_scope(self.name):
       with ops.device(self._local_device):
-        dataset = dataset_ops.Dataset.from_tensors(0).repeat()
-        dataset = dataset.map(next_work)
-        return dataset
+        return (dataset_ops.Dataset.from_tensors(0).repeat()).map(next_work)
 
   def add_summary(self):
     """Gets size of the work queue.
@@ -594,5 +585,4 @@ class LocalWorkMgr(object):
               [self.restore_works_barrier],
               parallel_iterations=1)
           with ops.control_dependencies([wait]):
-            queue_size = self._restore_work_queue.size()
-            return math_ops.equal(queue_size, 0)
+            return math_ops.equal(self._restore_work_queue.size(), 0)
