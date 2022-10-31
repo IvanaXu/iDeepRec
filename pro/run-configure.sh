@@ -13,7 +13,7 @@ ls -l
 # 
 echo
 echo ">> STEP@2"
-./configure --disable-protoc
+./configure
 
 # 
 echo
