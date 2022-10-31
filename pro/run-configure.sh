@@ -5,6 +5,13 @@ echo
 echo "> Run"
 
 #
+echo 
+echo ">> ~protobuf"
+cd /pro/test
+apt-get install libprotobuf-dev protobuf-compiler -y
+g++ main.cpp -o main && ./main
+
+#
 echo
 echo ">> STEP@1"
 cd /pro/DeepRec
@@ -13,7 +20,6 @@ ls -l
 # 
 echo
 echo ">> STEP@2"
-apt-get install libprotobuf-dev protobuf-compiler -y
 ./configure
 
 # 
