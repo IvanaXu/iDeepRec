@@ -13,6 +13,7 @@ ls -l
 # 
 echo
 echo ">> STEP@2"
+apt-get install libprotobuf-dev protobuf-compiler -y
 ./configure
 
 # 
