@@ -69,11 +69,7 @@ class Work(object): # pylint: disable=useless-object-inheritance
       prefix: Prefix of all works.
       url: Work path.
     """
-    if isinstance(url, bytes):
-      url = str(url.decode())
-    prefix = prefix or ''
-    # fullpath = str(prefix) + str(url)
-    return Work(prefix, url)
+    return Work(prefix or '', str(url.decode()) if isinstance(url, bytes) else url)
 
   def __init__(self, prefix, url):
     """Initializes the work.
@@ -184,7 +180,7 @@ class WorkQueue(saver.BaseSaverBuilder.SaveableObject):
     else:
       name = name or context.context().scope_name
 
-    if not isinstance(works, list) or not works:
+    if not works or not isinstance(works, list):
       raise ValueError(
           "WorkQueue requires works as a list of strings")
     
