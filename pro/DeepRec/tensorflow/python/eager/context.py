@@ -73,7 +73,7 @@ _python_eager_context_create_counter = monitoring.Counter(
 class _EagerTensorCache(object):
   """Simple cache which evicts items based on length in a FIFO manner."""
 
-  def __init__(self, max_items=256, max_tensor_size=10000):
+  def __init__(self, max_items=512, max_tensor_size=10000): # 256
     self._data = collections.OrderedDict()
     self._max_items = max_items
     self._max_tensor_size = max_tensor_size
