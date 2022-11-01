@@ -27,7 +27,7 @@ ls -l
 echo
 echo ">> STEP@5"
 pip uninstall tensorflow -y
-pip install /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
+pip install /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl -i https://pypi.org/simple/
 
 echo 
 echo ">> STEP@6"
