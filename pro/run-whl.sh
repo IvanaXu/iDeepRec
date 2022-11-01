@@ -36,4 +36,3 @@ python run_models.py
 
 #
 echo "> Run"
-
