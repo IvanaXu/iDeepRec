@@ -11,6 +11,13 @@ cd /pro/test
 apt-get install libprotobuf-dev protobuf-compiler -y
 g++ main.cpp -o main && ./main
 
+echo
+cd /pro/DeepRec/tensorflow/core/framework
+ls -l dataset_options* model*
+protoc dataset_options.proto --cpp_out=.
+protoc model.proto --cpp_out=.
+ls -l dataset_options* model*
+
 #
 echo
 echo ">> STEP@1"
