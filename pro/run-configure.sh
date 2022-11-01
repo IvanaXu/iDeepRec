@@ -18,6 +18,14 @@ protoc dataset_options.proto --cpp_out=.
 protoc model.proto --cpp_out=.
 echo && ls -l dataset_options* model*
 
+echo
+cd /pro/test
+git clone https://github.com/protocolbuffers/protobuf.git
+cd protobuf
+git submodule update --init --recursive
+bazel build :protoc :protobuf
+cp bazel-bin/protoc /usr/local/bin
+
 #
 echo
 echo ">> STEP@1"
@@ -32,7 +40,7 @@ echo ">> STEP@2"
 # 
 echo
 echo ">> STEP@3"
-bazel build :protoc :protobuf -c opt --config=opt  --config=mkl_threadpool --define build_with_mkl_dnn_v1_only=true //tensorflow/tools/pip_package:build_pip_package
+bazel build -c opt --config=opt  --config=mkl_threadpool --define build_with_mkl_dnn_v1_only=true //tensorflow/tools/pip_package:build_pip_package
 
 echo
 echo ">> STEP@4"
