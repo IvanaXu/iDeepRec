@@ -16,7 +16,7 @@ cd /pro/DeepRec/tensorflow/core/framework
 ls -l dataset_options* model*
 protoc dataset_options.proto --cpp_out=.
 protoc model.proto --cpp_out=.
-ls -l dataset_options* model*
+echo && ls -l dataset_options* model*
 
 #
 echo
