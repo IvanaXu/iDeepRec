@@ -73,12 +73,6 @@
 #     tensorflow_testing_rbe_win:   RBE options to use RBE with tensorflow-testing project on windows
 #
 
-
-# ADD 
-# FROM https://github.com/protocolbuffers/protobuf/tree/main/src
-build:protoc
-build:protobuf
-
 # Android configs. Bazel needs to have --cpu and --fat_apk_cpu both set to the
 # target CPU to build transient dependencies correctly. See
 # https://docs.bazel.build/versions/master/user-manual.html#flag--fat_apk_cpu
