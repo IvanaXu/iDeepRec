@@ -8,7 +8,17 @@ echo "> Run"
 echo 
 echo ">> ~protobuf"
 cd /pro/test
-apt-get install libprotobuf-dev protobuf-compiler -y
+# apt-get install libprotobuf-dev protobuf-compiler -y
+apt-get install cmake -y
+cp protobuf-cpp-3.21.9.zip /
+cd /
+unzip protobuf-cpp-3.21.9.zip
+cd protobuf-3.21.9
+cmake .
+cmake --install .
+cmake --build .
+protoc --version
+
 g++ main.cpp -o main && ./main
 
 echo
@@ -17,14 +27,6 @@ ls -l dataset_options* model*
 protoc dataset_options.proto --cpp_out=.
 protoc model.proto --cpp_out=.
 echo && ls -l dataset_options* model*
-
-echo
-cd /pro/test
-git clone https://github.com/protocolbuffers/protobuf.git
-cd protobuf
-git submodule update --init --recursive
-bazel build :protoc :protobuf
-cp bazel-bin/protoc /usr/local/bin
 
 #
 echo
