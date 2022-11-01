@@ -32,7 +32,7 @@ echo ">> STEP@2"
 # 
 echo
 echo ">> STEP@3"
-bazel build  -c opt --config=opt  --config=mkl_threadpool --define build_with_mkl_dnn_v1_only=true //tensorflow/tools/pip_package:build_pip_package
+bazel build :protoc :protobuf -c opt --config=opt  --config=mkl_threadpool --define build_with_mkl_dnn_v1_only=true //tensorflow/tools/pip_package:build_pip_package
 
 echo
 echo ">> STEP@4"
