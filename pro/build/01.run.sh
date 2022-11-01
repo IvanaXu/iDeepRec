@@ -6,6 +6,7 @@ apt-get install libprotobuf-dev protobuf-compiler -y
 
 echo
 protoc model.proto --cpp_out=.
+ls -l
 ## abseil
 # git clone https://github.com/abseil/abseil-cpp.git
 # cd abseil-cpp
