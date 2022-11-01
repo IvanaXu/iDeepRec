@@ -6,7 +6,8 @@ apt-get install libprotobuf-dev protobuf-compiler -y
 
 echo
 ## abseil
-cd abseil
+git clone https://github.com/abseil/abseil-cpp.git
+cd abseil-cpp
 bazel test --test_tag_filters=-benchmark @com_google_absl//...
 
 #
