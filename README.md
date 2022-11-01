@@ -1,5 +1,6 @@
 
 ![DeepRec Logo](https://github.com/alibaba/DeepRec/blob/main/docs/deeprec_logo.png)
+[![Open in GitHub Codespaces /part1](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/ivanaxu-ideeprec-5g6wx974w7727x9j)
 
 --------------------------------------------------------------------------------
 
