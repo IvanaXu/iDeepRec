@@ -11,4 +11,5 @@ bazel build //absl/...
 
 #
 echo && echo
+cd ../
 g++ main.cpp -o main && ./main
