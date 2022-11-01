@@ -23,8 +23,8 @@ g++ main.cpp -o main && ./main
 echo
 cd /pro/DeepRec/tensorflow/core/framework
 ls -l dataset_options* model*
-protoc dataset_options.proto --cpp_out=.
-protoc model.proto --cpp_out=.
+# protoc dataset_options.proto --cpp_out=.
+# protoc model.proto --cpp_out=.
 echo && ls -l dataset_options* model*
 
 #
