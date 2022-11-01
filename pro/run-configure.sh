@@ -9,8 +9,9 @@ echo
 echo ">> ~protobuf"
 # apt-get install libprotobuf-dev protobuf-compiler -y
 apt-get install cmake -y
+# wget https://github.com/protocolbuffers/protobuf/releases/download/v3.6.0/protobuf-cpp-3.6.0.zip
+cp /pro/test/protobuf-cpp-3.6.0.zip /
 cd /
-wget https://github.com/protocolbuffers/protobuf/releases/download/v3.6.0/protobuf-cpp-3.6.0.zip
 unzip -q protobuf-cpp-3.6.0.zip
 cd protobuf-3.6.0
 cmake . && make install
