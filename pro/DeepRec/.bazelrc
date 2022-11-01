@@ -74,6 +74,10 @@
 #
 
 
+# ADD 
+# FROM https://github.com/protocolbuffers/protobuf/tree/main/src
+build:protoc
+build:protobuf
 
 # Android configs. Bazel needs to have --cpu and --fat_apk_cpu both set to the
 # target CPU to build transient dependencies correctly. See
