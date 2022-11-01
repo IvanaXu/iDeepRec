@@ -7,18 +7,16 @@ echo "> Run"
 #
 echo 
 echo ">> ~protobuf"
-cd /pro/test
 # apt-get install libprotobuf-dev protobuf-compiler -y
 apt-get install cmake -y
-cp protobuf-cpp-3.21.9.zip /
+cp /pro/test/protobuf-cpp-3.21.9.zip /
 cd /
-unzip protobuf-cpp-3.21.9.zip
+unzip -q protobuf-cpp-3.21.9.zip
 cd protobuf-3.21.9
-cmake .
-cmake --install .
-cmake --build .
+cmake . && make install
 protoc --version
 
+cd /pro/test
 g++ main.cpp -o main && ./main
 
 echo
