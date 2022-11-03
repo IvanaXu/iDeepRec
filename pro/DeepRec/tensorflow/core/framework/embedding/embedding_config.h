@@ -30,7 +30,7 @@ struct EmbeddingConfig {
                   float l2_weight_threshold = -1.0, const std::string& layout = "normal_contiguous",
                   int64 max_element_size = 0, float false_positive_probability = -1.0,
                   DataType counter_type = DT_UINT64,
-                  int64 default_value_dim = 4096, bool record_freq =false,
+                  int64 default_value_dim = 512, bool record_freq =false,
                   bool record_version=false):
       emb_index(emb_index),
       primary_emb_index(primary_emb_index),
@@ -60,7 +60,7 @@ struct EmbeddingConfig {
 
   int64 calc_num_counter(int64 max_element_size, float false_positive_probability) {
     float loghpp = fabs(log(false_positive_probability));
-    float factor = log(2) * log(2);
+    float factor = 0.480453; // log(2) * log(2)
     int64 num_bucket = ceil(loghpp / factor * max_element_size);
     if (num_bucket * sizeof(counter_type) > 10 * (1L << 30))
       LOG(WARNING)<<"The Size of BloomFilter is more than 10GB!";
