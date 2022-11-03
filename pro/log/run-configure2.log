@@ -2,7 +2,7 @@
 > Run
 
 >> STEP@1
-total 208
+total 228
 -rw-r--r--  1 root root  2219 Nov  1 19:02 ACKNOWLEDGMENTS
 -rw-r--r--  1 root root   542 Nov  1 19:02 ADOPTERS.md
 -rw-r--r--  1 root root   349 Nov  1 19:02 AUTHORS
@@ -16,6 +16,11 @@ total 208
 -rw-r--r--  1 root root  1666 Nov  1 19:02 RELEASE.md
 -rw-r--r--  1 root root 11443 Nov  1 19:02 WORKSPACE
 -rw-r--r--  1 root root  1218 Nov  1 19:02 arm_compiler.BUILD
+lrwxrwxrwx  1 root root    87 Nov  1 19:03 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
+lrwxrwxrwx  1 root root   108 Nov  1 19:03 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx  1 root root   108 Nov  1 19:03 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx  1 root root    97 Nov  1 19:03 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
+lrwxrwxrwx  1 root root   113 Nov  1 19:03 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
 drwxr-xr-x  6 root root  4096 Nov  1 19:02 cibuild
 -rwxr-xr-x  1 root root   380 Nov  1 19:02 configure
 -rw-r--r--  1 root root   780 Nov  1 19:02 configure.cmd
@@ -72,11 +77,11 @@ Configuration finished
 >> STEP@3
 
 >> STEP@4
-Tue Nov 1 21:39:44 UTC 2022 : === Preparing sources in dir: /tmp/tmp.5GKtdi9brr
+Thu Nov 3 04:34:16 UTC 2022 : === Preparing sources in dir: /tmp/tmp.uJ024LKBaM
 /pro/DeepRec /pro/DeepRec
 /pro/DeepRec
-/tmp/tmp.5GKtdi9brr/tensorflow/include /pro/DeepRec
+/tmp/tmp.uJ024LKBaM/tensorflow/include /pro/DeepRec
 /pro/DeepRec
-Tue Nov 1 21:39:50 UTC 2022 : === Building wheel
-Tue Nov 1 21:40:14 UTC 2022 : === Output wheel file is in: /pkg/tensorflow_pkg
+Thu Nov 3 04:34:21 UTC 2022 : === Building wheel
+Thu Nov 3 04:34:45 UTC 2022 : === Output wheel file is in: /pkg/tensorflow_pkg
 > Run
