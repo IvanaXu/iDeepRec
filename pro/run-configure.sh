@@ -7,7 +7,9 @@ echo "> Run"
 #
 echo
 echo ">> STEP@1"
-cd /pro/DeepRec
+cd /pro/
+unzip r1.15.5-deeprec2208u1.zip
+cd /pro/DeepRec-r1.15.5-deeprec2208u1
 ls -l
 
 # 
