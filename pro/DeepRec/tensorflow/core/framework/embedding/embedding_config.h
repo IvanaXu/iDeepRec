@@ -78,7 +78,7 @@ struct EmbeddingConfig {
   }
 
   int64 calc_num_hash_func(float false_positive_probability) {
-    float loghpp = fabs(log(false_positive_probability)/log(2));
+    float loghpp = fabs(log(false_positive_probability)/0.693147); // log(2)
     return ceil(loghpp);
   }
   bool is_primary() const {
