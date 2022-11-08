@@ -23,12 +23,8 @@ limitations under the License.
 #include "tensorflow/core/framework/attr_value.pb.h"
 #include "tensorflow/core/framework/attr_value_util.h"
 #include "tensorflow/core/framework/cancellation.h"
-#include "tensorflow/core/framework/collective.h"
-#include "tensorflow/core/framework/dataset_metadata.pb.h"
-#include "tensorflow/core/framework/dataset_options.pb.h"
-#include "tensorflow/core/framework/dataset_stateful_op_allowlist.h"
+#include "tensorflow/core/framework/dataset_stateful_op_whitelist.h"
 #include "tensorflow/core/framework/function.h"
-#include "tensorflow/core/framework/function_handle_cache.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/model.h"
 #include "tensorflow/core/framework/node_def.pb.h"
@@ -45,11 +41,7 @@ limitations under the License.
 #include "tensorflow/core/lib/strings/strcat.h"
 #include "tensorflow/core/platform/cpu_info.h"
 #include "tensorflow/core/platform/env.h"
-#include "tensorflow/core/platform/errors.h"
-#include "tensorflow/core/platform/refcount.h"
-#include "tensorflow/core/platform/status.h"
 #include "tensorflow/core/platform/tracing.h"
-#include "tensorflow/tsl/platform/errors.h"
 
 // Polymorphic datasets should support all primitive TensorFlow
 // types. Use this macro to expand `m(T)` once for each primitive type
@@ -65,107 +57,34 @@ class Node;
 
 namespace data {
 
-namespace internal {
-// Merges Options from source to destination. If there is a conflict on a field,
-// the field value from the source takes precedence.
-void MergeOptions(const protobuf::Message& source,
-                  protobuf::Message* destination);
-void MergeOptions(const protobuf::MessageLite& source,
-                  protobuf::MessageLite* destination);
-}  // namespace internal
-
-using TraceMeMetadata = std::vector<std::pair<StringPiece, string>>;
-
-constexpr char kTFDataFunction[] = "_tf_data_function";
-
 constexpr int kInfiniteCardinality = -1;
 constexpr int kUnknownCardinality = -2;
-
-// This constant is a magic number that is used (as a prefix) to identify keys
-// used for serialization of iterator state.
-constexpr char kFullNameRandomHex[] = "60d899aa0d8ce4351e7c3b419e92d25b";
-constexpr char kPipe[] = "|";
-constexpr char kColon[] = ":";
-
-constexpr char kTFDataResourceTag[] = "tfdata";
-constexpr char kTraceInfoUnavailable[] = "unavailable";
-constexpr char kMetadata[] = "metadata";
-
-constexpr char kCardinalityAttrForRewrite[] = "_cardinality";
 
 class DatasetBase;
 class SerializationContext;
 
-inline bool IsTFDataFunction(const FunctionDef& func) {
-  auto iter = func.attr().find(data::kTFDataFunction);
-  return (iter != func.attr().end() && iter->second.b());
-}
-
 // Interface for reading values from a key-value store.
-// Used for restoring iterator state. This class is thread safe.
-// Please see comment on IteratorStateWriter for guidance around using the
-// Read*(key, val) vs Read*(name, key, val).
+// Used for restoring iterator state.
 class IteratorStateReader {
  public:
-  // Determines whether the iterator state contains the given key.
-  virtual bool Contains(StringPiece key) const = 0;
-  virtual bool Contains(StringPiece name, StringPiece key) const = 0;
-
-  // Reads an integer for the given key.
-  virtual Status ReadScalar(StringPiece key, int64_t* val) const = 0;
-  virtual Status ReadScalar(StringPiece name, StringPiece key,
-                            int64_t* val) const = 0;
-
-  // Reads a string for the given key.
-  virtual Status ReadScalar(StringPiece key, tstring* val) const = 0;
-  virtual Status ReadScalar(StringPiece name, StringPiece key,
-                            tstring* val) const = 0;
-
-  // Reads a tensor for the given key.
-  // TODO(jsimsa): Remove non-FLR overrides once all callers are updated.
-  virtual Status ReadTensor(StringPiece key, Tensor* val) const = 0;
-  virtual Status ReadTensor(FunctionLibraryRuntime* flr, StringPiece key,
-                            Tensor* val) const = 0;
-  virtual Status ReadTensor(StringPiece name, StringPiece key,
-                            Tensor* val) const = 0;
-  virtual Status ReadTensor(FunctionLibraryRuntime* flr, StringPiece name,
-                            StringPiece key, Tensor* val) const = 0;
+  virtual Status ReadScalar(StringPiece key, int64* val) = 0;
+  virtual Status ReadScalar(StringPiece key, tstring* val) = 0;
+  virtual Status ReadTensor(StringPiece key, Tensor* val) = 0;
+  virtual bool Contains(StringPiece key) = 0;
 
   virtual ~IteratorStateReader() {}
 };
 
 // Interface for writing values to a key-value store.
-// Used for saving iterator state. Not thread safe.
-// The IteratorStateWriter creates a tensor for each unique iterator name it
-// sees. For the Write*(key, val) API's the key is expected to encode this
-// name as keys are required to be produced using the full_name() method.
-// Each tensor has an upper limit of 2 GB and so if the state for an iterator
-// might exceed the 2 GB limit, you can pass an explicit name in via the
-// Write*(name, key, val) APIs allowing you to further split up the state
-// into more manageable chunks.
+// Used for saving iterator state.
 class IteratorStateWriter {
  public:
-  // Writes an integer for the given key.
-  virtual Status WriteScalar(StringPiece key, const int64_t val) = 0;
-  virtual Status WriteScalar(StringPiece name, StringPiece key,
-                             const int64_t val) = 0;
-
-  // Writes a string for the given key.
+  virtual Status WriteScalar(StringPiece key, const int64 val) = 0;
   virtual Status WriteScalar(StringPiece key, const tstring& val) = 0;
-  virtual Status WriteScalar(StringPiece name, StringPiece key,
-                             const tstring& val) = 0;
-
-  // Writes a tensor for the given key.
   virtual Status WriteTensor(StringPiece key, const Tensor& val) = 0;
-  virtual Status WriteTensor(StringPiece name, StringPiece key,
-                             const Tensor& val) = 0;
 
   virtual ~IteratorStateWriter() {}
 };
-
-// Generates a full name key for iterator checkpointing. All keys generated for
-// iterator checkpoints should go through this function.
-std::string FullName(const std::string& prefix, const std::string& name);
 
 // Wrapper around GraphDefBuilder. Used to serialize Dataset graph.
 class GraphDefBuilderWrapper {
@@ -184,7 +103,7 @@ class GraphDefBuilderWrapper {
     if (*output == nullptr) {
       return errors::Internal("AddScalar: Failed to build Const op.");
     }
-    return OkStatus();
+    return Status::OK();
   }
 
   // Adds a Const node with vector value to the Graph.
@@ -195,7 +114,7 @@ class GraphDefBuilderWrapper {
   template <typename T>
   Status AddVector(const std::vector<T>& val, Node** output) {
     Tensor val_t = Tensor(DataTypeToEnum<T>::v(),
-                          TensorShape({static_cast<int64_t>(val.size())}));
+                          TensorShape({static_cast<int64>(val.size())}));
     for (size_t i = 0; i < val.size(); i++) {
       val_t.flat<T>()(i) = val[i];
     }
@@ -203,12 +122,15 @@ class GraphDefBuilderWrapper {
     if (*output == nullptr) {
       return errors::Internal("AddVector: Failed to build Const op.");
     }
-    return OkStatus();
+    return Status::OK();
   }
 
+#ifdef USE_TSTRING
+  // TODO(dero): Temp guard to prevent duplicate declaration during tstring
+  // migration.
   Status AddVector(const std::vector<string>& val, Node** output) {
     Tensor val_t = Tensor(DataTypeToEnum<tstring>::v(),
-                          TensorShape({static_cast<int64_t>(val.size())}));
+                          TensorShape({static_cast<int64>(val.size())}));
     for (size_t i = 0; i < val.size(); i++) {
       val_t.flat<tstring>()(i) = val[i];
     }
@@ -216,8 +138,9 @@ class GraphDefBuilderWrapper {
     if (*output == nullptr) {
       return errors::Internal("AddVector: Failed to build Const op.");
     }
-    return OkStatus();
+    return Status::OK();
   }
+#endif  // USE_TSTRING
 
   // Adds a `Const` node for the given tensor value to the graph.
   //
@@ -229,7 +152,7 @@ class GraphDefBuilderWrapper {
     if (*output == nullptr) {
       return errors::Internal("AddTensor: Failed to build Const op.");
     }
-    return OkStatus();
+    return Status::OK();
   }
 
   // Adds a `Placeholder` node for the given tensor value to the graph.
@@ -243,44 +166,39 @@ class GraphDefBuilderWrapper {
       return errors::Internal(
           "AddPlaceholder: Failed to build Placeholder op.");
     }
-    return OkStatus();
+    return Status::OK();
   }
 
-  // Adds a node for the given dataset to the `Graph`. The value of
-  // `DatasetBase::type_string()` is used as the op type for the node. Values
-  // for the `output_types` and `output_shapes` node attributes are also written
-  // if those attributes are defined in the `OpDef`.
-  //
-  // If `use_dataset_name` is set, the value of `DatasetBase::node_name()` is
-  // used as the op name for the node. This argument should only be set when
-  // serializing `DatasetBase` instances which might not have been created
-  // through op kernel execution to make sure the dataset op name is preserved
-  // across serialization boundaries, which is in turn needed to make sure
-  // iterator checkpoints are valid across serialization boundaries. When
-  // `use_dataset_name` is set, the caller is responsible for making sure that
-  // the op name is unique across the graph.
-  //
-  // `*output` contains a pointer to the output `Node`. It is guaranteed to be
-  // non-null if the method returns with an OK status. The returned `Node`
-  // pointer is owned by the backing `Graph` of `GraphDefBuilder`.
   Status AddDataset(const DatasetBase* dataset,
-                    const std::vector<Node*>& inputs, Node** output);
+                    const std::vector<Node*>& inputs, Node** output) {
+    return AddDataset(dataset, inputs, {}, output);
+  }
+
+  // Adds a node corresponding to the `DatasetType` to the Graph.
+  // Return value of `DatasetType::type_string()` is used as the op type for the
+  // node.
+  // Values for the output_types and output_shapes node attributes are also
+  // written if those attributes are defined in the OpDef.
+  // `*output` contains a pointer to the output `Node`. It is guaranteed to be
+  // non-null if the method returns with an OK status.
+  // The returned Node pointer is owned by the backing Graph of GraphDefBuilder.
   Status AddDataset(const DatasetBase* dataset,
                     const std::vector<Node*>& inputs,
                     const std::vector<std::pair<StringPiece, AttrValue>>& attrs,
-                    Node** output);
+                    Node** output) {
+    std::vector<std::pair<size_t, Node*>> enumerated_inputs(inputs.size());
+    for (size_t i = 0; i < inputs.size(); i++) {
+      enumerated_inputs[i] = std::make_pair(i, inputs[i]);
+    }
+    return AddDataset(dataset, enumerated_inputs, {}, attrs, output);
+  }
+
   Status AddDataset(
       const DatasetBase* dataset,
       const std::vector<std::pair<size_t, Node*>>& inputs,
       const std::vector<std::pair<size_t, gtl::ArraySlice<Node*>>>& list_inputs,
       const std::vector<std::pair<StringPiece, AttrValue>>& attrs,
       Node** output);
-  Status AddDataset(
-      const DatasetBase* dataset,
-      const std::vector<std::pair<size_t, Node*>>& inputs,
-      const std::vector<std::pair<size_t, gtl::ArraySlice<Node*>>>& list_inputs,
-      const std::vector<std::pair<StringPiece, AttrValue>>& attrs,
-      bool use_dataset_name, Node** output);
 
   // Adds a user-defined function with name `function_name` to the graph and
   // recursively adds all functions it references. If a function with a matching
@@ -297,23 +215,13 @@ class GraphDefBuilderWrapper {
     SetAttrValue(value, attr);
   }
 
-  template <typename T>
-  AttrValue BuildAttrValue(const T& value) {
-    AttrValue attr;
-    SetAttrValue(value, &attr);
-    return attr;
-  }
-
- protected:
-  GraphDefBuilder* builder() { return b_; }
-
  private:
   void AddPlaceholderInternal(const Tensor& val, Node** output);
   void AddTensorInternal(const Tensor& val, Node** output);
   bool HasAttr(const string& op_type_name, const string& attr_name) const;
 
   bool HasAttr(const OpDef* op_def, const string& attr_name) const {
-    for (const auto& attr : op_def->attr()) {
+    for (auto attr : op_def->attr()) {
       if (attr.name() == attr_name) {
         return true;
       }
@@ -331,13 +239,14 @@ class GraphDefBuilderWrapper {
         TF_RETURN_IF_ERROR(AddFunction(ctx, name_attr_list.name(), lib_def));
       }
     }
-    return OkStatus();
+    return Status::OK();
   }
 
   GraphDefBuilder* b_;
 };
 
 class StatsAggregator;
+class FunctionHandleCache;
 
 // A utility class for running a function and ensuring that there is always a
 // `tensorflow::data` symbol on the stack.
@@ -351,35 +260,6 @@ class Runner {
   // Returns a global singleton Runner.
   static Runner* get();
 };
-
-// A class which provides a sequence of splits. Splits represent subdivisions of
-// a dataset, e.g. filenames or ranges within files. We use splitting to
-// partition input data into smaller pieces for distributed processing (see
-// go/tf-data-splitting-design).
-//
-// Datasets provide a `MakeSplitProvider` method to expose a listing of their
-// splits.
-//
-// Iterators created with a split provider will only iterate over the splits
-// provided by the split provider.
-class SplitProvider {
- public:
-  virtual ~SplitProvider() {}
-  // Stores the next split in `*split`, setting `*end_of_splits` to indicate
-  // whether there were any splits left.
-  virtual Status GetNext(Tensor* split, bool* end_of_splits) = 0;
-  // Resets the split provider to its beginning.
-  virtual Status Reset() = 0;
-  // Saves the state of this split provider.
-  virtual Status Save(std::function<std::string(std::string)> full_name,
-                      IteratorStateWriter* writer) = 0;
-  // Restores the state of this split provider.
-  virtual Status Restore(std::function<std::string(std::string)> full_name,
-                         IteratorStateReader* reader) = 0;
-};
-
-// Returns the runner threadpool size from an OpKernelContext.
-int32_t GetRunnerThreadpoolSizeFromOpKernelContext(OpKernelContext* ctx);
 
 // A cut-down version of `OpKernelContext` for running computations in
 // iterators. Note that we cannot simply use `OpKernelContext` here because we
@@ -398,34 +278,32 @@ class IteratorContext {
     explicit Params(IteratorContext* ctx)
         : allocator_getter(ctx->allocator_getter()),
           cancellation_manager(ctx->cancellation_manager()),
-          collective_executor(ctx->collective_executor()),
           env(ctx->env()),
           flr(ctx->flr()),
           function_handle_cache(ctx->function_handle_cache()),
-          interleave_depth(ctx->interleave_depth()),
-          is_restoring(ctx->is_restoring()),
-          model(ctx->model()),
-          options(ctx->options()),
           resource_mgr(ctx->resource_mgr()),
+          model(ctx->model()),
           runner(*(ctx->runner())),
           runner_threadpool_size(ctx->runner_threadpool_size()),
-          split_providers(ctx->split_providers()),
           stats_aggregator(ctx->stats_aggregator()),
           thread_factory(ctx->thread_factory()),
           thread_pool(ctx->thread_pool()) {}
 
     explicit Params(OpKernelContext* ctx)
-        : collective_executor(ctx->collective_executor()),
-          env(ctx->env()),
-          flr(ctx->function_library()) {
+        : env(ctx->env()), flr(ctx->function_library()) {
       // NOTE: need reinterpret_cast because function.h forward-declares Device.
       DeviceBase* device =
           reinterpret_cast<DeviceBase*>(ctx->function_library()->device());
       allocator_getter = [device](AllocatorAttributes attrs) {
         return device->GetAllocator(attrs);
       };
-
-      runner_threadpool_size = GetRunnerThreadpoolSizeFromOpKernelContext(ctx);
+      thread::ThreadPool* thread_pool =
+          ctx->device()->tensorflow_device_thread_pool();
+      if (thread_pool) {
+        runner_threadpool_size = thread_pool->NumThreads();
+      } else {
+        runner_threadpool_size = port::MaxParallelism();
+      }
 
       // NOTE: Wrap every runner invocation in a call to Runner()->Run(), so
       // that a symbol in the tensorflow::data namespace is always on the stack
@@ -447,10 +325,7 @@ class IteratorContext {
     std::function<Allocator*(AllocatorAttributes)> allocator_getter = nullptr;
 
     // The CancellationManager to be used to cancel execution of ops.
-    CancellationManager* cancellation_manager = nullptr;
-
-    // Collective support.
-    CollectiveExecutor* collective_executor = nullptr;
+    CancellationManager* cancellation_manager;
 
     // Interface to operating system functionality.
     Env* env = nullptr;
@@ -461,23 +336,12 @@ class IteratorContext {
     // A FunctionHandleCache that owns all the function handles. Not owned.
     FunctionHandleCache* function_handle_cache = nullptr;
 
-    // Records the number of ParallelInterleave operations in the path from the
-    // root node to this node (not including this node) in the input pipeline
-    // tree.
-    int64 interleave_depth = 0;
-
-    // Marks whether the iterator is restored from a checkpoint.
-    bool is_restoring = false;
-
-    // If non-null, identifies the object used for performance modeling.
-    std::shared_ptr<model::Model> model = nullptr;
-
-    // The input pipeline options.
-    const Options* options = nullptr;
-
     // A resource manager for storing dataset-related state, e.g. random
     // seeds or cached tensors. Not owned.
     ResourceMgr* resource_mgr = nullptr;
+
+    // If non-null, identifies the object used for performance modeling.
+    std::shared_ptr<model::Model> model = nullptr;
 
     // Function call support.
     std::function<void(std::function<void()>)> runner = nullptr;
@@ -485,14 +349,7 @@ class IteratorContext {
     // Number of threads used for executing user-defined functions.
     int32 runner_threadpool_size = 0;
 
-    // Split providers indicating which splits to process. May be empty,
-    // indicating that the iterator should process all splits.
-    std::vector<std::shared_ptr<SplitProvider>> split_providers;
-
     // The `StatsAggregator` object to record statistics about the iterator.
-    //
-    // TODO(b/147325552): Remove this API and any of its uses after we switch to
-    // using C++ based implementation for tf.data options (on 4/12/2021).
     std::shared_ptr<StatsAggregator> stats_aggregator = nullptr;
 
     // A factory for creating threads to perform blocking work.
@@ -520,10 +377,6 @@ class IteratorContext {
     return params_.cancellation_manager;
   }
 
-  CollectiveExecutor* collective_executor() {
-    return params_.collective_executor;
-  }
-
   Env* env() const { return params_.env; }
 
   FunctionLibraryRuntime* flr() { return params_.flr; }
@@ -532,25 +385,15 @@ class IteratorContext {
     return params_.function_handle_cache;
   }
 
-  int64 interleave_depth() { return params_.interleave_depth; }
-
-  bool is_restoring() { return params_.is_restoring; }
+  ResourceMgr* resource_mgr() { return params_.resource_mgr; }
 
   const std::shared_ptr<model::Model>& model() { return params_.model; }
-
-  const Options* options() { return params_.options; }
-
-  ResourceMgr* resource_mgr() { return params_.resource_mgr; }
 
   std::function<void(std::function<void()>)>* runner() {
     return &params_.runner;
   }
 
   int32 runner_threadpool_size() { return params_.runner_threadpool_size; }
-
-  std::vector<std::shared_ptr<SplitProvider>> split_providers() {
-    return params_.split_providers;
-  }
 
   std::shared_ptr<StatsAggregator> stats_aggregator() {
     return params_.stats_aggregator;
@@ -561,6 +404,8 @@ class IteratorContext {
   }
 
   thread::ThreadPoolInterface* thread_pool() { return params_.thread_pool; }
+
+  Params params() { return params_; }
 
   std::unique_ptr<thread::ThreadPool> CreateThreadPool(const string& name,
                                                        int num_threads) {
@@ -594,80 +439,38 @@ class IteratorContext {
 // Aggregates runtime support needed for dataset and iterator serialization.
 class SerializationContext {
  public:
-  // Handles the external state according to the external state policy.
-  Status HandleCheckExternalStateStatus(Status s) {
-    if (s.ok()) {
-      return s;
-    }
-    switch (params_.external_state_policy) {
-      case ExternalStatePolicy::POLICY_WARN:
-        LOG(WARNING) << s.ToString();
-        return OkStatus();
-      case ExternalStatePolicy::POLICY_IGNORE:
-        VLOG(2) << "Ignoring error status: " << s.ToString();
-        return OkStatus();
-      case ExternalStatePolicy::POLICY_FAIL:
-        return s;
-      default:
-        return errors::InvalidArgument("Unexpected value of external policy: ",
-                                       params_.external_state_policy);
-    }
-  }
-
   struct Params {
-    explicit Params() {}
-
-    explicit Params(OpKernelContext* ctx)
-        : resource_mgr(ctx->resource_manager()),
-          device_name(ctx->device()->attributes().name()) {}
-
     std::vector<std::pair<string, Tensor>>* input_list = nullptr;  // Not owned.
 
-    // Indicates what to do if the dataset depends on external state.
-    ExternalStatePolicy external_state_policy =
-        ExternalStatePolicy::POLICY_WARN;
+    // Indicates whether serialization should check if the dataset depends on
+    // external state. If the check is enabled and external state is
+    // encountered, then the serialization will fail.
+    bool check_external_state = true;
 
-    // Indicates whether the serialization is for rewrites.
-    //
-    // If true:
-    //   * A dataset that doesn't implement serialization is replaced with a
-    //     placeholder returned in `input_list`.
-    //   * Data tensors are replaced with a placeholder returned in
-    //     `input_list`.
-    //   * Datasets that use random seeds should not serialize the random seeds.
-    //     This doesn't affect datasets that use fixed seeds; fixed seeds will
-    //     always be preserved.
-    //   * Cardinality is serialized as an unregistered attribute
-    //     `_cardinality`.
-    // If false:
-    //   * A dataset that doesn't implement serialization should result in an
-    //     error.
-    //   * Data tensors (potentially large) should be serialized.
-    //   * Datasets that use random seeds should serialize the random seeds.
-    bool is_graph_rewrite = false;
+    // Indicates whether an attempt to serialize a dataset that does not
+    // implement serialization should result in an error. If set to `false`, the
+    // serialized graph will replace the dataset with a placeholder returned in
+    // `input_list`.
+    bool fail_if_unimplemented = true;
 
-    // A resource manager for looking up resources during serialization.
-    ResourceMgr* resource_mgr;
-
-    // The name of the device doing the serialization.
-    std::string device_name;
+    // Indicates whether (potentionally large) data tensors should be
+    // serialized, or replaced with a placeholder returned in `input_list`. The
+    // latter makes sense to do when performing data agnostic graph rewrites to
+    // reduce the memory usage.
+    bool serialize_data_tensors = true;
   };
 
-  explicit SerializationContext(Params params) : params_(params) {}
+  explicit SerializationContext(Params params) : params_(std::move(params)) {}
 
   std::vector<std::pair<string, Tensor>>* input_list() {
     return params_.input_list;
   }
 
-  ExternalStatePolicy external_state_policy() const {
-    return params_.external_state_policy;
-  }
+  bool check_external_state() const { return params_.check_external_state; }
 
-  bool is_graph_rewrite() const { return params_.is_graph_rewrite; }
+  bool fail_if_unimplemented() const { return params_.fail_if_unimplemented; }
 
-  const ResourceMgr* resource_mgr() const { return params_.resource_mgr; }
-
-  const std::string& device_name() const { return params_.device_name; }
+  bool serialize_data_tensors() const { return params_.serialize_data_tensors; }
 
  private:
   Params params_;
@@ -692,22 +495,15 @@ class IteratorBase {
   // output will be stored in `*out_tensors` and `false` will be
   // stored in `*end_of_sequence`.
   //
-  // If no more outputs remain in this iterator's range, `true` will be stored
-  // in `*end_of_sequence`, and `*out_tensors` will be empty.
+  // If no more outputs remain in this iterator's range, `true` will
+  // be stored in `*end_of_sequence`, and the content of
+  // `*out_tensors` will be undefined.
   //
   // Implementations should never return `OutOfRange` error. If at end of
-  // sequence, set `*end_of_sequence = true` and return `OkStatus()`.
+  // sequence, set `*end_of_sequence = true` and return `Status::OK()`.
   // Internally raised `OutOfRange` errors that do not imply end of sequence
   // should be converted to a different error type before being propagated to
   // the caller.
-  //
-  // Implementations must explicitly set `*end_of_sequence = false` if an
-  // `OkStatus()` status is returned and the iterator is not at the end of the
-  // sequence.
-  //
-  // `out_tensors` and `end_of_sequence` are output parameters. `*out_tensors`
-  // and `*end_of_sequence` should not be read by implementations of `GetNext`
-  // before they are assigned.
   //
   // This method is thread-safe.
   //
@@ -719,21 +515,6 @@ class IteratorBase {
   Status GetNext(IteratorContext&& ctx, std::vector<Tensor>* out_tensors,
                  bool* end_of_sequence) {
     return GetNext(&ctx, out_tensors, end_of_sequence);
-  }
-
-  // Skips the next `num_to_skip` outputs from the range that this iterator
-  // is traversing.
-  //
-  // If there are not enough outputs to skip, it will set
-  // `*end_of_sequence = true` and return `OkStatus()`. `*num_skipped` will
-  // store the number of outputs that are skipped. When `*end_of_sequence` is
-  // `false`, `*num_skipped` should equal to `num_to_skip`.
-  virtual Status Skip(IteratorContext* ctx, int num_to_skip,
-                      bool* end_of_sequence, int* num_skipped) = 0;
-
-  virtual Status Skip(IteratorContext&& ctx, int num_to_skip,
-                      bool* end_of_sequence, int* num_skipped) {
-    return Skip(&ctx, num_to_skip, end_of_sequence, num_skipped);
   }
 
   // Returns a vector of DataType values, representing the respective
@@ -752,18 +533,16 @@ class IteratorBase {
 
   // Performs initialization that needs to happen outside of a constructor to
   // properly propagate errors.
-  virtual Status Initialize(IteratorContext* ctx) { return OkStatus(); }
-
-  // Performs initialization of the base iterator.
-  Status InitializeBase(IteratorContext* ctx, const IteratorBase* parent);
+  virtual Status Initialize(IteratorContext* ctx) { return Status::OK(); }
 
   // Saves the state of this iterator.
   virtual Status Save(SerializationContext* ctx, IteratorStateWriter* writer) {
-    int64_t start_us = EnvTime::NowMicros();
-    TF_RETURN_IF_ERROR(SaveInternal(ctx, writer));
-    VLOG(1) << "Saved " << prefix() << " in "
-            << (EnvTime::NowMicros() - start_us) << "us";
-    return OkStatus();
+    return SaveInternal(writer);
+  }
+
+  // Restores the state of this iterator.
+  virtual Status Restore(IteratorContext* ctx, IteratorStateReader* reader) {
+    return RestoreInternal(ctx, reader);
   }
 
  protected:
@@ -771,73 +550,63 @@ class IteratorBase {
   virtual std::shared_ptr<model::Node> CreateNode(
       IteratorContext* ctx, model::Node::Args args) const = 0;
 
-  // Restores the state of this iterator.
-  virtual Status Restore(IteratorContext* ctx, IteratorStateReader* reader) {
-    int64_t start_us = EnvTime::NowMicros();
-    TF_RETURN_IF_ERROR(RestoreInternal(ctx, reader));
-    VLOG(1) << "Restored " << prefix() << " in "
-            << (EnvTime::NowMicros() - start_us) << "us";
-    return OkStatus();
-  }
-
   // This is needed so that sub-classes of IteratorBase can call
   // `SaveInternal` on their input iterators.
-  Status SaveInput(SerializationContext* ctx, IteratorStateWriter* writer,
+  Status SaveInput(IteratorStateWriter* writer,
                    const std::unique_ptr<IteratorBase>& input) {
-    return input->Save(ctx, writer);
+    return input->SaveInternal(writer);
   }
 
   // This is needed so that sub-classes of IteratorBase can call
   // `RestoreInternal` on their input iterators.
   Status RestoreInput(IteratorContext* ctx, IteratorStateReader* reader,
                       const std::unique_ptr<IteratorBase>& input) {
-    return input->Restore(ctx, reader);
-  }
-
-  Status RestoreInput(IteratorContext&& ctx, IteratorStateReader* reader,
-                      const std::unique_ptr<IteratorBase>& input) {
-    return RestoreInput(&ctx, reader, input);
+    return input->RestoreInternal(ctx, reader);
   }
 
   // Saves the state of this iterator.
   //
   // This method is used to store the state of the iterator in a checkpoint.
+  //
+  // TODO(jsimsa): Make this method pure virtual once all `IteratorBase`
   // implementations have an override.
-  virtual Status SaveInternal(SerializationContext* ctx,
-                              IteratorStateWriter* writer) = 0;
+  virtual Status SaveInternal(IteratorStateWriter* writer) {
+    return errors::Unimplemented("SaveInternal");
+  }
 
   // Restores the state of this iterator.
   //
   // This method is used to restore the state of the iterator from a checkpoint.
   //
-  // Implementations may assume that the iterator is in a clean state. That is,
-  // its `Initialize` method has been called, but its `GetNext` method has
-  // never been called.
+  // TODO(jsimsa): Make this method pure virtual once all `IteratorBase`
   // implementations have an override.
   virtual Status RestoreInternal(IteratorContext* ctx,
-                                 IteratorStateReader* reader) = 0;
+                                 IteratorStateReader* reader) {
+    return errors::Unimplemented("RestoreInternal");
+  }
 
-  // Returns a pointer to the node representing this iterator in the performance
-  // model. It may be null, if performance modeling is not enabled for this
-  // iterator.
-  std::shared_ptr<model::Node> model_node() const { return node_; }
-
-  // Returns the number of elements produced by this iterator.
-  int64_t num_elements() const {
+  // Returns the number of elements produced by this itertaor.
+  int64 num_elements() const {
     if (node_) return node_->num_elements();
     return 0;
   }
 
  private:
-  // For access to `AddCleanupFunction` and `Restore`.
-  friend class DatasetBase;
+  friend class DatasetBase;          // for access to `AddCleanupFunction`
   friend class DatasetBaseIterator;  // for access to `node_`
 
+  // Registers a cleanup function to be called upon object destruction.
+  //
+  // Registered functions are invoked in the reserve order of registration.
+  void AddCleanupFunction(std::function<void()>&& cleanup_fn) {
+    cleanup_fns_.push_back(std::move(cleanup_fn));
+  }
+
+  // Associates the given performance modeling `Node` with this iterator.
+  void SetNode(std::shared_ptr<model::Node> node) { node_ = node.get(); }
+
   std::vector<std::function<void()>> cleanup_fns_;
-  std::shared_ptr<model::Node> node_ = nullptr;
-  const IteratorBase* parent_ = nullptr;  // Not owned.
-  int64_t id_ = 0;
-  int64_t parent_id_ = 0;
+  model::Node* node_ = nullptr;  // Not owned.
 };
 
 // Represents runtime information needed to construct a dataset.
@@ -864,10 +633,7 @@ class DatasetContext {
 };
 
 // Returns the number of bytes allocated for the given tensor.
-int64_t GetAllocatedBytes(const std::vector<Tensor>& element);
-
-// Returns the estimated memory usage in bytes of the given tensor.
-int64_t GetTotalBytes(const std::vector<Tensor>& element);
+int64 GetAllocatedBytes(const std::vector<Tensor>& element);
 
 // Validates and extracts a `DatasetBase` object from `tensor`.
 //
@@ -906,15 +672,6 @@ class DatasetBase : public core::RefCounted {
   // the graph.
   const string& node_name() const { return node_name_; }
 
-  const Metadata& metadata() const { return metadata_; }
-
-  const Options& options() const { return options_; }
-
-  int64_t num_sources() const { return num_sources_; }
-
-  // Initializes the dataset using the given metadata.
-  void Initialize(const Metadata& metadata);
-
   // Returns a new iterator for iterating over the range of elements in
   // this dataset.
   //
@@ -925,44 +682,23 @@ class DatasetBase : public core::RefCounted {
   //
   // The prefix identifies the sequence of iterators leading up to the newly
   // created iterator.
-  Status MakeIterator(IteratorContext* ctx, const IteratorBase* parent,
-                      const string& output_prefix,
-                      std::unique_ptr<IteratorBase>* iterator) const;
-
-  Status MakeIterator(IteratorContext&& ctx, const IteratorBase* parent,
-                      const string& output_prefix,
+  Status MakeIterator(IteratorContext* ctx, const string& output_prefix,
                       std::unique_ptr<IteratorBase>* iterator) const {
-    return MakeIterator(&ctx, parent, output_prefix, iterator);
+    *iterator = MakeIteratorInternal(output_prefix);
+    if (const auto& model = ctx->model()) {
+      const string& prefix = (*iterator)->prefix();
+      (*iterator)->SetNode(model->AddNode(MakeNodeFactory(ctx, iterator->get()),
+                                          prefix, output_prefix));
+      (*iterator)->AddCleanupFunction(
+          [model, prefix]() { model->RemoveNode(prefix); });
+    }
+    return (*iterator)->Initialize(ctx);
   }
 
-  // Returns a new iterator restored from the checkpoint data in `reader`.
-  Status MakeIteratorFromCheckpoint(
-      IteratorContext* ctx, const string& output_prefix,
-      IteratorStateReader* reader,
-      std::unique_ptr<IteratorBase>* iterator) const {
-    std::unique_ptr<IteratorBase> it;
-    IteratorContext::Params params(ctx);
-    params.is_restoring = true;
-    IteratorContext restore_ctx(std::move(params));
-    TF_RETURN_IF_ERROR(MakeIterator(&restore_ctx,
-                                    /*parent=*/nullptr, output_prefix, &it));
-    TF_RETURN_IF_ERROR(it->Restore(&restore_ctx, reader));
-    *iterator = std::move(it);
-    return OkStatus();
+  Status MakeIterator(IteratorContext&& ctx, const string& output_prefix,
+                      std::unique_ptr<IteratorBase>* iterator) const {
+    return MakeIterator(&ctx, output_prefix, iterator);
   }
-
-  Status MakeIteratorFromCheckpoint(
-      IteratorContext&& ctx, const string& output_prefix,
-      IteratorStateReader* reader,
-      std::unique_ptr<IteratorBase>* iterator) const {
-    return MakeIteratorFromCheckpoint(&ctx, output_prefix, reader, iterator);
-  }
-
-  // Returns a split provider which partitions the dataset's data into splits
-  // and provides them in a sequence. The split provider is stored in
-  // `*split_provider`.
-  virtual Status MakeSplitProviders(
-      std::vector<std::unique_ptr<SplitProvider>>* split_providers) const;
 
   // Returns a vector of DataType values, representing the respective
   // element types of each tuple component in the outputs of this
@@ -975,85 +711,48 @@ class DatasetBase : public core::RefCounted {
   virtual const std::vector<PartialTensorShape>& output_shapes() const = 0;
 
   // Returns the number of bytes allocated for tensors of this dataset.
-  virtual int64_t AllocatedBytes() const { return 0; }
-
-  // Returns the estimated number of bytes used for tensors of this dataset.
-  virtual int64_t TotalBytes() const { return 0; }
+  virtual int64 AllocatedBytes() const { return 0; }
 
   // Returns the cardinality of this dataset.
-  // TODO(shilpakrish): Remove this overload once all callers are migrated
-  // to the API which passes in the options parameter.
-  ABSL_DEPRECATED("Use the overload that passes in the options parameter.")
-  int64_t Cardinality() const;
-
-  // Returns the cardinality of this dataset based on the options.
-  int64_t Cardinality(CardinalityOptions options) const;
-
-  // Internal implementation of cardinality for a dataset.
-  // TODO(shilpakrish): Remove this overload once all callers are migrated
-  // to the API which passes in the options parameter.
-  ABSL_DEPRECATED("Use the overload that passes in the options parameter.")
-  virtual int64_t CardinalityInternal() const { return kUnknownCardinality; }
-
-  // Internal implementation of cardinality for a dataset based on the options.
-  virtual int64_t CardinalityInternal(CardinalityOptions options) const {
-    return kUnknownCardinality;
-  }
+  virtual int64 Cardinality() const { return kUnknownCardinality; }
 
   // A human-readable debug string for this dataset.
   virtual string DebugString() const = 0;
 
-  // Stores the dataset's input datasets in `*inputs`. The pointers stored in
-  // `*inputs` are borrowed. The only valid non-ok return status is
-  // UNIMPLEMENTED in case `InputDatasets` is not implemented by a dataset
-  // subclass. Implementing `InputDatasets` enables `DatasetBase` to provide a
-  // default implementation of `MakeSplitProvider` when there is a single input
-  // dataset.
-  virtual Status InputDatasets(std::vector<const DatasetBase*>* inputs) const;
+  // If the dataset is stateful it will not be possible to save its graph or
+  // checkpoint the state of its iterators.
+  //
+  // TODO(jsimsa): Remove this method once all `DatasetBase` implementations are
+  // migrated over to `CheckExternalState`.
+  virtual bool IsStateful() const { return false; }
 
-  // Indicates whether the dataset depends on any external state which would
-  // prevent it from being serializable. If so, the method returns
-  // `errors::FailedPrecondition` with a message that identifies the external
-  // state. Otherwise, the method returns `OkStatus()`.
-  virtual Status CheckExternalState() const = 0;
+  // Indicates whether the dataset depends on any external state. If so, the
+  // method returns `errors::FailedPrecondition` with a message that identifies
+  // the external state. Otherwise, the method returns `Status::OK()`.
+  //
+  // TODO(jsimsa): Make this method pure virtual once all `DatasetBase`
+  // implementations have an override.
+  virtual Status CheckExternalState() const {
+    if (IsStateful()) {
+      return errors::FailedPrecondition("Dataset cannot be serialized.");
+    }
+    return Status::OK();
+  }
 
-  // Indicates whether the dataset is compatible with random access.
-  Status CheckRandomAccessCompatible(const int64 index) const;
+ protected:
+  friend Status AsGraphDef(
+      OpKernelContext* ctx, const DatasetBase* dataset,
+      SerializationContext&& serialization_ctx,
+      GraphDef* graph_def);  // For access to graph related members.
+  friend class CapturedFunction;
 
-  // Return the element at a particular index for a randomly accessible dataset.
-  virtual Status Get(OpKernelContext* ctx, int64 index,
-                     std::vector<Tensor>* out_tensors) const;
-
-  // Return a finalized version of the dataset.  The returned DatasetBase is
-  // unowned and lives for as long as this dataset.
-  virtual StatusOr<DatasetBase*> Finalize(
-      OpKernelContext* ctx,
-      std::function<StatusOr<core::RefCountPtr<DatasetBase>>()>
-          make_finalized_dataset) const;
-
-  // Wrapper around a GraphDefBuilder which provides support for serializing
-  // Datasets as GraphDefs.
   class DatasetGraphDefBuilder : public GraphDefBuilderWrapper {
    public:
     explicit DatasetGraphDefBuilder(GraphDefBuilder* b)
         : GraphDefBuilderWrapper(b) {}
     Status AddInputDataset(SerializationContext* ctx,
                            const DatasetBase* dataset, Node** output);
-    Status AddDatasetOrTensor(SerializationContext* ctx, const Tensor& val,
-                              Node** output);
-    Status AddIdentity(SerializationContext* ctx,
-                       const std::string& name_prefix, Node** input,
-                       Node** output);
-
-   private:
-    Status AddDatasetOrTensorHelper(SerializationContext* ctx,
-                                    const Tensor& val, Node** output);
-    Status AddResourceHelper(SerializationContext* ctx, const Tensor& val,
-                             Node** output);
   };
-
- protected:
-  friend class CapturedFunction;
 
   // Serializes the dataset into a `GraphDef`, which has two uses:
   //
@@ -1072,34 +771,17 @@ class DatasetBase : public core::RefCounted {
   virtual std::unique_ptr<IteratorBase> MakeIteratorInternal(
       const string& prefix) const = 0;
 
-  void set_options(const Options& options) { options_ = options; }
-
  private:
-  // Computes and stores the cardinality of a given dataset.
-  Status ComputeCardinality();
-
-  // Computes the number of source datasets feeding into this dataset. A source
-  // dataset is a leaf in the subtree of dataset inputs.
-  Status ComputeNumSources();
-
-  // Merges options from inputs to this dataset. If there is a conflict in a
-  // field value, the options set on this dataset takes precedence over those in
-  // the inputs. The order of precedence on the inputs is in the same order as
-  // how they appear for this dataset.
-  Status MergeOptionsFromInputs();
+  // Returns a factory for nodes that represent the given iterator.
+  static model::Node::Factory MakeNodeFactory(IteratorContext* ctx,
+                                              IteratorBase* iterator) {
+    return [ctx, iterator](model::Node::Args args) {
+      return iterator->CreateNode(ctx, std::move(args));
+    };
+  }
 
   const string type_string_;
   const string node_name_;
-  Metadata metadata_;
-  Options options_;
-  mutable mutex mu_;
-  mutable mutex cardinality_mu_;
-  mutable core::RefCountPtr<DatasetBase> finalized_dataset_;
-  //  The number of source datasets feeding into the dataset. A source dataset
-  //  is a leaf in the subtree of dataset inputs.
-  int64_t num_sources_ = -1;
-  mutable int64_t cardinality_ TF_GUARDED_BY(cardinality_mu_) =
-      kUnknownCardinality;
 };
 
 // Represents an iterator that is associated with a particular dataset.
@@ -1113,11 +795,11 @@ class DatasetBaseIterator : public IteratorBase {
     const string prefix;
   };
 
-  explicit DatasetBaseIterator(const BaseParams& params);
+  explicit DatasetBaseIterator(const BaseParams& params) : params_(params) {
+    params_.dataset->Ref();
+  }
 
-  ~DatasetBaseIterator() override;
-
-  virtual const DatasetBase* dataset() const { return params_.dataset; }
+  ~DatasetBaseIterator() override { params_.dataset->Unref(); }
 
   const DataTypeVector& output_dtypes() const override {
     return params_.dataset->output_dtypes();
@@ -1127,57 +809,32 @@ class DatasetBaseIterator : public IteratorBase {
     return params_.dataset->output_shapes();
   }
 
+  // The sequence of iterators leading up to this iterator.
   const string& prefix() const override { return params_.prefix; }
 
   // Returns a name to be used for the TraceMe event.
   //
-  // NOTE: TraceMe supports passing key-value pairs of "arguments" using the
+  // NOTE: TraceMe support passing key value pairs of "arguments" using the
   // following format "name#arg_1=value_,...,arg_n=value_n".
-  string BuildTraceMeName();
+  virtual string BuildTraceMeName() { return params_.prefix; }
 
   Status GetNext(IteratorContext* ctx, std::vector<Tensor>* out_tensors,
                  bool* end_of_sequence) final;
 
-  Status GetNext(IteratorContext&& ctx, std::vector<Tensor>* out_tensors,
-                 bool* end_of_sequence) {
-    return GetNext(&ctx, out_tensors, end_of_sequence);
-  }
-
-  Status Skip(IteratorContext* ctx, int num_to_skip, bool* end_of_sequence,
-              int* num_skipped) final;
-
   Status Save(SerializationContext* ctx, IteratorStateWriter* writer) final {
-    VLOG(2) << "Attempting to save checkpoints on iterator (prefix: "
-            << prefix() << ") from " << dataset()->DebugString();
+    TF_RETURN_IF_ERROR(params_.dataset->CheckExternalState());
     return IteratorBase::Save(ctx, writer);
   }
 
  protected:
-  Status Restore(IteratorContext* ctx, IteratorStateReader* reader) final {
-    VLOG(2) << "Attempting to restore checkpoints on iterator (prefix: "
-            << prefix() << ") from " << dataset()->DebugString();
-    return IteratorBase::Restore(ctx, reader);
-  }
-
   // Internal implementation of GetNext that is wrapped in tracing logic.
-  //
-  // See the docstring of `GetNext` method regaring the contract for
-  // `out_tensors` and `end_of_sequence`. Implementations may assume that
-  // `*out_tensors` is empty.
   virtual Status GetNextInternal(IteratorContext* ctx,
                                  std::vector<Tensor>* out_tensors,
                                  bool* end_of_sequence) = 0;
 
-  // Internal implementation of Skip that is wrapped in tracing logic
-  virtual Status SkipInternal(IteratorContext* ctx, int num_to_skip,
-                              bool* end_of_sequence, int* num_skipped);
-
   string full_name(const string& name) const {
-    return FullName(params_.prefix, name);
+    return strings::StrCat(params_.prefix, ":", name);
   }
-
-  // Returns a map of key-value pairs to included in the TraceMe string.
-  virtual TraceMeMetadata GetTraceMeMetadata() const { return {}; }
 
   // By default we model iterators using an unknown node, which acts as
   // pass-through with respect to performance modeling.
@@ -1208,7 +865,6 @@ class DatasetBaseIterator : public IteratorBase {
                            const std::vector<Tensor>& element) {
     if (collect_resource_usage(ctx)) {
       node_->record_buffer_event(-GetAllocatedBytes(element), -1);
-      DCHECK_GE(node_->buffered_elements(), 0);
     }
   }
 
@@ -1222,48 +878,43 @@ class DatasetBaseIterator : public IteratorBase {
   }
 
   // When modeling is enabled, this method records the fact that this iterator
-  // has produced an element and its size in bytes.
-  void RecordElement(IteratorContext* ctx, std::vector<Tensor>* out_tensors) {
-    if (collect_resource_usage(ctx)) {
-      int64_t num_bytes = GetAllocatedBytes(*out_tensors);
+  // has produced an element.
+  void RecordElement(IteratorContext* ctx) {
+    if (node_) {
       node_->record_element();
-      node_->record_bytes_produced(num_bytes);
-      if (node_->output()) {
-        node_->output()->record_bytes_consumed(num_bytes);
-      }
     }
   }
 
   // When modeling is enabled, this method records the fact that a thread of
   // this iterator has started work.
-  void RecordStart(IteratorContext* ctx) {
+  void RecordStart(IteratorContext* ctx, bool stop_output = false) {
     if (collect_resource_usage(ctx)) {
-      int64_t now_nanos = EnvTime::NowNanos();
+      int64 now_nanos = Env::Default()->NowNanos();
+      if (stop_output && node_->output()) {
+        node_->output()->record_stop(now_nanos);
+      }
       node_->record_start(now_nanos);
     }
   }
 
   // When modeling is enabled, this method records the fact that a thread of
   // this iterator has stopped work.
-  void RecordStop(IteratorContext* ctx) {
+  void RecordStop(IteratorContext* ctx, bool start_output = false) {
     if (collect_resource_usage(ctx)) {
-      int64_t now_nanos = EnvTime::NowNanos();
+      int64 now_nanos = Env::Default()->NowNanos();
       node_->record_stop(now_nanos);
+      if (start_output && node_->output()) {
+        node_->output()->record_start(now_nanos);
+      }
     }
   }
 
-  // Returns whether work is currently being recorded, i.e. whether we are
-  // currently between a `RecordStart` and a `RecordStop`.
-  bool IsRecording(IteratorContext* ctx) {
-    return node_ && node_->is_recording();
-  }
-
  private:
-  bool collect_resource_usage(IteratorContext* ctx) {
-    return ctx->model() && node_;
+  inline bool collect_resource_usage(IteratorContext* ctx) {
+    auto model = ctx->model();
+    return model && model->collect_resource_usage() && node_;
   }
 
-  string traceme_metadata_;
   BaseParams params_;
 };
 
@@ -1285,7 +936,12 @@ class DatasetIterator : public DatasetBaseIterator {
         typed_dataset_(params.dataset) {}
 
   // The dataset from which this iterator was created.
-  const DatasetType* dataset() const final { return typed_dataset_; }
+  const DatasetType* dataset() const { return typed_dataset_; }
+
+ protected:
+  virtual Status GetNextInternal(IteratorContext* ctx,
+                                 std::vector<Tensor>* out_tensors,
+                                 bool* end_of_sequence) = 0;
 
  private:
   const DatasetType* const typed_dataset_;  // Not owned.
@@ -1300,7 +956,7 @@ Status ParseScalarArgument(OpKernelContext* ctx,
     return errors::InvalidArgument(argument_name, " must be a scalar");
   }
   *output = argument_t->scalar<T>()();
-  return OkStatus();
+  return Status::OK();
 }
 
 template <typename T>
@@ -1317,49 +973,27 @@ Status ParseVectorArgument(OpKernelContext* ctx,
   for (int i = 0; i < size; ++i) {
     output->push_back(argument_t->vec<T>()(i));
   }
-  return OkStatus();
+  return Status::OK();
 }
 
 // Encapsulates the work required to plug a DatasetBase into the core TensorFlow
 // graph execution engine.
 class DatasetOpKernel : public OpKernel {
  public:
-  explicit DatasetOpKernel(OpKernelConstruction* ctx) : OpKernel(ctx) {
-    if (ctx->HasAttr(kMetadata)) {
-      std::string serialized_metadata;
-      OP_REQUIRES_OK(ctx, ctx->GetAttr(kMetadata, &serialized_metadata));
-      OP_REQUIRES(ctx, metadata_.ParseFromString(serialized_metadata),
-                  errors::InvalidArgument(absl::StrCat(
-                      "Could not parse the 'metadata' attribute.")));
-    }
-  }
-
+  DatasetOpKernel(OpKernelConstruction* ctx) : OpKernel(ctx) {}
   void Compute(OpKernelContext* ctx) final;
-
-  // Checks whether the given op is a tf.data operation.
-  //
-  // NOTE: The check uses a heuristic and can produce both false positives and
-  // false negatives. In particular, tf.data operations are expected to use
-  // names that end with "Dataset" or "DatasetV[0-9]+".
-  static bool IsDatasetOp(const OpDef& op_def);
-
-  string TraceString(const OpKernelContext& ctx, bool verbose) const override;
 
  protected:
   // Subclasses should implement this method. It will be called during Compute
   // execution.
   virtual void MakeDataset(OpKernelContext* ctx, DatasetBase** output) = 0;
-
- private:
-  Metadata metadata_;
 };
 
 // Encapsulates the work required to plug unary Datasets into the core
 // TensorFlow graph execution engine.
 class UnaryDatasetOpKernel : public DatasetOpKernel {
  public:
-  explicit UnaryDatasetOpKernel(OpKernelConstruction* ctx)
-      : DatasetOpKernel(ctx) {}
+  UnaryDatasetOpKernel(OpKernelConstruction* ctx) : DatasetOpKernel(ctx) {}
 
  protected:
   void MakeDataset(OpKernelContext* ctx, DatasetBase** output) final;
@@ -1371,8 +1005,7 @@ class UnaryDatasetOpKernel : public DatasetOpKernel {
 // TensorFlow graph execution engine.
 class BinaryDatasetOpKernel : public DatasetOpKernel {
  public:
-  explicit BinaryDatasetOpKernel(OpKernelConstruction* ctx)
-      : DatasetOpKernel(ctx) {}
+  BinaryDatasetOpKernel(OpKernelConstruction* ctx) : DatasetOpKernel(ctx) {}
 
  protected:
   void MakeDataset(OpKernelContext* ctx, DatasetBase** output) final;
@@ -1396,7 +1029,7 @@ class BinaryDatasetOpKernel : public DatasetOpKernel {
 // overhead is tolerable.
 class BackgroundWorker {
  public:
-  BackgroundWorker(Env* env, const char* name);
+  BackgroundWorker(Env* env, const string& name);
 
   ~BackgroundWorker();
 
@@ -1405,17 +1038,28 @@ class BackgroundWorker {
  private:
   void WorkerLoop();
 
-  Env* const env_;
-  const char* const name_;
-
   std::unique_ptr<Thread> thread_;
   mutex mu_;
   condition_variable cond_var_;
-  bool cancelled_ TF_GUARDED_BY(mu_) = false;
-  std::deque<std::function<void()>> work_queue_ TF_GUARDED_BY(mu_);
+  bool cancelled_ GUARDED_BY(mu_) = false;
+  std::deque<std::function<void()>> work_queue_ GUARDED_BY(mu_);
 };
 
 }  // namespace data
+
+// TODO(b/114112161): Remove these aliases when all users have moved over to the
+// `tensorflow::data` namespace.
+using data::DatasetBase;
+using data::DatasetContext;
+using data::DatasetIterator;
+using data::DatasetOpKernel;
+using data::IteratorBase;
+using data::IteratorContext;
+using data::IteratorStateReader;
+using data::IteratorStateWriter;
+using data::SerializationContext;
+using data::UnaryDatasetOpKernel;
+
 }  // namespace tensorflow
 
 #endif  // TENSORFLOW_CORE_FRAMEWORK_DATASET_H_
