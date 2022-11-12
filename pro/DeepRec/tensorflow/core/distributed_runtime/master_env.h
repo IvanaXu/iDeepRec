@@ -93,7 +93,7 @@ struct MasterEnv {
       worker_cache_factory;
 
   // fuse recv ops or not
-  bool tensor_fuse = false;
+  bool tensor_fuse = true;
 
   // A pool of threads for scheduling compute work.
   thread::ThreadPool* compute_pool = nullptr;
