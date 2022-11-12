@@ -20,7 +20,6 @@ limitations under the License.
 #include <unordered_set>
 #include <vector>
 
-#include "tensorflow/core/common_runtime/function.h"
 #include "tensorflow/core/common_runtime/process_util.h"
 #include "tensorflow/core/common_runtime/profile_handler.h"
 #include "tensorflow/core/common_runtime/stats_publisher_interface.h"
@@ -36,9 +35,7 @@ limitations under the License.
 #include "tensorflow/core/framework/node_def_util.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_description.pb.h"
-#include "tensorflow/core/graph/graph_constructor.h"
 #include "tensorflow/core/graph/graph_partition.h"
-#include "tensorflow/core/graph/star_server_graph_partition.h"
 #include "tensorflow/core/graph/tensor_id.h"
 #include "tensorflow/core/lib/core/blocking_counter.h"
 #include "tensorflow/core/lib/core/notification.h"
@@ -58,7 +55,6 @@ limitations under the License.
 #include "tensorflow/core/platform/mutex.h"
 #include "tensorflow/core/platform/tracing.h"
 #include "tensorflow/core/public/session_options.h"
-#include "tensorflow/core/util/env_var.h"
 
 namespace tensorflow {
 
@@ -73,9 +69,8 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
                     std::unique_ptr<ClientGraph> client_graph,
                     const SessionOptions& session_opts,
                     const StatsPublisherFactory& stats_publisher_factory,
-                    GraphExecutionState* execution_state,
                     bool is_partial, WorkerCacheInterface* worker_cache,
-                    const MasterEnv* env, bool should_deregister)
+                    bool should_deregister)
       : session_handle_(handle),
         bg_opts_(bopts),
         client_graph_before_register_(std::move(client_graph)),
@@ -83,7 +78,6 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
         is_partial_(is_partial),
         callable_opts_(bopts.callable_options),
         worker_cache_(worker_cache),
-        env_(env),
         should_deregister_(should_deregister),
         collective_graph_key_(
             client_graph_before_register_->collective_graph_key) {
@@ -100,8 +94,6 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
                       strings::StrCat(
                           "(", absl::StrJoin(n->requested_inputs(), ", "))));
     }
-
-    executor_policy_ = session_opts_.config.executor_policy();
   }
 
   ~ReffedClientGraph() override {
@@ -203,7 +195,7 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
 
   // Partitions the graph into subgraphs and registers them on
   // workers.
-  virtual Status RegisterPartitions(PartitionOptions popts);
+  Status RegisterPartitions(PartitionOptions popts);
 
   // Runs one step of all partitions.
   Status RunPartitions(const MasterEnv* env, int64 step_id,
@@ -230,7 +222,7 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
                       const RunState* run_state,
                       GraphExecutionState* execution_state);
 
- protected:
+ private:
   const string session_handle_;
   const BuildGraphOptions bg_opts_;
 
@@ -239,7 +231,6 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
   const SessionOptions session_opts_;
   const bool is_partial_;
   const CallableOptions callable_opts_;
-  const MasterEnv* env_;
   WorkerCacheInterface* const worker_cache_;  // Not owned.
 
   struct NodeDetails {
@@ -334,8 +325,6 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
   // Deregisters the partitions on the workers.  Called in the
   // destructor and does not wait for the rpc completion.
   void DeregisterPartitions();
-
-  ExecutorPolicy executor_policy_ = ExecutorPolicy::USE_NORMAL_EXECUTOR;
 
   TF_DISALLOW_COPY_AND_ASSIGN(ReffedClientGraph);
 };
@@ -442,10 +431,6 @@ Status MasterSession::ReffedClientGraph::DoBuildPartitions(
   }
 
   // Partition the graph.
-  if (popts.tensor_fuse) {
-    return PartitionWithTensorFuse(popts, &client_graph->graph, out_partitions);
-  }
-
   return Partition(popts, &client_graph->graph, out_partitions);
 }
 
@@ -623,7 +608,6 @@ Status MasterSession::ReffedClientGraph::RunPartitionsHelper(
     CancellationManager* cm, bool is_last_partial_run) {
   // Collect execution cost stats on a smoothly decreasing frequency.
   ExecutorOpts exec_opts;
-  exec_opts.set_executor_policy(executor_policy_);
   if (pss->report_tensor_allocations_upon_oom) {
     exec_opts.set_report_tensor_allocations_upon_oom(true);
   }
@@ -1100,248 +1084,6 @@ void MasterSession::ReffedClientGraph::DeregisterPartitions() {
   }
 }
 
-class MasterSession::ReffedClientGraphV2
-    : public MasterSession::ReffedClientGraph {
- public:
-  ReffedClientGraphV2(const string& handle, const BuildGraphOptions& bopts,
-                      std::unique_ptr<ClientGraph> cg,
-                      const SessionOptions& session_opts,
-                      const StatsPublisherFactory& stats_publisher_factory,
-                      GraphExecutionState* execution_state, bool is_partial,
-                      WorkerCacheInterface* worker_cache, const MasterEnv* env,
-                      bool should_deregister)
-    : MasterSession::ReffedClientGraph(handle, bopts, std::move(cg),
-        session_opts,
-        stats_publisher_factory,
-        execution_state,
-        is_partial,
-        worker_cache,
-        env,
-        should_deregister)
-  {}
-
- public:
-  Status DoRegisterPsGraphs(const PartitionOptions& popts,
-                            std::vector<SubGraph> *ps_graphs);
-  Status RegisterPartitions(PartitionOptions popts) override;
-};
-
-Status MasterSession::ReffedClientGraphV2::DoRegisterPsGraphs(
-    const PartitionOptions& popts, std::vector<SubGraph> *ps_graphs) {
-
-  struct Call {
-    std::string worker_loc;
-    WorkerInterface* worker = nullptr;
-    RegisterGraphRequest req;
-    RegisterGraphResponse resp;
-    Status status;
-  };
-
-  Status s;
-  std::vector<Call> calls;
-  const int num = ps_graphs->size();
-  calls.reserve(num);
-  for (auto& ps_graph : *ps_graphs) {
-    Call call;
-    call.worker_loc = ps_graph.GetLoc();
-    auto worker = worker_cache_->GetOrCreateWorker(call.worker_loc);
-    if (worker == nullptr) {
-      s = errors::NotFound("worker ", call.worker_loc);
-      break;
-    }
-    call.worker = worker;
-    calls.push_back(call);
-  }
-
-  if (!s.ok()) {
-    for (Call& call : calls) {
-      worker_cache_->ReleaseWorker(call.worker_loc, call.worker);
-    }
-    return s;
-  }
-  BlockingCounter done(num);
-  for (int i = 0; i < num; ++i) {
-    Call* c = &calls[i];
-    c->req.set_session_handle(session_handle_);
-
-    bool enable_ps_graph_fusion = true;
-    TF_CHECK_OK(ReadBoolFromEnvVar("TF_ENABLE_PS_GRAPH_FUSION", true,
-                                   &enable_ps_graph_fusion));
-    if (enable_ps_graph_fusion) {
-      GraphConstructorOptions opts;
-      opts.allow_internal_ops = true;
-      Graph graph(OpRegistry::Global());
-      TF_CHECK_OK(ConvertGraphDefToGraph(opts, (*ps_graphs)[i].GetGraphDef(),
-                                         &graph));
-      graph.ToGraphDef(c->req.mutable_graph_def());
-    } else {
-      *c->req.mutable_graph_def() = (*ps_graphs)[i].GetGraphDef();
-    }
-
-    // For simplicity, we ship the library completely to every worker.
-    if (popts.flib_def) {
-      *c->req.mutable_graph_def()->mutable_library() = popts.flib_def->ToProto();
-    }
-    *c->req.mutable_graph_options() = session_opts_.config.graph_options();
-    VLOG(2) << "Register " << c->req.graph_def().DebugString();
-    auto cb = [c, &done](const Status& s) {
-      c->status = s;
-      done.DecrementCount();
-    };
-    c->worker->RegisterGraphAsync(&c->req, &c->resp, cb);
-  }
-  done.Wait();
-  for (int i = 0; i < num; ++i) {
-    Call* c = &calls[i];
-    s.Update(c->status);
-    (*ps_graphs)[i].SetGraphHandle(c->resp.graph_handle());
-  }
-
-  return s;
-}
-
-#define RETURN_IF_NOT_OK(s)                     \
-  if (!s.ok()) {                                \
-    mu_.lock();                                 \
-    init_result_ = s;                           \
-    init_done_.Notify();                        \
-    mu_.unlock();                               \
-    return s;                                   \
-  }
-
-namespace {
-void AddFunctionlibrary(PartitionOptions opts, const Graph* g,
-                        SubGraph& sub_graph) {
-  const FunctionLibraryDefinition* flib_def = opts.flib_def;
-  if (flib_def == nullptr) {
-    flib_def = &g->flib_def();
-  }
-
-  // Set versions, function library
-  *(sub_graph.GetGraphDef().mutable_versions()) = g->versions();
-  // Prune unreachable functions from `flib_def` before adding them to `gdef`.
-  *(sub_graph.GetGraphDef().mutable_library()) =
-      flib_def->ReachableDefinitions(sub_graph.GetGraphDef()).ToProto();
-}
-
-void AddFunctionlibrary(PartitionOptions opts, const Graph* g,
-                        std::vector<SubGraph>& sub_graphs) {
-  for (auto& sg : sub_graphs) {
-    AddFunctionlibrary(opts, g, sg);
-  }
-}
-} // namespace
-
-Status MasterSession::ReffedClientGraphV2::RegisterPartitions(
-    PartitionOptions popts) {
-  mu_.lock();
-  if (client_graph_before_register_) {
-    // The `ClientGraph` is no longer needed after partitions are registered.
-    // Since it can account for a large amount of memory, we consume it here,
-    // and it will be freed after concluding with registration.
-
-    std::unique_ptr<ClientGraph> client_graph;
-    std::swap(client_graph_before_register_, client_graph);
-    mu_.unlock();
-
-    popts.flib_def = client_graph->flib_def.get();
-    SubGraph worker_sub_graph;
-    std::vector<SubGraph> ps_sub_graphs;
-    TrainGraphPartitioner gp(popts, &client_graph->graph,
-                             env_->run_graph_mode_with_zero_copy,
-                             true); // use fuse recv
-    Status s;
-    // enable star_server (V2)
-    if (env_->run_graph_mode) {
-      s = gp.SplitGraphV2(&worker_sub_graph, &ps_sub_graphs);
-      RETURN_IF_NOT_OK(s);
-
-      s = gp.CompleteSubGraphsV2(&ps_sub_graphs);
-      RETURN_IF_NOT_OK(s);
-
-      // Add Function library
-      AddFunctionlibrary(popts, &(client_graph->graph),
-                         ps_sub_graphs);
-      s = DoRegisterPsGraphs(popts, &ps_sub_graphs);
-      RETURN_IF_NOT_OK(s);
-
-      s = gp.CompleteMainGraphV2(ps_sub_graphs, &worker_sub_graph);
-      RETURN_IF_NOT_OK(s);
-      // Add Function library
-      AddFunctionlibrary(popts, &(client_graph->graph),
-                         worker_sub_graph);
-    } else {
-      // enable star_server lite (V1)
-      s = gp.SplitGraph(&worker_sub_graph, &ps_sub_graphs);
-      RETURN_IF_NOT_OK(s);
-
-      s = gp.CompleteSubGraphs(&ps_sub_graphs);
-      RETURN_IF_NOT_OK(s);
-
-      // Add Function library
-      AddFunctionlibrary(popts, &(client_graph->graph),
-                         ps_sub_graphs);
-      s = DoRegisterPsGraphs(popts, &ps_sub_graphs);
-      RETURN_IF_NOT_OK(s);
-
-      s = gp.CompleteMainGraph(ps_sub_graphs, &worker_sub_graph);
-      RETURN_IF_NOT_OK(s);
-      // Add Function library
-      AddFunctionlibrary(popts, &(client_graph->graph),
-                         worker_sub_graph);
-    }
-
-    std::unordered_map<string, GraphDef> graph_defs;
-
-    if ((worker_sub_graph.GetNodes().size()) > 0) {
-      graph_defs[worker_sub_graph.GetLoc()] = worker_sub_graph.GetGraphDef();
-    } else {
-      int64 task_index = -1;
-      Status s = ReadInt64FromEnvVar("TASK_INDEX", -1, &task_index);
-      if (!s.ok() || task_index == -1) {
-        LOG(FATAL) << "Read Env 'TASK_INDEX' failed. task_index=" << task_index;
-      }
-
-      std::string location = strings::StrCat("/job:worker/replica:0/task:",
-                                             task_index);
-      if (IsChiefRole()) {
-        location = "/job:chief/replica:0/task:0";
-      }
-
-      graph_defs[location] = worker_sub_graph.GetGraphDef();
-    }
-
-    // NOTE(mrry): The pointers in `graph_defs_for_publishing` do not remain
-    // valid after the call to DoRegisterPartitions begins, so
-    // `stats_publisher_` must make a copy if it wants to retain the
-    // GraphDef objects.
-    std::vector<const GraphDef*> graph_defs_for_publishing;
-    graph_defs_for_publishing.reserve(partitions_.size());
-    for (auto& name_def : graph_defs) {
-      const FunctionLibraryDefinition* flib_def = popts.flib_def;
-      if (flib_def != nullptr) {
-        VLOG(1) << "Add flib_def to worker graph: " << flib_def->ToProto().DebugString();
-        *(name_def.second.mutable_library()) = flib_def->ToProto();
-      }
-      graph_defs_for_publishing.push_back(&name_def.second);
-    }
-    stats_publisher_->PublishGraphProto(graph_defs_for_publishing);
-    if (graph_defs.size() > 0) {
-      s = DoRegisterPartitions(popts, std::move(graph_defs));
-    }
-    mu_.lock();
-    init_result_ = s;
-    init_done_.Notify();
-  } else {
-    mu_.unlock();
-    init_done_.WaitForNotification();
-    mu_.lock();
-  }
-  Status result = init_result_;
-  mu_.unlock();
-  return result;
-}
-
 namespace {
 void CopyAndSortStrings(size_t size,
                         const std::function<string(size_t)>& input_accessor,
@@ -1737,23 +1479,10 @@ Status MasterSession::StartStep(const BuildGraphOptions& opts, bool is_partial,
       std::unique_ptr<ClientGraph> client_graph;
       TF_RETURN_IF_ERROR(execution_state_->BuildGraph(opts, &client_graph));
       WorkerCacheInterface* worker_cache = get_worker_cache();
-      /*auto entry = new ReffedClientGraph(
+      auto entry = new ReffedClientGraph(
           handle_, opts, std::move(client_graph), session_opts_,
           stats_publisher_factory_, is_partial, worker_cache,
-          !should_delete_worker_sessions_);*/
-      ReffedClientGraph *entry = nullptr;
-      if (env_->run_graph_mode || env_->run_graph_mode_lite) {
-        entry = new ReffedClientGraphV2(
-            handle_, opts, std::move(client_graph), session_opts_,
-            stats_publisher_factory_, execution_state_.get(), is_partial,
-            worker_cache, env_, !should_delete_worker_sessions_);
-        LOG(INFO) << "Use ReffedClientGraphV2 for partition and run  graph.";
-      } else {
-        entry = new ReffedClientGraph(
-            handle_, opts, std::move(client_graph), session_opts_,
-            stats_publisher_factory_, execution_state_.get(), is_partial,
-            worker_cache, env_, !should_delete_worker_sessions_);
-      }
+          !should_delete_worker_sessions_);
       iter = m->insert({hash, entry}).first;
       VLOG(1) << "Preparing to execute new graph";
     }
@@ -1881,7 +1610,6 @@ Status MasterSession::BuildAndRegisterPartitions(ReffedClientGraph* rcg) {
   // Registers subgraphs if haven't done so.
   PartitionOptions popts;
   popts.node_to_loc = SplitByWorker;
-  popts.tensor_fuse = env_->tensor_fuse;
   // The closures popts.{new_name,get_incarnation} are called synchronously in
   // RegisterPartitions() below, so do not need a Ref()/Unref() pair to keep
   // "this" alive during the closure.
@@ -2215,8 +1943,7 @@ Status MasterSession::MakeCallable(const MakeCallableRequest& req,
     TF_RETURN_IF_ERROR(execution_state_->BuildGraph(opts, &client_graph));
     callable = new ReffedClientGraph(handle_, opts, std::move(client_graph),
                                      session_opts_, stats_publisher_factory_,
-                                     execution_state_.get(), false /* is_partial */,
-                                     get_worker_cache(), env_,
+                                     false /* is_partial */, get_worker_cache(),
                                      !should_delete_worker_sessions_);
   }
 

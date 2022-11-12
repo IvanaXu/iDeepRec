@@ -17,15 +17,18 @@ limitations under the License.
 #define TENSORFLOW_COMPILER_XLA_SERVICE_GPU_THUNK_EMITTER_H_
 
 #include "tensorflow/compiler/xla/service/buffer_assignment.h"
+#include "tensorflow/compiler/xla/service/dfs_hlo_visitor_with_default.h"
 #include "tensorflow/compiler/xla/service/gpu/thunk.h"
 #include "tensorflow/compiler/xla/statusor.h"
 #include "tensorflow/compiler/xla/types.h"
+#include "tensorflow/compiler/xla/xla_data.pb.h"
+#include "tensorflow/core/platform/types.h"
 
 namespace xla {
 namespace gpu {
 
 // Implements handling of GPU execution for HLO operations that are handed off
-// to specialized thunks that do not require code generation. Intended to be
+// to specialzied thunks that do not require code generation. Intended to be
 // mixed into GPU emitters.
 class ThunkEmitter {
  public:
@@ -47,7 +50,6 @@ class ThunkEmitter {
   Status HandleTriangularSolve(HloInstruction* hlo);
   Status HandleInfeed(HloInstruction* xla_infeed);
   Status HandleOutfeed(HloInstruction* outfeed);
-  Status HandleAsyncOutSend(HloInstruction* async_out_sen);
 
  private:
   EmissionContext* context_;
@@ -90,10 +92,6 @@ class ThunkEmitter {
   // Returns an OutfeedThunk that performs a device-to-host memcpy to implement
   // `inst`.
   std::unique_ptr<Thunk> BuildOutfeedThunk(const HloInstruction* inst);
-
-  // Returns an AsyncOutSendThunk that carries out asynchronous send via
-  // Rendezvous mechanism
-  std::unique_ptr<Thunk> BuildAsyncOutSendThunk(const HloInstruction* inst);
 };
 
 }  // namespace gpu

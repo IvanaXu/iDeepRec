@@ -42,27 +42,24 @@ namespace interpreter {
 // buffer allocation. Refer to interpreter/README.md for more.
 class InterpreterExecutable : public Executable {
  public:
-  InterpreterExecutable(
-      std::unique_ptr<HloModule> hlo_module,
-      std::unique_ptr<HloEvaluator> evaluator,
-      absl::optional<DynamicDimensionInference> dynamic_dymension_inference);
+  InterpreterExecutable(std::unique_ptr<HloModule> hlo_module,
+                        std::unique_ptr<HloEvaluator> evaluator);
   ~InterpreterExecutable() override;
 
-  StatusOr<ExecutionOutput> ExecuteAsyncOnStream(
+  StatusOr<ScopedShapedBuffer> ExecuteAsyncOnStream(
       const ServiceExecutableRunOptions* run_options,
-      std::vector<ShapeTree<MaybeOwningDeviceMemory>> arguments,
+      absl::Span<const ShapedBuffer* const> arguments,
       HloExecutionProfile* hlo_execution_profile) override
-      TF_LOCKS_EXCLUDED(evaluator_lock_);
+      LOCKS_EXCLUDED(evaluator_lock_);
 
   static int64 ShapeSizeBytes(const Shape& shape);
 
  protected:
   // The interpreter interprets executables with an HloEvaluator.
-  std::unique_ptr<HloEvaluator> evaluator_ TF_PT_GUARDED_BY(evaluator_lock_);
+  std::unique_ptr<HloEvaluator> evaluator_ PT_GUARDED_BY(evaluator_lock_);
   mutable tensorflow::mutex evaluator_lock_;
 
  private:
-  absl::optional<DynamicDimensionInference> dynamic_dimension_inference_;
   TF_DISALLOW_COPY_AND_ASSIGN(InterpreterExecutable);
 };
 

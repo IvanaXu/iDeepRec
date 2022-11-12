@@ -595,8 +595,7 @@ class DistributedDatasetV1(DistributedDataset):
     """
     return self._make_initializable_iterator()
 
-  def _make_initializable_iterator(self, shared_name=None,
-                                   force_deactivate_gpu_prefetching=False):  # pylint: unused-argument, disable=missing-docstring
+  def _make_initializable_iterator(self, shared_name=None):  # pylint: disable=unused-argument
     """Get an initializable iterator for DistributedDatasetV1."""
     # Eager mode generates already initialized iterators. Hence we cannot create
     # an initializable iterator.
@@ -658,8 +657,7 @@ class DistributedDatasetsFromFunction(_IterableInput):
 class DistributedDatasetsFromFunctionV1(DistributedDatasetsFromFunction):
   """Inputs created from dataset function."""
 
-  def _make_initializable_iterator(self, shared_name=None,
-                                   force_deactivate_gpu_prefetching=False):  # pylint: disable=missing-docstring
+  def _make_initializable_iterator(self, shared_name=None):
     """Get an initializable iterator for DistributedDatasetsFromFunctionV1."""
     del shared_name  # Unused
     # Eager mode generates already initialized iterators. Hence we cannot create

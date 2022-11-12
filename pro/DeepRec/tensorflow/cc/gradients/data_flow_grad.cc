@@ -148,7 +148,6 @@ Status DynamicStitchGrad(const Scope& scope, const Operation& op,
   return scope.status();
 }
 REGISTER_GRADIENT_OP("DynamicStitch", DynamicStitchGrad);
-REGISTER_GRADIENT_OP("DynamicStitchFast", DynamicStitchGrad);
 REGISTER_GRADIENT_OP("ParallelDynamicStitch", DynamicStitchGrad);
 
 }  // anonymous namespace

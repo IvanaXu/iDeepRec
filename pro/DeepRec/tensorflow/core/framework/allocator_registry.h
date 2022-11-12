@@ -38,12 +38,6 @@ class AllocatorFactory {
   // Create an Allocator.
   virtual Allocator* CreateAllocator() = 0;
 
-  //Create PMEM Allocator.
-  virtual Allocator* CreatePMEMAllocator() {return CreateAllocator();};
-
-  //Create EV Allocator.
-  virtual Allocator* CreateEVAllocator() {return CreateAllocator();};
-
   // Create a SubAllocator. If NumaEnabled() is true, then returned SubAllocator
   // will allocate memory local to numa_node.  If numa_node == kNUMANoAffinity
   // then allocated memory is not specific to any NUMA node.
@@ -76,15 +70,6 @@ class AllocatorFactoryRegistry {
   // and return an allocator constructed by it.  If multiple factories have
   // been registered with the same priority, picks one by unspecified criteria.
   Allocator* GetAllocator();
-
-  //If use PMEMallocator, then factory pick this one
-  Allocator* GetPMEMAllocator();
-
-#ifdef TENSORFLOW_USE_PMEM
-  Allocator* GetExperimentalPMEMAllocator(const std::string& pmem_path, size_t pmem_size);
-#endif
-
-  Allocator* GetEVAllocator();
 
   // Returns 'best fit' SubAllocator.  First look for the highest priority
   // factory that is NUMA-enabled.  If none is registered, fall back to the

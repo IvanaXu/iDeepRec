@@ -114,15 +114,8 @@ TEST_F(XlaActivityListenerTest, Test) {
   std::vector<std::pair<string, Tensor>> inputs_2x2 = {{"A", tensor_2x2}};
 
   std::vector<Tensor> outputs;
-  // Now we compile the first time at the 3rd call.
   TF_ASSERT_OK(session->Run(inputs_2x2, output_names, /*target_node_names=*/{},
-			    &outputs));
-  EXPECT_EQ(listener()->jit_compilation_activity().compile_count(), 0);
-
-  for (int i = 0; i < 2; i++) {
-    TF_ASSERT_OK(session->Run(inputs_2x2, output_names, /*target_node_names=*/{},
-			      &outputs));
-  }
+                            &outputs));
 
   absl::string_view expected_auto_clustering_activity =
       R"(global_jit_level: ON_2
@@ -165,11 +158,8 @@ summary {
 }
 )";
 
-  VLOG(0) << listener()->auto_clustering_activity().DebugString();
-  VLOG(0) << expected_auto_clustering_activity;
-  // TODO: Enable this test again after repairing the activity listener
-  //  EXPECT_EQ(listener()->auto_clustering_activity().DebugString(),
-  //            expected_auto_clustering_activity);
+  EXPECT_EQ(listener()->auto_clustering_activity().DebugString(),
+            expected_auto_clustering_activity);
 
   EXPECT_EQ(listener()->jit_compilation_activity().cluster_name(), "cluster_0");
   EXPECT_EQ(listener()->jit_compilation_activity().compile_count(), 1);

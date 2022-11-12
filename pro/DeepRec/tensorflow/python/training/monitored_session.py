@@ -39,7 +39,6 @@ from tensorflow.python.summary import summary
 from tensorflow.python.training import basic_session_run_hooks
 from tensorflow.python.training import coordinator
 from tensorflow.python.training import queue_runner
-from tensorflow.python.training import incremental_saver as incr_saver
 from tensorflow.python.training import saver as training_saver
 from tensorflow.python.training import session_manager as sm
 from tensorflow.python.training import session_run_hook
@@ -114,8 +113,7 @@ class Scaffold(object):
                local_init_op=None,
                summary_op=None,
                saver=None,
-               copy_from_scaffold=None,
-               incremental_save_restore=False):
+               copy_from_scaffold=None):
     """Create a scaffold.
 
     Args:
@@ -182,8 +180,6 @@ class Scaffold(object):
     self._local_init_op = local_init_op
     self._summary_op = summary_op
     self._saver = saver
-    self._incremental_save_restore = incremental_save_restore
-    self._incr_saver = None
 
   def finalize(self):
     """Creates operations if needed and finalizes the graph."""
@@ -230,8 +226,7 @@ class Scaffold(object):
                                                  summary.merge_all)
     # pylint: disable=g-long-lambda
     if self._saver is None:
-      self._saver = training_saver._get_saver_or_default(
-              incremental_save_restore=self._incremental_save_restore)  # pylint: disable=protected-access
+      self._saver = training_saver._get_saver_or_default()  # pylint: disable=protected-access
     # pylint: enable=g-long-lambda
     if isinstance(self._saver, trackable_util.Checkpoint):
       self._saver = training_saver.Saver(
@@ -240,11 +235,6 @@ class Scaffold(object):
           sharded=True)
     else:
       self._saver.build()
-      self._incr_saver = incr_saver._get_incremental_saver(self._incremental_save_restore, self._saver)
-
-    from tensorflow.contrib.structured_model.python import core
-    if core.get_structured_model():
-      core.get_structured_model().graph_transform()
 
     ops.get_default_graph().finalize()
     logging.info('Graph was finalized.')
@@ -426,35 +416,6 @@ def _create_monitored_session_with_worker_context(
       hooks=all_hooks,
       stop_grace_period_secs=stop_grace_period_secs)
 
-@tf_export('train.mark_target_node')
-def mark_target_node(target_nodes_or_tensors):
-  def is_valid_node(op):
-    return isinstance(op, ops.Tensor) or \
-           isinstance(op, ops.Operation) or \
-           isinstance(op, variables.Variable)
-
-  target_node=[]
-  for op in target_nodes_or_tensors:
-    if is_valid_node(op):
-      target_node.append(op.name)
-    elif isinstance(op, dict):
-      for value in op.values():
-        if is_valid_node(value):
-          target_node.append(value.name)
-        else:
-          logging.warning('%s, %s is not tensor or '
-                          'operation in dict'%(value, type(value)))
-    elif isinstance(op, list):
-      for value in op:
-        if is_valid_node(value):
-          target_node.append(value.name)
-        else:
-          logging.warning('%s, %s is not tensor or '
-                          'operation in list'%(value, type(value)))
-    else:
-      logging.warning("%s, %s is not tensor or operation"%(op, type(op)))
-  os.environ['TARGET_NODES_NAME']=";".join(target_node)
-
 
 @tf_export(v1=['train.MonitoredTrainingSession'])
 def MonitoredTrainingSession(
@@ -472,10 +433,7 @@ def MonitoredTrainingSession(
     log_step_count_steps=100,
     max_wait_secs=7200,
     save_checkpoint_steps=USE_DEFAULT,
-    summary_dir=None,
-    save_incremental_checkpoint_secs=None,
-    target_nodes_or_tensors=None):
-
+    summary_dir=None):
   """Creates a `MonitoredSession` for training.
 
   For a chief, this utility sets proper session initializer/restorer. It also
@@ -529,8 +487,6 @@ def MonitoredTrainingSession(
       `save_checkpoint_secs` is used. Default not enabled.
     summary_dir: A string.  Optional path to a directory where to save
       summaries. If None, checkpoint_dir is used instead.
-    target_nodes_or_tensors: list of tf.Tensor or tf.Operation indicates
-      targets, which determine graph transformation of 'smart-stage'
 
   Returns:
     A `MonitoredSession` object.
@@ -552,11 +508,7 @@ def MonitoredTrainingSession(
   elif save_checkpoint_steps == USE_DEFAULT:
     save_checkpoint_steps = None
 
-  if target_nodes_or_tensors:
-    mark_target_node(target_nodes_or_tensors)
-
-  incremental_save_restore = True if save_incremental_checkpoint_secs else False
-  scaffold = scaffold or Scaffold(incremental_save_restore=incremental_save_restore)
+  scaffold = scaffold or Scaffold()
   worker_context = distribute_coordinator_context.get_current_worker_context()
 
   if worker_context:
@@ -622,8 +574,7 @@ def MonitoredTrainingSession(
               checkpoint_dir,
               save_steps=save_checkpoint_steps,
               save_secs=save_checkpoint_secs,
-              scaffold=scaffold,
-              incremental_save_secs=save_incremental_checkpoint_secs))
+              scaffold=scaffold))
 
   if hooks:
     all_hooks.extend(hooks)
@@ -688,7 +639,6 @@ class ChiefSessionCreator(SessionCreator):
     return self._get_session_manager().prepare_session(
         self._master,
         saver=self._scaffold.saver,
-        incr_saver=self._scaffold._incr_saver,
         checkpoint_dir=self._checkpoint_dir,
         checkpoint_filename_with_path=self._checkpoint_filename_with_path,
         config=self._config,

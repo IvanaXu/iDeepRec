@@ -42,8 +42,7 @@ _CORNER_CASES = {
         'message': {}
     },
     'train.LooperThread': {
-        'join': {},
-        'native_id': {}
+        'join': {}
     }
 }
 
@@ -81,10 +80,6 @@ else:
 
   def _SkipMember(cls, member):  # pylint: disable=unused-argument
     return False
-
-
-if sys.version_info.major == 3 and sys.version_info.minor >= 8:
-  _NORMALIZE_TYPE["<class '_collections._tuplegetter'>"] = "<type 'property'>"
 
 
 def _NormalizeType(ty):

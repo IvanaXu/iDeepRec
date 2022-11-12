@@ -95,8 +95,7 @@ struct NthElementFunctor<CPUDevice, T> {
     const int last_dim = input_tensor.dim_size(input_tensor.dims() - 1);
 
     // Allocate each row to different shard.
-    auto SubNthElement = [&, input, output, last_dim, n](int64 start,
-                                                         int64 limit) {
+    auto SubNthElement = [&, input, output, last_dim, n](int start, int limit) {
       // std::nth_element would rearrange the array, so we need a new buffer.
       std::vector<T> buf(last_dim);
 

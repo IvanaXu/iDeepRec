@@ -18,7 +18,6 @@ cc_library(
         "snappy-stubs-public.h",
     ],
     hdrs = ["snappy.h"],
-    includes = ["."],
     copts = ["-DHAVE_CONFIG_H"] + select({
         "@org_tensorflow//tensorflow:windows": [],
         "//conditions:default": [

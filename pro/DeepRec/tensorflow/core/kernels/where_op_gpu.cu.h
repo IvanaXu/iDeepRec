@@ -22,10 +22,10 @@ limitations under the License.
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #if GOOGLE_CUDA
-#include "cub/device/device_reduce.cuh"
-#include "cub/device/device_select.cuh"
-#include "cub/iterator/counting_input_iterator.cuh"
-#include "cub/iterator/transform_input_iterator.cuh"
+#include "third_party/cub/device/device_reduce.cuh"
+#include "third_party/cub/device/device_select.cuh"
+#include "third_party/cub/iterator/counting_input_iterator.cuh"
+#include "third_party/cub/iterator/transform_input_iterator.cuh"
 #elif TENSORFLOW_USE_ROCM
 #include "external/rocprim_archive/hipcub/include/hipcub/hipcub.hpp"
 #endif
@@ -149,7 +149,7 @@ struct NumTrue<GPUDevice, T, TIndex> {
   EIGEN_ALWAYS_INLINE static Status Compute(
       OpKernelContext* ctx, const GPUDevice& d,
       typename TTypes<T>::ConstFlat input,
-      typename TTypes<TIndex>::UnalignedScalar num_true) {
+      typename TTypes<TIndex>::Scalar num_true) {
     const auto& cu_stream = GetGpuStream(ctx);
 
     std::size_t temp_storage_bytes = 0;

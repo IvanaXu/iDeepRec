@@ -85,6 +85,25 @@ ProgramShape GetProgramShapeWithLayout(const HloModule& module) {
 
 }  // namespace
 
+Status VerifiedHloModule::Verify() {
+  if (computation_count() == 0) {
+    // The computation was never built. Nothing to verify.
+    return Status::OK();
+  }
+  return verifier_.Run(this).status();
+}
+
+void VerifiedHloModule::VerifyOrAddFailure(const string& message) {
+  Status status = Verify();
+  if (!status.ok()) {
+    ADD_FAILURE() << "HloVerifier failed on module " << name()
+                  << (message.empty() ? "" : absl::StrCat(" (", message, ")"))
+                  << ": " << status;
+    LOG(ERROR) << "Contents of bad module:";
+    XLA_LOG_LINES(tensorflow::ERROR, ToString());
+  }
+}
+
 HloTestBase::HloTestBase(bool verifier_layout_sensitive,
                          bool allow_mixed_precision_in_hlo_verifier,
                          std::function<bool(const HloInstruction*)>
@@ -136,7 +155,8 @@ HloTestBase::ParseAndReturnVerifiedModule(absl::string_view hlo_text,
       TestName(), config, verifier_layout_sensitive_,
       allow_mixed_precision_in_hlo_verifier_,
       backend().compiler()->ShapeSizeBytesFunction());
-  TF_RETURN_IF_ERROR(module->ParseHloStringAndVerifyModule(hlo_text));
+  TF_RETURN_IF_ERROR(ParseHloString(hlo_text, module.get()));
+  TF_RETURN_IF_ERROR(module->Verify());
   return std::move(module);
 }
 
@@ -315,7 +335,8 @@ StatusOr<::testing::AssertionResult> HloTestBase::RunAndCompareInternal(
 ::testing::AssertionResult HloTestBase::RunAndCompare(
     string_view hlo_string, const absl::optional<ErrorSpec>& error,
     const std::function<void(HloModule*)>& reference_preprocessor) {
-  auto module_or_status = ParseAndReturnVerifiedModule(hlo_string);
+  auto module_or_status =
+      HloRunner::CreateModuleFromString(hlo_string, GetDebugOptionsForTest());
   if (!module_or_status.ok()) {
     return ::testing::AssertionFailure()
            << "Error while parsing HLO text format: "
@@ -329,7 +350,8 @@ StatusOr<::testing::AssertionResult> HloTestBase::RunAndCompareInternal(
                                             bool run_hlo_passes,
                                             ExecutionProfile* profile,
                                             string backend_config) {
-  auto module_or_status = ParseAndReturnVerifiedModule(hlo_string);
+  auto module_or_status =
+      HloRunner::CreateModuleFromString(hlo_string, GetDebugOptionsForTest());
   if (!module_or_status.ok()) {
     return ::testing::AssertionFailure()
            << "Error while parsing HLO text format: "
@@ -364,6 +386,7 @@ StatusOr<::testing::AssertionResult> HloTestBase::RunAndCompareInternal(
     instruction->set_raw_backend_config_string(backend_config);
   }
 
+  // return ::testing::AssertionSuccess();
   auto output = test_runner_.Execute(std::move(module), fake_argument_ptrs,
                                      /*run_hlo_passes=*/run_hlo_passes,
                                      /*profile=*/profile);
@@ -375,15 +398,15 @@ StatusOr<::testing::AssertionResult> HloTestBase::RunAndCompareInternal(
 
 ::testing::AssertionResult HloTestBase::RunMultipleTimes(
     string_view hlo_string, bool run_hlo_passes,
-    std::vector<ExecutionProfile>* profiles, string backend_config,
-    bool assert_determinism) {
+    std::vector<ExecutionProfile>* profiles, string backend_config) {
   int n = profiles->size();
   std::vector<std::vector<Literal*>> fake_argument_ptrs(n);
   std::vector<std::vector<Literal>> fake_arguments(n);
   std::vector<std::unique_ptr<Executable>> executables(n);
 
   for (int i = 0; i < n; ++i) {
-    auto module_or_status = ParseAndReturnVerifiedModule(hlo_string);
+    auto module_or_status =
+        HloRunner::CreateModuleFromString(hlo_string, GetDebugOptionsForTest());
     if (!module_or_status.ok()) {
       return ::testing::AssertionFailure()
              << "Error while parsing HLO text format: "
@@ -426,25 +449,12 @@ StatusOr<::testing::AssertionResult> HloTestBase::RunAndCompareInternal(
     executables[i] = std::move(executable.ValueOrDie());
   }
 
-  absl::optional<Literal> canonical_output;
   for (int i = 0; i < n; ++i) {
-    StatusOr<Literal> output =
+    auto output =
         test_runner_.Execute(std::move(executables[i]), fake_argument_ptrs[i],
                              /*profile=*/&((*profiles)[i]));
     if (!output.ok()) {
       return ::testing::AssertionFailure() << output.status().error_message();
-    }
-
-    if (assert_determinism) {
-      if (!canonical_output.has_value()) {
-        canonical_output = output.ConsumeValueOrDie();
-      } else {
-        if (*canonical_output != output.ValueOrDie()) {
-          return ::testing::AssertionFailure()
-                 << "Successive runs have returned different results: "
-                 << *canonical_output << " vs. " << output.ValueOrDie();
-        }
-      }
     }
   }
 
@@ -467,7 +477,8 @@ StatusOr<::testing::AssertionResult> HloTestBase::RunAndCompareInternal(
 ::testing::AssertionResult HloTestBase::RunAndCompareNoHloPasses(
     string_view hlo_string, const absl::optional<ErrorSpec>& error,
     const std::function<void(HloModule*)>& reference_preprocessor) {
-  auto module_or_status = ParseAndReturnVerifiedModule(hlo_string);
+  auto module_or_status =
+      HloRunner::CreateModuleFromString(hlo_string, GetDebugOptionsForTest());
   if (!module_or_status.ok()) {
     return ::testing::AssertionFailure()
            << "Error while parsing HLO text format: "
@@ -507,19 +518,6 @@ HloInstruction* HloTestBase::FindInstruction(HloModule* module,
     auto instructions = c->instructions();
     auto it = absl::c_find_if(
         instructions, [&](HloInstruction* i) { return i->name() == name; });
-    if (it != instructions.end()) {
-      return *it;
-    }
-  }
-  return nullptr;
-}
-
-HloInstruction* HloTestBase::FindInstruction(HloModule* module,
-                                             HloOpcode opcode) {
-  for (const HloComputation* c : module->computations()) {
-    auto instructions = c->instructions();
-    auto it = absl::c_find_if(
-        instructions, [&](HloInstruction* i) { return i->opcode() == opcode; });
     if (it != instructions.end()) {
       return *it;
     }

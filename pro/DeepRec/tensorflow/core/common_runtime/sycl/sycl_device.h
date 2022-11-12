@@ -216,7 +216,8 @@ class SYCLDevice : public LocalDevice {
                              const AllocatorAttributes alloc_attrs,
                              Tensor* tensor) override;
 
-  Status TryGetDeviceContext(DeviceContext** out_context) override;
+  Status FillContextMap(const Graph* graph,
+                        DeviceContextMap* device_context_map) override;
 
   Status Sync() override;
 

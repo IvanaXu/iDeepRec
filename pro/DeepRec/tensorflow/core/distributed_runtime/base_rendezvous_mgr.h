@@ -82,10 +82,6 @@ class BaseRendezvousMgr : public RendezvousMgrInterface {
   Status RecvLocal(int64 step_id, const Rendezvous::ParsedKey& parsed,
                    Tensor* val, bool* is_dead) override;
 
-  void FuseRecvLocalAsync(int64 step_id,
-                          const std::vector<Rendezvous::ParsedKey>& parsed_keys,
-                          Rendezvous::FuseDoneCallback done) override;
-
   // Removes rendezvous for "step_id".
   //
   // TODO(zhifengc): Have a background thread in worker that
@@ -94,11 +90,6 @@ class BaseRendezvousMgr : public RendezvousMgrInterface {
 
   // Removed all rendezvous.
   void CleanupAll() override;
-
-  // Returns Rendezvous supporting send and recv across steps.
-  // The caller takes ownership of one reference on the
-  // returned Rendezvous instance.
-  RemoteRendezvous* FindInterStepRendezvous();
 
  protected:
   virtual BaseRemoteRendezvous* Create(int64 step_id,
@@ -137,9 +128,6 @@ class BaseRemoteRendezvous : public RemoteRendezvous {
   Status Send(const ParsedKey& key, const Rendezvous::Args& args,
               const Tensor& val, const bool is_dead) override;
 
-  Status Send(const ParsedKey& key, const Rendezvous::Args& args,
-              Tensor* val, mutex* mu, const bool is_dead) override;
-
   // This method is called only by the RecvOp.  It tests to see
   // whether the value will be produced by a local or remote device
   // and handles accordingly.  In the local case it forwards to
@@ -161,29 +149,10 @@ class BaseRemoteRendezvous : public RemoteRendezvous {
   // REQUIRES: "parsed" is one that will be Saved into the local rendezvous.
   void RecvLocalAsync(const ParsedKey& parsed, DoneCallback done);
 
-  void FuseRecvAsync(const std::vector<ParsedKey>& parsed_keys,
-                     const Rendezvous::Args& recv_args,
-                     FuseDoneCallback done) override;
-
-  void FuseRecvLocalAsync(const std::vector<ParsedKey>& parsed_keys,
-                          FuseDoneCallback done);
-
-  void FuseRecvLocalSync(const std::vector<ParsedKey>& parsed_keys,
-                         FuseDoneCallback done);
-
-  // For ref send/recv
-  void RecvAsync(const ParsedKey& key, const Rendezvous::Args& args,
-                 RefDoneCallback done) override;
-
  protected:
   virtual void RecvFromRemoteAsync(const Rendezvous::ParsedKey& parsed,
                                    const Rendezvous::Args& args,
                                    DoneCallback done) = 0;
-
-  virtual void FuseRecvFromRemoteAsync(
-      const std::vector<Rendezvous::ParsedKey>& parsed_keys,
-      const Rendezvous::Args& args,
-      FuseDoneCallback done);
 
   // Returns true if "src" and "dst" are located in the same worker,
   // and hence may use a local rendezvous.
@@ -213,7 +182,6 @@ class BaseRemoteRendezvous : public RemoteRendezvous {
   // Status given by StartAbort() if any.
   Status status_ GUARDED_BY(mu_);
   WorkerSession* session_ GUARDED_BY(mu_);  // Not owned.
-  string worker_name_ GUARDED_BY(mu_);
 
   // Data structures to handle calls when partially initialized.
   struct DeferredCall {
@@ -223,15 +191,6 @@ class BaseRemoteRendezvous : public RemoteRendezvous {
     DeferredCall(const ParsedKey& parsed, DoneCallback done);
   };
   std::vector<DeferredCall> deferred_calls_ GUARDED_BY(mu_);
-
-  struct DeferredFuseCall {
-    const std::vector<ParsedKey> parsed_keys;
-    FuseDoneCallback done;
-
-    DeferredFuseCall(const std::vector<ParsedKey>& parsed_keys,
-                     FuseDoneCallback done);
-  };
-  std::vector<DeferredFuseCall> deferred_fuse_calls_ GUARDED_BY(mu_);
 
   typedef std::function<void()> InactiveCallback;
 
@@ -259,9 +218,6 @@ class BaseRemoteRendezvous : public RemoteRendezvous {
 
   // Must be called only if fully initialized.
   void RecvLocalAsyncInternal(const ParsedKey& parsed, DoneCallback done);
-
-  void FuseRecvLocalAsyncInternal(const std::vector<ParsedKey>& parsed_keys,
-                                  FuseDoneCallback done);
 
   TF_DISALLOW_COPY_AND_ASSIGN(BaseRemoteRendezvous);
 };

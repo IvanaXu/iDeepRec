@@ -146,44 +146,6 @@ class Node {
   bool IsOp() const { return id() > 1; }
 
   // Node class helpers
-  bool IsApplyAdagradOps() const {
-    return type_string() == "ApplyAdagrad" ||
-           type_string() == "ResourceApplyAdagrad";
-  }
-  bool IsSparseApplyAdagradOps() const {
-    return type_string() == "SparseApplyAdagrad" ||
-           type_string() == "KvResourceSparseApplyAdagrad" ||
-           type_string() == "ResourceSparseApplyAdagrad";
-  }
-  bool IsApplyAdamOps() const {
-    return type_string() == "ApplyAdam" ||
-           type_string() == "ResourceApplyAdam";
-  }
-  bool IsApplySparseAdamOps() const {
-    return type_string() == "SparseAdam" ||
-           type_string() == "SparseApplyAdam" ||
-           type_string() == "ResourceSparseApplyAdam" ||
-           type_string() == "KvResourceSparseApplyAdam" ||
-           type_string() == "ResourceSparseApplyAdamAsync" ||
-           type_string() == "KvResourceSparseApplyAdamAsync";
-  }
-  bool IsApplyFtrlOps() const {
-    return type_string() == "ApplyFtrl" ||
-           type_string() == "ResourceApplyFtrl" ||
-           type_string() == "ApplyFtrlV2" ||
-           type_string() == "ResourceApplyFtrlV2";
-  }
-  bool IsSparseApplyFtrlOps() const {
-    return type_string() == "SparseApplyFtrl" ||
-           type_string() == "GroupSparseApplyFtrl" ||
-           type_string() == "ResourceGroupSparseApplyFtrl" ||
-           type_string() == "ResourceSparseApplyFtrl" ||
-           type_string() == "KvResourceSparseApplyFtrl" ||
-           type_string() == "SparseApplyFtrlV2" ||
-           type_string() == "ResourceSparseApplyFtrlV2" ||
-           type_string() == "KvResourceSparseApplyFtrlV2";
-  }
-  bool IsPlaceholder() const { return type_string() == "Placeholder"; }
   bool IsSwitch() const { return class_ == NC_SWITCH; }
   bool IsMerge() const { return class_ == NC_MERGE; }
   bool IsEnter() const { return class_ == NC_ENTER; }
@@ -191,19 +153,10 @@ class Node {
   bool IsNextIteration() const { return class_ == NC_NEXT_ITERATION; }
   bool IsLoopCond() const { return class_ == NC_LOOP_COND; }
   bool IsControlTrigger() const { return class_ == NC_CONTROL_TRIGGER; }
-  bool IsSend() const { return class_ == NC_SEND ||
-                               class_ == NC_HOST_SEND ||
-                               class_ == NC_REF_SEND; }
-  bool IsRecv() const { return class_ == NC_RECV ||
-                               class_ == NC_HOST_RECV ||
-                               class_ == NC_REF_RECV; }
-  bool IsFuseRecv() const { return class_ == NC_FUSE_RECV ||
-                                   class_ == NC_HOST_FUSE_RECV; }
+  bool IsSend() const { return class_ == NC_SEND || class_ == NC_HOST_SEND; }
+  bool IsRecv() const { return class_ == NC_RECV || class_ == NC_HOST_RECV; }
   bool IsConstant() const { return class_ == NC_CONSTANT; }
-  bool IsStage() const { return class_ == NC_TENSOR_BUFFER_PUT; }
-  bool IsUnstage() const { return class_ == NC_TENSOR_BUFFER_TAKE; }
   bool IsVariable() const { return class_ == NC_VARIABLE; }
-  bool IsKvVarHandle() const { return class_ == NC_KV_VAR_HANDLE; }
   bool IsIdentity() const { return class_ == NC_IDENTITY; }
   bool IsGetSessionHandle() const { return class_ == NC_GET_SESSION_HANDLE; }
   bool IsGetSessionTensor() const { return class_ == NC_GET_SESSION_TENSOR; }
@@ -217,7 +170,6 @@ class Node {
   }
   bool IsHostSend() const { return class_ == NC_HOST_SEND; }
   bool IsHostRecv() const { return class_ == NC_HOST_RECV; }
-  bool IsHostFuseRecv() const { return class_ == NC_HOST_FUSE_RECV; }
   bool IsScopedAllocator() const { return class_ == NC_SCOPED_ALLOCATOR; }
   bool IsCollective() const { return class_ == NC_COLLECTIVE; }
 
@@ -230,9 +182,6 @@ class Node {
   bool IsArg() const { return class_ == NC_ARG; }
   // Is this node a function output
   bool IsRetval() const { return class_ == NC_RETVAL; }
-  bool IsRunGraph() const {
-    return class_ == NC_STAR_RUN_GRAPH ||
-           class_ == NC_RUN_GRAPH; }
 
   template <typename T>
   void AddAttr(const string& name, const T& val) {
@@ -307,15 +256,10 @@ class Node {
     NC_CONTROL_TRIGGER,
     NC_SEND,
     NC_HOST_SEND,
-    NC_REF_SEND,
     NC_RECV,
     NC_HOST_RECV,
-    NC_REF_RECV,
-    NC_FUSE_RECV,
-    NC_HOST_FUSE_RECV,
     NC_CONSTANT,
     NC_VARIABLE,
-    NC_KV_VAR_HANDLE,
     NC_IDENTITY,
     NC_GET_SESSION_HANDLE,
     NC_GET_SESSION_TENSOR,
@@ -329,10 +273,6 @@ class Node {
     NC_WHILE,
     NC_ARG,
     NC_RETVAL,
-    NC_STAR_RUN_GRAPH,
-    NC_RUN_GRAPH,
-    NC_TENSOR_BUFFER_PUT,
-    NC_TENSOR_BUFFER_TAKE,
     NC_OTHER  // Not a special kind of node
   };
 
@@ -724,9 +664,6 @@ class Graph {
   // Builds a node name to node pointer index for all nodes in the graph.
   std::unordered_map<string, Node*> BuildNodeNameIndex() const;
 
-  // Return true if this graph contain gradients node
-  bool IsTrainingGraph() const;
-
   // TODO(josh11b): uint64 hash() const;
 
  private:
@@ -819,17 +756,11 @@ inline bool IsLoopCond(const Node* node) { return node->IsLoopCond(); }
 inline bool IsControlTrigger(const Node* n) { return n->IsControlTrigger(); }
 inline bool IsSend(const Node* node) { return node->IsSend(); }
 inline bool IsRecv(const Node* node) { return node->IsRecv(); }
-inline bool IsFuseRecv(const Node* node) { return node->IsFuseRecv(); }
 inline bool IsHostSend(const Node* node) { return node->IsHostSend(); }
 inline bool IsHostRecv(const Node* node) { return node->IsHostRecv(); }
-inline bool IsHostFuseRecv(const Node* node) { return node->IsHostFuseRecv(); }
-inline bool IsRunGraph(const Node* node) { return node->IsRunGraph(); }
 
 // True for Nodes that mediate the transfer of values between processes.
-inline bool IsTransferNode(const Node* n) {
-  return IsSend(n) || IsRecv(n) ||
-         IsFuseRecv(n) || IsRunGraph(n);
-}
+inline bool IsTransferNode(const Node* n) { return IsSend(n) || IsRecv(n); }
 
 inline bool IsConstant(const Node* node) { return node->IsConstant(); }
 inline bool IsVariable(const Node* node) { return node->IsVariable(); }

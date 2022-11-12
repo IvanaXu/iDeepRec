@@ -24,10 +24,10 @@ limitations under the License.
 #include "tensorflow/core/lib/gtl/inlined_vector.h"
 #include "tensorflow/core/platform/logging.h"
 
-#include "dnnl.hpp"
+#include "mkldnn.hpp"
 #include "tensorflow/core/util/mkl_util.h"
-using dnnl::stream;
-using dnnl::sum;
+using mkldnn::stream;
+using mkldnn::sum;
 
 namespace tensorflow {
 typedef Eigen::ThreadPoolDevice CPUDevice;
@@ -107,7 +107,7 @@ class MklAddNOp : public OpKernel {
   }
 
   void Compute(OpKernelContext* ctx) override {
-    // Each input tensor in OneDNN layout has additional meta-tensor carrying
+    // Each input tensor in MKL layout has additional meta-tensor carrying
     // layout information. So the number of actual tensors is half the total
     // number of inputs.
     const int num_inputs = ctx->num_inputs() / 2;
@@ -155,7 +155,12 @@ class MklAddNOp : public OpKernel {
       auto cpu_engine = engine(ENGINE_CPU, 0);
       std::vector<float> coeff(num_inputs, 1.0);
       std::vector<MEMORY_PRIMITIVE_DESC> srcs_pd;
+
+#ifdef ENABLE_MKLDNN_V1
       std::vector<memory> inputs;
+#else
+      std::vector<primitive::at> inputs;
+#endif
 
       MklDnnData<T> dst(&cpu_engine);
       MklDnnData<T> src(&cpu_engine);
@@ -167,19 +172,18 @@ class MklAddNOp : public OpKernel {
       if (mkl_input_index >= 0) {
         has_mkl_input = true;
         GetMklShape(ctx, mkl_input_index, &mkl_shape);
-        // OneDNN input has the data format information.
+        // MKL input has the data format information.
         mkl_data_format = mkl_shape.GetTfDataFormat();
         tf_data_format = MklDnnDataFormatToTFDataFormat(mkl_data_format);
         dnn_fmt = MklTensorFormatToMklDnnDataFormat(mkl_data_format);
       }
 
       std::shared_ptr<stream> fwd_cpu_stream;
-      MklDnnThreadPool eigen_tp(ctx);
-      fwd_cpu_stream.reset(CreateStream(&eigen_tp, cpu_engine));
+      fwd_cpu_stream.reset(CreateStream(ctx, cpu_engine));
 
-      // Create memory descriptor for OneDNN.
+      // Create memory descriptor for MKL-DNN.
       // If all input in Tensorflow format, create block memory descriptor,
-      // else convert TF format to OneDNN memory descriptor
+      // else convert TF format to MKL memory descriptor
       for (int src_idx = 0; src_idx < num_inputs; ++src_idx) {
         MklDnnShape src_mkl_shape;
         GetMklShape(ctx, src_idx, &src_mkl_shape);
@@ -207,13 +211,21 @@ class MklAddNOp : public OpKernel {
             md = MklDnnData<T>::CreateBlockedMemDesc(dims, strides);
           }
         }
+#ifdef ENABLE_MKLDNN_V1
         srcs_pd.push_back(memory::desc(md));
+#else
+        srcs_pd.push_back(memory::primitive_desc(md, cpu_engine));
+#endif
         src.SetUsrMem(md, &src_tensor);
         src.SetUsrMemDataHandle(&src_tensor, fwd_cpu_stream);
         inputs.push_back(src.GetOpMem());
       }
 
+#ifdef ENABLE_MKLDNN_V1
       auto sum_pd = sum::primitive_desc(coeff, srcs_pd, cpu_engine);
+#else
+      auto sum_pd = sum::primitive_desc(coeff, srcs_pd);
+#endif
       output_mkl_shape.SetMklTensor(has_mkl_input);
       auto output_pd = sum_pd.PRIMITIVE_DESC_DST;
       dst.SetUsrMem(output_pd);
@@ -234,15 +246,20 @@ class MklAddNOp : public OpKernel {
       dst.SetUsrMemDataHandle(dst_tensor, fwd_cpu_stream);
       // Create Sum op, and submit net for execution.
       std::vector<primitive> net;
-      dnnl::sum sum_op(sum_pd);
+#ifdef ENABLE_MKLDNN_V1
+      mkldnn::sum sum_op(sum_pd);
       std::unordered_map<int, memory> net_args = {
-          { DNNL_ARG_DST,
+          { MKLDNN_ARG_DST,
             dst.GetOpMem() }};
       for (int i = 0; i < num_inputs; ++i) {
-        net_args.insert({DNNL_ARG_MULTIPLE_SRC + i, inputs[i]});
+        net_args.insert({MKLDNN_ARG_MULTIPLE_SRC + i, inputs[i]});
       }
       sum_op.execute(*fwd_cpu_stream, net_args);
-    } catch (dnnl::error& e) {
+#else
+      net.push_back(sum(sum_pd, inputs, dst.GetOpMem()));
+      fwd_cpu_stream->submit(net).wait();
+#endif
+    } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +
                          string(__FILE__) + ":" + std::to_string(__LINE__);

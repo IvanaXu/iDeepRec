@@ -16,7 +16,7 @@
 #ifdef INTEL_MKL
 #define EIGEN_USE_THREADS
 
-#include "dnnl.hpp"
+#include "mkldnn.hpp"
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/framework/common_shape_fns.h"
 #include "tensorflow/core/framework/numeric_op.h"
@@ -25,13 +25,16 @@
 #include "tensorflow/core/util/mkl_types.h"
 #include "tensorflow/core/util/mkl_util.h"
 
-using dnnl::algorithm;
-using dnnl::engine;
-using dnnl::error;
-using dnnl::memory;
-using dnnl::pooling_backward;
-using dnnl::pooling_forward;
-using dnnl::prop_kind;
+using mkldnn::algorithm;
+using mkldnn::engine;
+using mkldnn::error;
+using mkldnn::memory;
+#ifndef ENABLE_MKLDNN_V1
+using mkldnn::padding_kind;
+#endif
+using mkldnn::pooling_backward;
+using mkldnn::pooling_forward;
+using mkldnn::prop_kind;
 
 namespace tensorflow {
 
@@ -42,7 +45,7 @@ class MklAvgPoolingOp : public MklPoolingForwardOpBase<T> {
  public:
   explicit MklAvgPoolingOp(OpKernelConstruction* context)
       : MklPoolingForwardOpBase<T>(context) {
-    // Workspace is an DNNL construct that is only used in Max Pooling.
+    // Workspace is an MKLDNN construct that is only used in Max Pooling.
     // So set workspace_enabled_ to false.
     this->workspace_enabled_ = false;
   }
@@ -96,7 +99,7 @@ class MklAvgPoolingOp : public MklPoolingForwardOpBase<T> {
       memory::desc input_md = dnn_shape_input.IsMklTensor()
                                   ? dnn_shape_input.GetMklLayout()
                                   : memory::desc(src_dims, MklDnnType<T>(),
-                                                 this->data_format_dnnl_);
+                                                 this->data_format_mkldnn_);
 
       // Get an average pooling primitive from the op pool.
       MklPoolingFwdPrimitive<T>* pooling_fwd = nullptr;
@@ -107,18 +110,26 @@ class MklAvgPoolingOp : public MklPoolingForwardOpBase<T> {
         pooling_prop_kind = prop_kind::forward_inference;
       else
         pooling_prop_kind = prop_kind::forward_training;
+#ifdef ENABLE_MKLDNN_V1
       // TODO(DNNL): Find out what should we use input_md.data.format.
       MklPoolingParams fwdParams(
           src_dims, output_dims_mkl_order, filter_dims, strides, padding_left,
           padding_right, ALGORITHM::pooling_avg_exclude_padding,
           pooling_prop_kind,
-          static_cast<MEMORY_FORMAT>(this->data_format_dnnl_), input_md);
+          static_cast<MEMORY_FORMAT>(this->data_format_mkldnn_), input_md);
+#else
+      MklPoolingParams fwdParams(
+          src_dims, output_dims_mkl_order, filter_dims, strides, padding_left,
+          padding_right, ALGORITHM::pooling_avg_exclude_padding,
+          pooling_prop_kind, static_cast<MEMORY_FORMAT>(input_md.data.format),
+          input_md);
+#endif
       pooling_fwd = MklPoolingFwdPrimitiveFactory<T>::Get(fwdParams);
 
       // Allocate output tensor.
       this->AllocateOutputTensor(context, *(pooling_fwd->GetPoolingFwdPd()),
                                  output_dims_mkl_order,
-                                 this->tensor_format_dnnl_, &output_tensor);
+                                 this->tensor_format_mkldnn_, &output_tensor);
       DCHECK(output_tensor);
       OP_REQUIRES_OK(context, context->status());
 
@@ -126,8 +137,7 @@ class MklAvgPoolingOp : public MklPoolingForwardOpBase<T> {
 
       T* dst_data = output_tensor->flat<T>().data();
       std::shared_ptr<stream> fwd_cpu_stream;
-      MklDnnThreadPool eigen_tp(context);
-      fwd_cpu_stream.reset(CreateStream(&eigen_tp, pooling_fwd->GetEngine()));
+      fwd_cpu_stream.reset(CreateStream(context, pooling_fwd->GetEngine()));
       // Execute pooling op.
       pooling_fwd->Execute(src_data, dst_data, nullptr, fwd_cpu_stream);
 
@@ -150,7 +160,7 @@ class MklAvgPoolingOp : public MklPoolingForwardOpBase<T> {
         output_min->flat<float>()(0) = min_input;
         output_max->flat<float>()(0) = max_input;
       }
-    } catch (dnnl::error& e) {
+    } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +
                          string(__FILE__) + ":" + std::to_string(__LINE__);
@@ -222,33 +232,40 @@ class MklAvgPoolingGradOp : public MklPoolingBackwardOpBase<T> {
           orig_input_mkl_shape.IsMklTensor()
               ? orig_input_mkl_shape.GetMklLayout()
               : memory::desc(orig_input_dims_mkl_order, MklDnnType<T>(),
-                             this->data_format_dnnl_);
+                             this->data_format_mkldnn_);
 
       // Get diff_dst memory::desc.
       memory::desc diff_dst_md =
           grad_mkl_shape.IsMklTensor()
               ? grad_mkl_shape.GetMklLayout()
               : memory::desc(diff_dst_dims, MklDnnType<T>(),
-                             this->data_format_dnnl_);
+                             this->data_format_mkldnn_);
 
 // Pass prop_kind::forward_training to create a forward primitive
 // that is used in the backward pass.
+#ifdef ENABLE_MKLDNN_V1
       // TODO(DNNL): Find out what should we use src_md.data.format.
       MklPoolingParams bwdParams(
           orig_input_dims_mkl_order, output_dims_mkl_order, filter_dims,
           strides, padding_left, padding_right,
           ALGORITHM::pooling_avg_exclude_padding, prop_kind::forward_training,
-          static_cast<MEMORY_FORMAT>(this->data_format_dnnl_), src_md);
+          static_cast<MEMORY_FORMAT>(this->data_format_mkldnn_), src_md);
+#else
+      MklPoolingParams bwdParams(
+          orig_input_dims_mkl_order, output_dims_mkl_order, filter_dims,
+          strides, padding_left, padding_right,
+          ALGORITHM::pooling_avg_exclude_padding, prop_kind::forward_training,
+          static_cast<MEMORY_FORMAT>(src_md.data.format), src_md);
+#endif
       MklPoolingBwdPrimitive<T>* pooling_bwd =
           MklPoolingBwdPrimitiveFactory<T>::Get(bwdParams);
 
       std::shared_ptr<stream> bwd_cpu_stream;
-      MklDnnThreadPool eigen_tp(context);
-      bwd_cpu_stream.reset(CreateStream(&eigen_tp, pooling_bwd->GetEngine()));
+      bwd_cpu_stream.reset(CreateStream(context, pooling_bwd->GetEngine()));
       Tensor* output_tensor = nullptr;
       this->AllocateOutputTensor(context, *(pooling_bwd->GetPoolingBwdPd()),
                                  orig_input_dims_mkl_order,
-                                 this->tensor_format_dnnl_, &output_tensor);
+                                 this->tensor_format_mkldnn_, &output_tensor);
 
       // TODO(nammbash): Refactor (lines 249-262) common code for
       // max & avg pooling into superclass or common utils function.
@@ -273,7 +290,7 @@ class MklAvgPoolingGradOp : public MklPoolingBackwardOpBase<T> {
       // Execute pooling op.
       pooling_bwd->Execute(diff_dst_data, diff_src_data, nullptr,
                            bwd_cpu_stream);
-    } catch (dnnl::error& e) {
+    } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +
                          string(__FILE__) + ":" + std::to_string(__LINE__);

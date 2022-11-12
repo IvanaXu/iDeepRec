@@ -102,7 +102,7 @@ xla::XlaOp XlaExpression::AsXlaOp(xla::XlaBuilder* builder) const {
 }
 
 xla::StatusOr<absl::optional<Tensor>> XlaExpression::ResolveConstant(
-    xla::Client* client, bool dynamic_dimension_is_minus_one) const {
+    xla::Client* client) const {
   switch (kind()) {
     case Kind::kConstant:
       return {constant_value()};
@@ -122,8 +122,7 @@ xla::StatusOr<absl::optional<Tensor>> XlaExpression::ResolveConstant(
   if (!is_constant) return {absl::nullopt};
 
   TF_ASSIGN_OR_RETURN(xla::XlaComputation constant_graph,
-                      handle().builder()->BuildConstantSubGraph(
-                          handle(), dynamic_dimension_is_minus_one));
+                      handle().builder()->BuildConstantSubGraph(handle()));
 
   TF_ASSIGN_OR_RETURN(TensorShape shape, GetShape());
 

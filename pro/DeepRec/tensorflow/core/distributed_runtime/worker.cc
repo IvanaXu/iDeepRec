@@ -17,7 +17,6 @@ limitations under the License.
 
 #include "tensorflow/core/common_runtime/collective_executor_mgr.h"
 #include "tensorflow/core/common_runtime/device_mgr.h"
-#include "tensorflow/core/common_runtime/memory_planner.h"
 #include "tensorflow/core/common_runtime/process_util.h"
 #include "tensorflow/core/common_runtime/scoped_allocator_mgr.h"
 #include "tensorflow/core/common_runtime/step_stats_collector.h"
@@ -38,13 +37,6 @@ Worker::Worker(WorkerEnv* env) : env_(env), recent_request_ids_(100000) {
 
 void Worker::GetStatusAsync(const GetStatusRequest* request,
                             GetStatusResponse* response, StatusCallback done) {
-  GetStatusAsyncWithOptions(request, response, done, nullptr);
-}
-
-void Worker::GetStatusAsyncWithOptions(const GetStatusRequest* request,
-                                       GetStatusResponse* response,
-                                       StatusCallback done,
-                                       CallOptions* call_opts) {
   DeviceMgr* dm = env_->device_mgr;
   std::vector<DeviceAttributes> devices;
   dm->ListDeviceAttributes(&devices);
@@ -75,7 +67,6 @@ void Worker::DeleteWorkerSessionAsync(CallOptions* opts,
 void Worker::RegisterGraphAsync(const RegisterGraphRequest* request,
                                 RegisterGraphResponse* response,
                                 StatusCallback done) {
-  MemoryPlannerFactory::GetMemoryPlanner()->SetThreadPool(env_->compute_pool);
   std::shared_ptr<WorkerSession> session;
   Status s;
   if (request->create_worker_session_called()) {
@@ -177,7 +168,6 @@ void Worker::DoRunGraph(CallOptions* opts, RunGraphRequestWrapper* request,
     return;
   }
 
-  ScopedMemoryCollector scoped_memory_collector;
   std::shared_ptr<WorkerSession> session;
   if (request->create_worker_session_called()) {
     s = env_->session_mgr->WorkerSessionForSession(request->session_handle(),
@@ -189,14 +179,9 @@ void Worker::DoRunGraph(CallOptions* opts, RunGraphRequestWrapper* request,
     done(s);
     return;
   }
-  std::map<std::string, bool> is_send_dead;
   GraphMgr::NamedTensors in;
   GraphMgr::NamedTensors* out = new GraphMgr::NamedTensors;
   s = PrepareRunGraph(request, &in, out);
-  // NOTE(jiankeng.pt): tensor in worker side is not dead.
-  for (size_t i = 0; i < request->num_sends(); ++i) {
-    is_send_dead.insert({request->send_key(i), false});
-  }
   if (!s.ok()) {
     delete out;
     done(s);
@@ -234,7 +219,7 @@ void Worker::DoRunGraph(CallOptions* opts, RunGraphRequestWrapper* request,
   }
   session->graph_mgr->ExecuteAsync(
       request->graph_handle(), step_id, session.get(), request->exec_opts(),
-      collector, response, cm, in, is_send_dead,
+      collector, response, cm, in,
       [this, step_id, response, session, cm, out, token, collector,
        profiler_session, opts, done](const Status& status) {
         Status s = status;
@@ -295,14 +280,9 @@ void Worker::DoPartialRunGraph(CallOptions* opts,
     return;
   }
 
-  std::map<std::string, bool> is_send_dead;
   GraphMgr::NamedTensors in;
   GraphMgr::NamedTensors* out = new GraphMgr::NamedTensors;
   s = PrepareRunGraph(request, &in, out);
-  // NOTE(jiankeng.pt): tensor in worker side is not dead.
-  for (size_t i = 0; i < request->num_sends(); ++i) {
-    is_send_dead.insert({request->send_key(i), false});
-  }
   auto finish = [done, out, opts](const Status& s) {
     opts->ClearCancelCallback();
     delete out;
@@ -332,7 +312,7 @@ void Worker::DoPartialRunGraph(CallOptions* opts,
                                            [cm]() { cm->StartCancel(); });
     session->graph_mgr->ExecuteAsync(
         graph_handle, step_id, session.get(), request->exec_opts(),
-        nullptr /* collector */, nullptr /* response */, cm, in, is_send_dead,
+        nullptr /* collector */, nullptr /* response */, cm, in,
         [this, token, step_id, session](Status s) {
           cancellation_manager_.DeregisterCallback(token);
           partial_run_mgr_.ExecutorDone(step_id, s);
@@ -456,8 +436,7 @@ Status Worker::PrepareRecvTensor(const Rendezvous::ParsedKey& parsed,
   TF_RETURN_IF_ERROR(env_->device_mgr->LookupDevice(local_name, src_dev));
 
   // Does the device have the right incarnation number we expect?
-  if (0 != parsed.src_incarnation &&
-      (*src_dev)->attributes().incarnation() != parsed.src_incarnation) {
+  if ((*src_dev)->attributes().incarnation() != parsed.src_incarnation) {
     return errors::Aborted(
         "RecvTensor expects a different device incarnation: ",
         parsed.src_incarnation, " vs. ", (*src_dev)->attributes().incarnation(),

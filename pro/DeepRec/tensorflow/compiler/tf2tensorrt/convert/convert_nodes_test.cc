@@ -2514,8 +2514,6 @@ TEST_F(OpConverterTest, ConvertSquare) {
 }
 
 #if IS_TRT_VERSION_GE(5, 1, 0, 0)
-// TODO: @mconley @jdekhtiar - Reactivate when fixed
-#ifndef TF2TENSORRT_BYPASS_NMS_RESIZE_OPS
 TEST_F(OpConverterTest, ConvertCombinedNMS) {
   // Get the NodeDef for CombinedNMS.
   auto get_nms_nodedef = []() -> NodeDef {
@@ -2614,7 +2612,6 @@ TEST_F(OpConverterTest, ConvertCombinedNMS) {
   }
 }
 
-#endif  // TF2TENSORRT_BYPASS_NMS_RESIZE_OPS
 #endif  // CombinedNonMaxSuppression
 
 TEST_F(OpConverterTest, ConvertActivation) {
@@ -3861,7 +3858,8 @@ TEST_F(OpConverterTest, ConvertConv2D) {
   };
 
   // Ok.
-  std::vector<TestParams> ok_params{
+  const int kConv2DOKCases = 7;
+  TestParams ok_params[kConv2DOKCases] = {
       // Basic
       TestParams{/*input_dims=*/{1, 2, 3},
                  /*input=*/{0, 1, 2, 3, 3, 4},
@@ -3946,34 +3944,9 @@ TEST_F(OpConverterTest, ConvertConv2D) {
                  /*is_conv2d_backprop_input=*/true,
                  /*expected_output_dims=*/{1, 2, 4},
                  /*expected_output=*/{0, 0, -1, 1, -2, 2, -3, 3}},
-      // Transpose Strided NHWC
-      TestParams{/*input_dims=*/{2, 2, 1},
-                 /*input=*/{0, 1, 2, 3},
-                 /*filter_dims=*/{1, 2, 1, 1},
-                 /*filter=*/{-1, 1},
-                 /*strides=*/{1, 1, 2, 1},
-                 /*padding=*/"SAME",
-                 /*data_format=*/"NHWC",
-                 /*dilations=*/{1, 1, 1, 1},
-                 /*is_conv2d_backprop_input=*/true,
-                 /*expected_output_dims=*/{2, 4, 1},
-                 /*expected_output=*/{0, 0, -1, 1, -2, 2, -3, 3}},
-      // Transpose Strided NHWC with VALID padding
-      TestParams{/*input_dims=*/{3, 1, 1},
-                 /*input=*/{0, 1, 2},
-                 /*filter_dims=*/{2, 1, 1, 1},
-                 /*filter=*/{-1, 1},
-                 /*strides=*/{1, 2, 1, 1},
-                 /*padding=*/"VALID",
-                 /*data_format=*/"NHWC",
-                 /*dilations=*/{1, 1, 1, 1},
-                 /*is_conv2d_backprop_input=*/true,
-                 /*expected_output_dims=*/{7, 1, 1},
-                 /*expected_output=*/{0, 0, -1, 1, -2, 2, 0}},
-
   };
 
-  for (int i = 0; i < ok_params.size(); i++) {
+  for (int i = 0; i < kConv2DOKCases; i++) {
     Reset();
     NodeDef node_def = get_conv2d_nodedef(
         ok_params[i].strides, ok_params[i].padding, ok_params[i].data_format,
@@ -3981,13 +3954,11 @@ TEST_F(OpConverterTest, ConvertConv2D) {
     AddTestTensor("input", ok_params[i].input_dims);
     AddTestWeights<float>("weights", ok_params[i].filter_dims,
                           ok_params[i].filter);
-
-
     if (ok_params[i].is_conv2d_backprop_input) {
-      std::vector<int> tf_input_sizes = ok_params[i].expected_output_dims;
-      tf_input_sizes.insert(tf_input_sizes.begin(), 1);  // Add batch dimension.
-      QCHECK_EQ(4, tf_input_sizes.size());
-      AddTestWeights<int>("input_sizes", {4}, tf_input_sizes);
+      AddTestWeights<float>(
+          "input_sizes",
+          {static_cast<int>(ok_params[i].expected_output.size())},
+          ok_params[i].expected_output);
     }
     RunValidationAndConversion(node_def);
     TRT_TensorOrWeights output;
@@ -6096,8 +6067,6 @@ TEST_F(OpConverterTest, ConvertSquaredDifference) {
 }
 
 #if IS_TRT_VERSION_GE(6, 0, 0, 0)
-// TODO: @mconley @jdekhtiar - Reactivate when fixed
-#ifndef TF2TENSORRT_BYPASS_NMS_RESIZE_OPS
 template <typename OpType>
 NodeDef MakeResizeNodeDef(std::string name, DataType dtype,
                           bool align_corners) {
@@ -6148,13 +6117,6 @@ void TestConvertResize(OpConverterTest* test) {
           CastTestVector<float, CType>({2.0f, 0.5f, -1.0f, 2.0f, 0.5f, -1.0f}),
       }};
 
-// This use case is not supported as of TRT version 7.1
-#if IS_TRT_VERSION_GE(7, 1, 0, 0)
-  if (OpType == ops::ResizeBilinear) {
-    params.erase(params.begin());
-  }
-#endif
-
   for (int i = 0; i < params.size(); ++i) {
     test->Reset();
     // Create resize node.
@@ -6199,7 +6161,7 @@ TEST_F(OpConverterTest, ConvertResize) {
     // First input is weight, should fail.
     Reset();
     NodeDef node_def =
-        MakeResizeNodeDef<ops::ResizeBilinear>("my_resize", DT_FLOAT, true);
+        MakeResizeNodeDef<ops::ResizeBilinear>("my_resize", DT_FLOAT, false);
     AddTestWeights<float>("input", {1, 2}, {1, 2});
     AddTestWeights<int>("size", {1, 2}, {1, 2});
     RunValidationAndConversion(
@@ -6211,7 +6173,7 @@ TEST_F(OpConverterTest, ConvertResize) {
     // output dimension is a tensor, should fail.
     Reset();
     NodeDef node_def =
-        MakeResizeNodeDef<ops::ResizeBilinear>("my_resize", DT_FLOAT, true);
+        MakeResizeNodeDef<ops::ResizeBilinear>("my_resize", DT_FLOAT, false);
     AddTestTensor("input", {1, 2});
     AddTestTensor("size", {1, 2});
     RunValidationAndConversion(
@@ -6224,7 +6186,6 @@ TEST_F(OpConverterTest, ConvertResize) {
   TestConvertResize<ops::ResizeNearestNeighbor, DT_FLOAT>(this);
   TestConvertResize<ops::ResizeNearestNeighbor, DT_HALF>(this);
 }
-#endif  // TF2TENSORRT_BYPASS_NMS_RESIZE_OPS
 #endif  // IS_TRT_VERSION_GE(6, 0, 0, 0)
 
 NodeDef MakePadNodeDef(std::string name, DataType dtype) {

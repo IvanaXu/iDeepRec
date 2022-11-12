@@ -24,7 +24,7 @@ VALID_LIBS = [
     "flatbuffers",
     "gast_archive",
     "gif_archive",
-    "grpc",
+    "com_github_grpc_grpc",
     "hwloc",
     "icu",
     "jpeg",
@@ -43,7 +43,7 @@ VALID_LIBS = [
     "swig",
     "termcolor_archive",
     "wrapt",
-    "zlib_archive",
+    "zlib",
 ]
 
 def auto_configure_fail(msg):

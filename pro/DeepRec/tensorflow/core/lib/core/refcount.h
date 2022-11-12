@@ -73,10 +73,6 @@ using RefCountPtr = std::unique_ptr<T, RefCountDeleter>;
 class ScopedUnref {
  public:
   explicit ScopedUnref(RefCounted* o) : obj_(o) {}
-  ScopedUnref(ScopedUnref&& rhs) {
-    obj_ = rhs.obj_;
-    rhs.obj_ = nullptr;
-  }
   ~ScopedUnref() {
     if (obj_) obj_->Unref();
   }

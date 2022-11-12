@@ -85,18 +85,6 @@ cc_library(
 )
 
 cc_library(
-    name = "rccl",
-    srcs = ["rocm/lib/%{rccl_lib}"],
-    data = ["rocm/lib/%{rccl_lib}"],
-    includes = [
-        ".",
-        "rocm/include",
-    ],
-    linkstatic = 1,
-    visibility = ["//visibility:public"],
-)
-
-cc_library(
     name = "rocm",
     visibility = ["//visibility:public"],
     deps = [

@@ -76,7 +76,6 @@ class GrpcDebugTest : public ::testing::Test {
   ServerData server_data_;
 };
 
-/*
 TEST_F(GrpcDebugTest, ConnectionTimeoutWorks) {
   // Use a short timeout so the test won't take too long.
   const int64 kOriginalTimeoutMicros = GetChannelConnectionTimeoutMicros();
@@ -101,7 +100,7 @@ TEST_F(GrpcDebugTest, ConnectionTimeoutWorks) {
       " within a timeout of ", kShortTimeoutMicros / 1e6, " s");
   ASSERT_NE(string::npos,
             publish_status.error_message().find(expected_error_msg));
-}*/
+}
 
 TEST_F(GrpcDebugTest, ConnectionToDelayedStartingServerWorks) {
   ServerData server_data;

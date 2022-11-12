@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// A graph pass that rewrites graph for propagating OneDNN layout as a tensor
+// A graph pass that rewrites graph for propagating MKL layout as a tensor
 
 #ifndef TENSORFLOW_CORE_COMMON_RUNTIME_MKL_LAYOUT_PASS_H_
 #define TENSORFLOW_CORE_COMMON_RUNTIME_MKL_LAYOUT_PASS_H_
@@ -23,9 +23,6 @@ limitations under the License.
 #include <sys/types.h>
 #include <memory>
 #include "tensorflow/core/graph/graph.h"
-#include "tensorflow/core/util/env_var.h"
-#include "tensorflow/core/lib/strings/str_util.h"
-#include "tensorflow/core/lib/gtl/flatset.h"
 
 namespace tensorflow {
 // Interface to invoke the pass for unit test

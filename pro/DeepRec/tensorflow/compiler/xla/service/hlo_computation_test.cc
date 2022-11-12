@@ -26,6 +26,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_matchers.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
+#include "tensorflow/compiler/xla/service/hlo_parser.h"
 #include "tensorflow/compiler/xla/service/pattern_matcher.h"
 #include "tensorflow/compiler/xla/service/pattern_matcher_gmock.h"
 #include "tensorflow/compiler/xla/shape_util.h"
@@ -157,7 +158,7 @@ TEST_F(HloComputationTest, PostOrderTrace) {
       builder.AddInstruction(HloInstruction::CreateTrace("foobar", negate1));
   auto negate2 = builder.AddInstruction(
       HloInstruction::CreateUnary(r0f32_, HloOpcode::kNegate, negate1));
-  auto module = CreateNewVerifiedModule();
+  auto module = CreateNewUnverifiedModule();
   auto computation = module->AddEntryComputation(builder.Build());
   // Trace instructions should be at the end of the sort.
   EXPECT_THAT(computation->MakeInstructionPostOrder(),
@@ -696,7 +697,7 @@ ENTRY entry {
   ROOT t = (f32[128], f32[128]) tuple(add, crs1)
 })";
   TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+                          ParseAndReturnUnverifiedModule(hlo_string));
   EXPECT_THAT(module->entry_computation()->MakeInstructionPostOrder(),
               ElementsAre(op::Parameter(), op::AllReduce(), op::AllReduce(),
                           op::Add(), op::Tuple()));

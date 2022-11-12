@@ -3869,9 +3869,7 @@ def gather(params,
            validate_indices=None,
            name=None,
            axis=None,
-           batch_dims=0,
-           ev_init_value=None,
-           counts=None):  # pylint: disable=g-doc-args
+           batch_dims=0):  # pylint: disable=g-doc-args
   r"""Gather slices from params axis axis according to indices.
 
   Gather slices from params axis `axis` according to `indices`.  `indices` must
@@ -3952,13 +3950,7 @@ def gather(params,
   try:
     # TODO(apassos) find a less bad way of detecting resource variables
     # without introducing a circular dependency.
-    from tensorflow.python.ops import kv_variable_ops
-    if isinstance(params, kv_variable_ops.EmbeddingVariable):
-      return params.sparse_read(indices, name=name, ev_init_value=ev_init_value,
-        counts=counts)
-    else:
-      return params.sparse_read(indices, name=name, ev_init_value=ev_init_value)
-
+    return params.sparse_read(indices, name=name)
   except AttributeError:
     return gen_array_ops.gather_v2(
         params, indices, axis, name=name)

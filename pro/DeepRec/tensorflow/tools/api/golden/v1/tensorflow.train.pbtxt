@@ -9,19 +9,7 @@ tf_module {
     mtype: "<type \'type\'>"
   }
   member {
-    name: "AdagradDecayOptimizer"
-    mtype: "<type \'type\'>"
-  }
-  member {
-    name: "AdagradDecayOptimizerV2"
-    mtype: "<type \'type\'>"
-  }
-  member {
     name: "AdagradOptimizer"
-    mtype: "<type \'type\'>"
-  }
-  member {
-    name: "AdamAsyncOptimizer"
     mtype: "<type \'type\'>"
   }
   member {
@@ -262,7 +250,7 @@ tf_module {
   }
   member_method {
     name: "MonitoredTrainingSession"
-    argspec: "args=[\'master\', \'is_chief\', \'checkpoint_dir\', \'scaffold\', \'hooks\', \'chief_only_hooks\', \'save_checkpoint_secs\', \'save_summaries_steps\', \'save_summaries_secs\', \'config\', \'stop_grace_period_secs\', \'log_step_count_steps\', \'max_wait_secs\', \'save_checkpoint_steps\', \'summary_dir\', \'save_incremental_checkpoint_secs\', \'target_nodes_or_tensors\'], varargs=None, keywords=None, defaults=[\'\', \'True\', \'None\', \'None\', \'None\', \'None\', \'<object object instance>\', \'<object object instance>\', \'<object object instance>\', \'None\', \'120\', \'100\', \'7200\', \'<object object instance>\', \'None\', \'None\', \'None\'], "
+    argspec: "args=[\'master\', \'is_chief\', \'checkpoint_dir\', \'scaffold\', \'hooks\', \'chief_only_hooks\', \'save_checkpoint_secs\', \'save_summaries_steps\', \'save_summaries_secs\', \'config\', \'stop_grace_period_secs\', \'log_step_count_steps\', \'max_wait_secs\', \'save_checkpoint_steps\', \'summary_dir\'], varargs=None, keywords=None, defaults=[\'\', \'True\', \'None\', \'None\', \'None\', \'None\', \'<object object instance>\', \'<object object instance>\', \'<object object instance>\', \'None\', \'120\', \'100\', \'7200\', \'<object object instance>\', \'None\'], "
   }
   member_method {
     name: "NewCheckpointReader"
@@ -318,7 +306,7 @@ tf_module {
   }
   member_method {
     name: "export_meta_graph"
-    argspec: "args=[\'filename\', \'meta_info_def\', \'graph_def\', \'saver_def\', \'collection_list\', \'as_text\', \'graph\', \'export_scope\', \'clear_devices\', \'clear_extraneous_savers\', \'strip_default_attrs\', \'save_debug_info\', \'incr_saver_def\'], varargs=None, keywords=kwargs, defaults=[\'None\', \'None\', \'None\', \'None\', \'None\', \'False\', \'None\', \'None\', \'False\', \'False\', \'False\', \'False\', \'None\'], "
+    argspec: "args=[\'filename\', \'meta_info_def\', \'graph_def\', \'saver_def\', \'collection_list\', \'as_text\', \'graph\', \'export_scope\', \'clear_devices\', \'clear_extraneous_savers\', \'strip_default_attrs\', \'save_debug_info\'], varargs=None, keywords=kwargs, defaults=[\'None\', \'None\', \'None\', \'None\', \'None\', \'False\', \'None\', \'None\', \'False\', \'False\', \'False\', \'False\'], "
   }
   member_method {
     name: "generate_checkpoint_state_proto"
@@ -383,10 +371,6 @@ tf_module {
   member_method {
     name: "load_variable"
     argspec: "args=[\'ckpt_dir_or_file\', \'name\'], varargs=None, keywords=None, defaults=None"
-  }
-  member_method {
-    name: "mark_target_node"
-    argspec: "args=[\'target_nodes_or_tensors\'], varargs=None, keywords=None, defaults=None"
   }
   member_method {
     name: "match_filenames_once"

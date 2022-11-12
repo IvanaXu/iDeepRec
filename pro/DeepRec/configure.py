@@ -64,7 +64,10 @@ APPLE_BAZEL_FILES = [
 ]
 
 # List of files to move when building for iOS.
-IOS_FILES = []
+IOS_FILES = [
+    'tensorflow/lite/experimental/objc/TensorFlowLiteObjC.podspec',
+    'tensorflow/lite/experimental/swift/TensorFlowLiteSwift.podspec',
+]
 
 
 class UserInputError(Exception):
@@ -1429,15 +1432,6 @@ def main():
   set_build_var(environ_cp, 'TF_ENABLE_XLA', 'XLA JIT', 'with_xla_support',
                 xla_enabled_by_default, 'xla')
 
-  set_build_var(environ_cp, 'TF_NEED_STAR', 'STAR', 'with_star_support',
-                True, 'star')
-
-  set_build_var(environ_cp, 'TF_ENABLE_PMEM', 'PMEM', 'with_pmem_support',
-                False, 'pmem')
-
-  set_build_var(environ_cp, 'TF_ENABLE_GPU_EV', 'GPU_EV', 'with_gpu_ev_support',
-                False, 'gpu_ev')
-
   set_action_env_var(
       environ_cp,
       'TF_NEED_OPENCL_SYCL',
@@ -1461,8 +1455,6 @@ def main():
     write_action_env_to_bazelrc('LD_LIBRARY_PATH',
                                 environ_cp.get('LD_LIBRARY_PATH'))
 
-  write_action_env_to_bazelrc("TF_USE_CCACHE",
-                              environ_cp.get('TF_USE_CCACHE', '0'))
   environ_cp['TF_NEED_CUDA'] = str(
       int(get_var(environ_cp, 'TF_NEED_CUDA', 'CUDA', False)))
   if (environ_cp.get('TF_NEED_CUDA') == '1' and
@@ -1602,7 +1594,6 @@ def main():
   config_info_line('nogcp', 'Disable GCP support.')
   config_info_line('nohdfs', 'Disable HDFS support.')
   config_info_line('noignite', 'Disable Apache Ignite support.')
-  config_info_line('nokafka', 'Disable Apache Kafka support.')
   config_info_line('nonccl', 'Disable NVIDIA NCCL support.')
 
 

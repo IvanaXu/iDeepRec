@@ -17,7 +17,7 @@ limitations under the License.
 
 #define EIGEN_USE_THREADS
 
-#include "dnnl.hpp"
+#include "mkldnn.hpp"
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/type_traits.h"
@@ -28,10 +28,10 @@ limitations under the License.
 #include "tensorflow/core/util/mkl_types.h"
 #include "tensorflow/core/util/mkl_util.h"
 
-using dnnl::primitive_attr;
-using dnnl::prop_kind;
-using dnnl::reorder;
-using dnnl::stream;
+using mkldnn::primitive_attr;
+using mkldnn::prop_kind;
+using mkldnn::reorder;
+using mkldnn::stream;
 
 namespace {
 enum {
@@ -88,14 +88,18 @@ class MklReorderWithScalePrimitive : public MklPrimitive {
 
   void Execute(void* src_data, void* dst_data,
                std::shared_ptr<stream> reorder_stream) {
-#ifdef ENABLE_DNNL_THREADPOOL
+#ifdef ENABLE_MKLDNN_THREADPOOL
     context_.src_mem->set_data_handle(src_data, *reorder_stream);
     context_.dst_mem->set_data_handle(dst_data, *reorder_stream);
 #else
     context_.src_mem->set_data_handle(src_data);
     context_.dst_mem->set_data_handle(dst_data);
-#endif  // ENABLE_DNNL_THREADPOOL
+#endif  // ENABLE_MKLDNN_THREADPOOL
+#ifndef ENABLE_MKLDNN_V1
+    reorder_stream->submit(context_.net);
+#else
     context_.reorder_prim->execute(*reorder_stream, context_.prim_args);
+#endif  // !ENABLE_MKLDNN_V1
     // After execution, set data handle back.
     context_.src_mem->set_data_handle(DummyData);
     context_.dst_mem->set_data_handle(DummyData);
@@ -104,17 +108,22 @@ class MklReorderWithScalePrimitive : public MklPrimitive {
  private:
   // Primitive reuse context for reorder
   struct ReorderContext {
-    // OneDNN memory
-    std::shared_ptr<dnnl::memory> src_mem;
-    std::shared_ptr<dnnl::memory> dst_mem;
+    // MKL-DNN memory
+    std::shared_ptr<mkldnn::memory> src_mem;
+    std::shared_ptr<mkldnn::memory> dst_mem;
 
     // Reorder primitive descriptor and primitive
     std::shared_ptr<reorder::primitive_desc> reorder_pd;
     std::shared_ptr<primitive> reorder_prim;
 
     // Stream and primitive vector
-    std::shared_ptr<dnnl::stream> reorder_stream;
-    std::unordered_map<int, dnnl::memory> prim_args;
+    std::shared_ptr<mkldnn::stream> reorder_stream;
+
+#ifndef ENABLE_MKLDNN_V1
+    std::vector<mkldnn::primitive> net;
+#else
+    std::unordered_map<int, mkldnn::memory> prim_args;
+#endif  // !ENABLE_MKLDNN_V1
 
     ReorderContext()
         : src_mem(nullptr),
@@ -133,7 +142,7 @@ class MklReorderWithScalePrimitive : public MklPrimitive {
 
     // Check if there is any fusion as post-ops
     auto const& post_op_params = fwdParams.post_op_params;
-    dnnl::primitive_attr post_ops_attr;
+    mkldnn::primitive_attr post_ops_attr;
 
     DCHECK(post_op_params.name == "scale");
     DCHECK_EQ(post_op_params.param.size(), 1);
@@ -146,10 +155,16 @@ class MklReorderWithScalePrimitive : public MklPrimitive {
         GET_MEMORY_PRIMITIVE_DESC_FROM_MEM_PTR(context_.dst_mem), cpu_engine_,
         post_ops_attr));
 
-    // Create reorder primitive
+// Create reorder primitive
+#ifndef ENABLE_MKLDNN_V1
+    context_.reorder_prim.reset(new reorder(
+        *context_.reorder_pd, *context_.src_mem, *context_.dst_mem));
+    context_.net.push_back(*context_.reorder_prim);
+#else
     context_.reorder_prim.reset(new reorder(*context_.reorder_pd));
-    context_.prim_args.insert({DNNL_ARG_FROM, *context_.src_mem});
-    context_.prim_args.insert({DNNL_ARG_TO, *context_.dst_mem});
+    context_.prim_args.insert({MKLDNN_ARG_FROM, *context_.src_mem});
+    context_.prim_args.insert({MKLDNN_ARG_TO, *context_.dst_mem});
+#endif  // !ENABLE_MKLDNN_V1
   }
 };
 
@@ -402,6 +417,9 @@ class MklQuantizeV2Op : public OpKernel {
 
     memory::desc dst_md =
         memory::desc(src_dims, MklDnnType<T>(), dst_layout_type);
+#ifndef ENABLE_MKLDNN_V1
+    auto dst_pd = memory::primitive_desc(dst_md, cpu_engine);
+#endif  // !ENABLE_MKLDNN_V1
     // Standard shape assignments for layout pass
     MklDnnShape output_mkl_shape;
     TensorShape output_tf_shape;
@@ -475,8 +493,7 @@ class MklQuantizeV2Op : public OpKernel {
         MklReorderWithScalePrimitiveFactory<T>::Get(src.GetUsrMem(),
                                                     dst.GetUsrMem(), fwdParams);
     std::shared_ptr<stream> cpu_stream;
-    MklDnnThreadPool eigen_tp(ctx);
-    cpu_stream.reset(CreateStream(&eigen_tp, reorder_prim->GetEngine()));
+    cpu_stream.reset(CreateStream(ctx, reorder_prim->GetEngine()));
     reorder_prim->Execute(src.GetUsrMemDataHandle(), dst.GetUsrMemDataHandle(),
                           cpu_stream);
 

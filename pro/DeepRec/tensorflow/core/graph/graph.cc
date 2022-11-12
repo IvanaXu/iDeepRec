@@ -68,17 +68,12 @@ const std::unordered_map<string, Node::NodeClass>& Node::kNodeClassTable =
         {"ControlTrigger", NC_CONTROL_TRIGGER},
         {"_Send", NC_SEND},
         {"_HostSend", NC_HOST_SEND},
-        {"_RefSend", NC_REF_SEND},
         {"_Recv", NC_RECV},
         {"_HostRecv", NC_HOST_RECV},
-        {"_RefRecv", NC_REF_RECV},
-        {"_FuseRecv", NC_FUSE_RECV},
-        {"_HostFuseRecv", NC_HOST_FUSE_RECV},
         {"Const", NC_CONSTANT},
         {"HostConst", NC_CONSTANT},
         {"Variable", NC_VARIABLE},
         {"VariableV2", NC_VARIABLE},
-        {"KvVarHandleOp", NC_KV_VAR_HANDLE},
         REF_CLASS("Identity", NC_IDENTITY),
         {"GetSessionHandle", NC_GET_SESSION_HANDLE},
         {"GetSessionHandleV2", NC_GET_SESSION_HANDLE},
@@ -99,8 +94,6 @@ const std::unordered_map<string, Node::NodeClass>& Node::kNodeClassTable =
         {"StatelessIf", NC_IF},
         {"While", NC_WHILE},
         {"StatelessWhile", NC_WHILE},
-        {"StarRunGraph", NC_STAR_RUN_GRAPH},
-        {"RunGraph", NC_RUN_GRAPH},
         // Not using the constants defined in FunctionLibraryDefinition for the
         // 4 ops below because android inference library does not link
         // tf.function related files.
@@ -108,9 +101,6 @@ const std::unordered_map<string, Node::NodeClass>& Node::kNodeClassTable =
         {"_DeviceArg", NC_ARG},
         {"_Retval", NC_RETVAL},
         {"_DeviceRetval", NC_RETVAL},
-        {"_XlaMerge", NC_MERGE},
-        {"TensorBufferPut", NC_TENSOR_BUFFER_PUT},
-        {"TensorBufferTake", NC_TENSOR_BUFFER_TAKE},
     });
 
 #undef REF_CLASS
@@ -836,15 +826,6 @@ Status Graph::AddWhileContext(StringPiece frame_name,
   }
   *result = &pair.first->second;
   return Status::OK();
-}
-
-bool Graph::IsTrainingGraph() const {
-  for (Node* node : op_nodes()) {
-    if (node->name().find("gradient") != std::string::npos) {
-      return true;
-    }
-  }
-  return false;
 }
 
 std::unordered_map<string, Node*> Graph::BuildNodeNameIndex() const {

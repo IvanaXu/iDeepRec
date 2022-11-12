@@ -79,9 +79,6 @@ class Rendezvous : public core::RefCounted {
     friend class Rendezvous;
     friend class SendOp;
     friend class RecvOp;
-    friend class FuseRecvOp;
-    friend class RefSendOp;
-    friend class RefRecvOp;
     string buf_;
   };
   static Status ParseKey(StringPiece key, ParsedKey* out);
@@ -100,10 +97,6 @@ class Rendezvous : public core::RefCounted {
   virtual Status Send(const ParsedKey& key, const Args& args, const Tensor& val,
                       const bool is_dead) = 0;
 
-  // Send ref tensor
-  virtual Status Send(const ParsedKey& key, const Args& args, Tensor* ref_val,
-                      mutex* ref_mu, const bool is_dead) { return Status::OK(); }
-
   // Callback provided by a tensor consumer waiting on the rendezvous.
   // It will be invoked when the tensor is available, or when a non-OK
   // status arises in the production of that tensor.  It also gets
@@ -114,26 +107,8 @@ class Rendezvous : public core::RefCounted {
                              const Tensor&, const bool)>
       DoneCallback;
 
-  typedef std::function<void(const Status&, const Args&, const Args&,
-                             Tensor*, mutex*, const bool)>
-      RefDoneCallback;
-
   virtual void RecvAsync(const ParsedKey& key, const Args& args,
                          DoneCallback done) = 0;
-
-  // Recv ref tensor
-  virtual void RecvAsync(const ParsedKey& key, const Args& args,
-                         RefDoneCallback done) {};
-
-  typedef std::function<void(const Status&, const std::vector<Args>&,
-                             const Args&,
-                             const std::vector<Tensor>&,
-                             const std::vector<bool>&)>
-      FuseDoneCallback;
-
-  // Local rendezvous does not need this.
-  virtual void FuseRecvAsync(const std::vector<ParsedKey>& parsed_keys,
-                             const Args& args, FuseDoneCallback done) {}
 
   // Synchronous wrapper for RecvAsync.
   Status Recv(const ParsedKey& key, const Args& args, Tensor* val,

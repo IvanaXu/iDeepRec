@@ -20,7 +20,6 @@ from __future__ import print_function
 import abc
 import enum
 import functools
-import os
 import threading
 import warnings
 import weakref
@@ -323,49 +322,6 @@ class DatasetV2(tracking_base.Trackable, composite_tensor.CompositeTensor):
           dataset, options.experimental_stats.aggregator,
           options.experimental_stats.prefix,
           options.experimental_stats.counter_prefix)
-          
-    # TODO: DEKHTIARJonathan - Re-enable once stable.
-    # if os.environ.get("TF_ENABLE_AUTOMATIC_GPU_PREFETCHING", "0") == "1":
-    #   from tensorflow.python.distribute import distribution_strategy_context
-    #   if not distribution_strategy_context.has_strategy():
-    #     if (options.experimental_optimization.prefetch_to_device is not None and
-    #         os.environ.get("TF_DISABLE_AUTOMATIC_GPU_PREFETCHING", "0") == "0"):
-    #       from tensorflow.python.data.experimental.ops import prefetching_ops
-    #       prefetch_device = options.experimental_optimization.prefetch_to_device
-    # 
-    #       def prefetch_to_device(target_device, buffer_size=None):
-    #         """A transformation that copies dataset elements to the given `target_device`.
-    # 
-    #         Args:
-    #           target_device: The name of a device to which elements will be copied.
-    #           buffer_size: (Optional.) The number of elements to buffer on `device`.
-    #             Defaults to an automatically chosen value.
-    # 
-    #         Returns:
-    #           A `Dataset` transformation function, which can be passed to
-    #           `tf.data.Dataset.apply`.
-    #         """
-    # 
-    #         def _apply_fn(dataset):
-    #           source_device = dataset._variant_tensor.device
-    #           if source_device == "":
-    #             source_device = "/cpu:0"
-    #           return prefetching_ops._CopyToDeviceDataset(
-    #               dataset,
-    #               target_device=target_device,
-    #               source_device=source_device
-    #           ).prefetch(buffer_size)
-    # 
-    #         return _apply_fn
-    # 
-    #       dataset = dataset.apply(
-    #         prefetch_to_device(prefetch_device, buffer_size=1))
-    #   else:
-    #     logging.warning("GPU prefetching has been deactivated in your "
-    #                     "`tf.data` pipeline. It is not compatible with "
-    #                     "`tf.distribute` API. Please transition to `horovod` for "
-    #                     "maximum performance.")
-
     return dataset
 
   def __iter__(self):
@@ -380,9 +336,9 @@ class DatasetV2(tracking_base.Trackable, composite_tensor.CompositeTensor):
     Raises:
       RuntimeError: If not inside of tf.function and not executing eagerly.
     """
-    if context.executing_eagerly() or ops.inside_function():
-      with ops.device(self._variant_tensor.device):
-        return iterator_ops.IteratorV2(self)
+    if (context.executing_eagerly()
+        or ops.get_default_graph()._building_function):  # pylint: disable=protected-access
+      return iterator_ops.IteratorV2(self)
     else:
       raise RuntimeError("__iter__() is only supported inside of tf.function "
                          "or when eager execution is enabled.")
@@ -1705,8 +1661,7 @@ class DatasetV1(DatasetV2):
 
   def _make_one_shot_iterator(self):  # pylint: disable=missing-docstring
     if context.executing_eagerly():
-      with ops.device(self._variant_tensor.device):
-        return iterator_ops.IteratorV2(self)
+      return iterator_ops.IteratorV2(self)
 
     _ensure_same_dataset_graph(self)
     # Now that we create datasets at python object creation time, the capture
@@ -1731,27 +1686,8 @@ class DatasetV1(DatasetV2):
         assert op_level_seed is not None
         core_random_seed.set_random_seed(
             (graph_level_seed + 87654321 * op_level_seed) % (2 ** 63 - 1))
-      
-      # TODO: DEKHTIARJonathan - Re-enable once stable.
-      # prefetch_to_device = self.options().experimental_optimization.prefetch_to_device
-      # if prefetch_to_device is not None:
-      #   logging.warning("GPU prefetching has been deactivated in your "
-      #                   "`tf.data` pipeline. It is not compatible with "
-      #                   "`tf.data.make_one_shot_iterator`. Please transition "
-      #                   "to `tf.data.make_initializable_iterator` for maximum "
-      #                   "performance.")
-      #   try:
-      #     options = Options()
-      #     options.experimental_optimization.prefetch_to_device = None
-      #     dataset = self.with_options(options)
-      #   except ValueError:
-      #     self._dataset._options.experimental_optimization.prefetch_to_device = None
-      #     dataset = self
-      # else:
-      #   dataset = self
-      dataset = self
 
-      dataset = dataset._apply_options()
+      dataset = self._apply_options()
       return dataset._variant_tensor  # pylint: disable=protected-access
 
     try:
@@ -1767,21 +1703,19 @@ class DatasetV1(DatasetV2):
       else:
         six.reraise(ValueError, err)
 
-    with ops.device(self._variant_tensor.device):
-      # pylint: disable=protected-access
-      return iterator_ops.Iterator(
-          gen_dataset_ops.one_shot_iterator(
-              dataset_factory=_make_dataset, **self._flat_structure), None,
-          get_legacy_output_types(self), get_legacy_output_shapes(self),
-          get_legacy_output_classes(self))
+    # pylint: disable=protected-access
+    return iterator_ops.Iterator(
+        gen_dataset_ops.one_shot_iterator(
+            dataset_factory=_make_dataset, **self._flat_structure), None,
+        get_legacy_output_types(self), get_legacy_output_shapes(self),
+        get_legacy_output_classes(self))
 
   @deprecation.deprecated(
       None, "Use `for ... in dataset:` to iterate over a dataset. If using "
       "`tf.estimator`, return the `Dataset` object directly from your input "
       "function. As a last resort, you can use "
       "`tf.compat.v1.data.make_initializable_iterator(dataset)`.")
-  def make_initializable_iterator(self, shared_name=None,
-                                  force_deactivate_gpu_prefetching=False):
+  def make_initializable_iterator(self, shared_name=None):
     """Creates an `Iterator` for enumerating the elements of this dataset.
 
     Note: The returned iterator will be in an uninitialized state,
@@ -1798,8 +1732,6 @@ class DatasetV1(DatasetV2):
       shared_name: (Optional.) If non-empty, the returned iterator will be
         shared under the given name across multiple sessions that share the same
         devices (e.g. when using a remote server).
-      force_deactivate_gpu_prefetching (Optional) If True, will deactivate
-        automatic GPU prefetching.
 
     Returns:
       An `Iterator` over the elements of this dataset.
@@ -1808,50 +1740,27 @@ class DatasetV1(DatasetV2):
       RuntimeError: If eager execution is enabled.
     """
 
-    return self._make_initializable_iterator(shared_name,
-                                             force_deactivate_gpu_prefetching)
+    return self._make_initializable_iterator(shared_name)
 
-  def _make_initializable_iterator(self, shared_name=None,
-                                   force_deactivate_gpu_prefetching=False):  # pylint: disable=missing-docstring
+  def _make_initializable_iterator(self, shared_name=None):  # pylint: disable=missing-docstring
     if context.executing_eagerly():
       raise RuntimeError(
           "dataset.make_initializable_iterator is not supported when eager "
           "execution is enabled.")
     _ensure_same_dataset_graph(self)
-
-    dataset = self
-
-    # if force_deactivate_gpu_prefetching:
-    #   prefetch_to_device = dataset.options().experimental_optimization.prefetch_to_device
-    #   if prefetch_to_device is not None:
-    #     logging.warning("GPU prefetching has been deactivated in your "
-    #                     "`tf.data` pipeline. It is not compatible with "
-    #                     "`MultiDeviceIterator`.")
-    #     try:
-    #       options = Options()
-    #       options.experimental_optimization.prefetch_to_device = None
-    #       dataset = dataset.with_options(options)
-    #     except ValueError:
-    #       dataset._dataset._options.experimental_optimization.prefetch_to_device = None
-
-    dataset = dataset._apply_options()
-
+    dataset = self._apply_options()
     if shared_name is None:
       shared_name = ""
-
-    with ops.device(self._variant_tensor.device):
-      iterator_resource = gen_dataset_ops.iterator_v2(
-          container="", shared_name=shared_name, **self._flat_structure)
-
+    iterator_resource = gen_dataset_ops.iterator_v2(
+        container="", shared_name=shared_name, **self._flat_structure)
+    with ops.colocate_with(iterator_resource):
       initializer = gen_dataset_ops.make_iterator(
           dataset._variant_tensor,  # pylint: disable=protected-access
           iterator_resource)
-
-      # pylint: disable=protected-access
-      return iterator_ops.Iterator(iterator_resource, initializer,
-                                   get_legacy_output_types(dataset),
-                                   get_legacy_output_shapes(dataset),
-                                   get_legacy_output_classes(dataset))
+    # pylint: disable=protected-access
+    return iterator_ops.Iterator(
+        iterator_resource, initializer, get_legacy_output_types(dataset),
+        get_legacy_output_shapes(dataset), get_legacy_output_classes(dataset))
 
   @property
   @deprecation.deprecated(
@@ -2173,8 +2082,7 @@ def make_one_shot_iterator(dataset):
 
 
 @tf_export(v1=["data.make_initializable_iterator"])
-def make_initializable_iterator(dataset, shared_name=None,
-                                force_deactivate_gpu_prefetching=False):
+def make_initializable_iterator(dataset, shared_name=None):
   """Creates a `tf.compat.v1.data.Iterator` for enumerating the elements of a dataset.
 
   Note: The returned iterator will be in an uninitialized state,
@@ -2192,8 +2100,6 @@ def make_initializable_iterator(dataset, shared_name=None,
     shared_name: (Optional.) If non-empty, the returned iterator will be shared
       under the given name across multiple sessions that share the same devices
       (e.g. when using a remote server).
-    force_deactivate_gpu_prefetching (Optional) If True, will deactivate
-      automatic GPU prefetching.
 
   Returns:
     A `tf.compat.v1.data.Iterator` over the elements of `dataset`.
@@ -2204,11 +2110,9 @@ def make_initializable_iterator(dataset, shared_name=None,
   try:
     # Call the defined `_make_initializable_iterator()` if there is one, because
     # some datasets (e.g. for prefetching) override its behavior.
-    return dataset._make_initializable_iterator(
-      shared_name, force_deactivate_gpu_prefetching)  # pylint: disable=protected-access
+    return dataset._make_initializable_iterator(shared_name)  # pylint: disable=protected-access
   except AttributeError:
-    return DatasetV1Adapter(dataset)._make_initializable_iterator(
-      shared_name, force_deactivate_gpu_prefetching)  # pylint: disable=protected-access
+    return DatasetV1Adapter(dataset)._make_initializable_iterator(shared_name)  # pylint: disable=protected-access
 
 
 @tf_export("data.experimental.get_structure")
@@ -2370,8 +2274,7 @@ class Options(options_lib.OptionsBase):
       result.append("make_sloppy")
     if self.experimental_stats and self.experimental_stats.latency_all_edges:
       result.append("latency_all_edges")
-    if (self.experimental_slack and
-        self.experimental_optimization.prefetch_to_device is None):
+    if self.experimental_slack:
       result.append("slack")
     if (self.experimental_distribute and
         self.experimental_distribute._make_stateless):  # pylint: disable=protected-access
@@ -3755,14 +3658,11 @@ class PrefetchDataset(UnaryUnchangedStructureDataset):
       buffer_size = -1  # This is the sentinel for auto-tuning.
     self._buffer_size = ops.convert_to_tensor(
         buffer_size, dtype=dtypes.int64, name="buffer_size")
-
-    with ops.device(input_dataset._variant_tensor.device):
-      variant_tensor = gen_dataset_ops.prefetch_dataset(
-          input_dataset._variant_tensor,  # pylint: disable=protected-access
-          buffer_size=self._buffer_size,
-          slack_period=slack_period,
-          **self._flat_structure)
-
+    variant_tensor = gen_dataset_ops.prefetch_dataset(
+        input_dataset._variant_tensor,  # pylint: disable=protected-access
+        buffer_size=self._buffer_size,
+        slack_period=slack_period,
+        **self._flat_structure)
     super(PrefetchDataset, self).__init__(input_dataset, variant_tensor)
 
 

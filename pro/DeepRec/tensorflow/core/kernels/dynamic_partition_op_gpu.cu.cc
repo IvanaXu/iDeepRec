@@ -36,10 +36,10 @@ limitations under the License.
 #define EIGEN_USE_GPU
 
 #if GOOGLE_CUDA
-#include "cub/device/device_radix_sort.cuh"
-#include "cub/device/device_reduce.cuh"
-#include "cub/iterator/constant_input_iterator.cuh"
-#include "cub/thread/thread_operators.cuh"
+#include "third_party/cub/device/device_radix_sort.cuh"
+#include "third_party/cub/device/device_reduce.cuh"
+#include "third_party/cub/iterator/constant_input_iterator.cuh"
+#include "third_party/cub/thread/thread_operators.cuh"
 #elif TENSORFLOW_USE_ROCM
 #include "external/rocprim_archive/hipcub/include/hipcub/hipcub.hpp"
 #endif
@@ -307,17 +307,27 @@ class DynamicPartitionOpGPU : public AsyncOpKernel {
         c, status,
         errors::Internal("Failed to launch copy from device to host."), done);
 
-    cudaDeviceSynchronize();
-
-    OpOutputList outputs;
-    this->AllocateOutputs(c, &data, &partitions, &cpu_tensor, &outputs, done);
-    if (!c->status().ok()) {
+    // Keep a reference to partition_count so that the buffer
+    // is not deallocated at the end of the function, before
+    // memcpy is completed.
+    TensorReference partition_ref(partition_count);
+    auto wrapped_callback = [this, c, &data, &partitions, indices_out,
+                             partition_ref, cpu_tensor, done]() {
+      OpOutputList outputs;
+      this->AllocateOutputs(c, &data, &partitions, &cpu_tensor, &outputs, done);
+      if (!c->status().ok()) {
+        partition_ref.Unref();
         return;
-    }
-    int32 N = partitions.NumElements();
-    int64 slice_size = data.NumElements() / N;
-    this->GatherSlices(c, &data, &indices_out, N, slice_size, outputs);
-    done();
+      }
+      int32 N = partitions.NumElements();
+      int64 slice_size = data.NumElements() / N;
+      this->GatherSlices(c, &data, &indices_out, N, slice_size, outputs);
+      partition_ref.Unref();
+      done();
+    };
+
+    c->device()->tensorflow_gpu_device_info()->event_mgr->ThenExecute(
+        stream, wrapped_callback);
   }
 
  protected:
@@ -470,8 +480,6 @@ class DynamicPartitionOpGPU : public AsyncOpKernel {
 TF_CALL_GPU_NUMBER_TYPES(REGISTER_DYNAMIC_PARTITION_GPU);
 TF_CALL_complex64(REGISTER_DYNAMIC_PARTITION_GPU);
 TF_CALL_complex128(REGISTER_DYNAMIC_PARTITION_GPU);
-TF_CALL_int32(REGISTER_DYNAMIC_PARTITION_GPU);
-TF_CALL_int64(REGISTER_DYNAMIC_PARTITION_GPU);
 #undef REGISTER_DYNAMIC_PARTITION_GPU
 
 }  // namespace tensorflow

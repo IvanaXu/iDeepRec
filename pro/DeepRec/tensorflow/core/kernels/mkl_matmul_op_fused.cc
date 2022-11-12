@@ -15,7 +15,7 @@ limitations under the License.
 
 // See docs in ../ops/math_ops.cc.
 
-// This file uses OneDNN InnerProduct for acceleration of TF Matrix-Matrix
+// This file uses MKL-DNN InnerProduct for acceleration of TF Matrix-Matrix
 // Multiplication (MatMul) with bias (BiasAdd) operations.
 #ifdef INTEL_MKL
 
@@ -35,10 +35,8 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
     OP_REQUIRES_OK(ctx, ctx->GetAttr("fused_ops", &fused_ops_));
     OP_REQUIRES_OK(ctx, ctx->GetAttr("transpose_a", &transpose_a_));
     OP_REQUIRES_OK(ctx, ctx->GetAttr("transpose_b", &transpose_b_));
-    if (ctx->HasAttr("is_filter_const")) {
-      OP_REQUIRES_OK(
-          ctx, ctx->GetAttr("is_filter_const", &(this->is_weight_const_)));
-    }
+    OP_REQUIRES_OK(ctx,
+                   ctx->GetAttr("is_filter_const", &(this->is_weight_const_)));
 
     OP_REQUIRES(ctx, fused_ops_.size() <= 2,
                 errors::InvalidArgument(
@@ -59,8 +57,16 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
     const Tensor& weight_tensor = ctx->input(this->kInputIndexWeight);
     const Tensor& bias_tensor = MklGetInput(ctx, this->kInputIndexBias);
 
+    MklDnnShape src_mkl_shape;
+    MklDnnShape weight_mkl_shape;
+    GetMklShape(ctx, this->kInputIndexSrc, &src_mkl_shape);
+    GetMklShape(ctx, this->kInputIndexWeight, &weight_mkl_shape);
+    OP_REQUIRES(ctx, !weight_mkl_shape.IsMklTensor(),
+                errors::InvalidArgument("Weight should not be in MKL Layout"));
+
     // Get shapes of input tensors
-    auto src_tf_shape = src_tensor.shape();
+    auto src_tf_shape = src_mkl_shape.IsMklTensor() ? src_mkl_shape.GetTfShape()
+                                                    : src_tensor.shape();
     auto weight_tf_shape = weight_tensor.shape();
 
     // Check the constraint of input matrix and bias
@@ -105,7 +111,7 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
         transpose_b_ ? MEMORY_FORMAT::oi : MEMORY_FORMAT::io;
 
     // Set weight format for primitive:
-    //   1. const, let OneDNN determine format because it will be cached;
+    //   1. const, let MKL-DNN determine format because it will be cached;
     //   2. var, keep the original format to avoid reordering.
     MklDnnMatMulFwdParams matmul_params(
         src_dims, weight_dims, bias_dims, dst_dims, src_format,
@@ -114,37 +120,44 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
 
     // Extend the basic parameters for data types and fusions.
     ExtendMklDnnMatMulFwdParams(ctx, matmul_params);
-    bool do_not_cache = MklPrimitiveFactory<T>::IsPrimitiveMemOptEnabled();
     MklDnnMatMulFwdPrimitive<T, T, T, T, T>* matmul_prim =
-        MklDnnMatMulFwdPrimitiveFactory<T, T, T, T, T>::Get(matmul_params, do_not_cache);
+        MklDnnMatMulFwdPrimitiveFactory<T, T, T, T, T>::Get(matmul_params, 0);
 
     // Allocate output tensor.
     Tensor* dst_tensor = nullptr;
-    std::shared_ptr<dnnl::inner_product_forward::primitive_desc> matmul_pd =
+    std::shared_ptr<mkldnn::inner_product_forward::primitive_desc> matmul_pd =
         matmul_prim->GetPrimitiveDesc();
 
-    // The output shape of MatMul is same both for OneDNN and TF version.
+    // The output shape of MatMul is same both for MKL and TF version.
     // They are all NC format, no matter what's the format of input.
     // And the shape of AddOp is also the same with output's shape.
     auto dst_pd = matmul_pd->PRIMITIVE_DESC_DST;
+
+    MklDnnShape output_mkl_shape;
+    output_mkl_shape.SetMklTensor(false);
 
     TensorShape output_tf_shape({batch, channel});
 
     if (fuse_add_) {
       const Tensor& add_tensor = MklGetInput(ctx, kInputIndex_Add);
+      MklDnnShape add_mkl_shape;
+      GetMklShape(ctx, kInputIndex_Add, &add_mkl_shape);
 
-      if (ctx->forward_input_to_output_with_shape(
-              kInputIndex_Add, kOutputIndex_Dst, output_tf_shape,
-              &dst_tensor)) {
-
+      if (ForwardMklTensorInToOutWithMklShape(ctx, kInputIndex_Add,
+                                              kOutputIndex_Dst, &dst_tensor,
+                                              output_mkl_shape, false)) {
         ;  // If it's not native format, need to forward and set meta first
       } else {
         // If forward is not successful, we should use reorder to copy add
         // tensor to dst tensor
-        ctx->allocate_output(kOutputIndex_Dst, output_tf_shape, &dst_tensor);
+        AllocateOutputSetMklShape(ctx, kOutputIndex_Dst, &dst_tensor,
+                                  output_tf_shape, output_mkl_shape);
         auto output_format_tag =
             MklTensorFormatToMklDnnDataFormat(MKL_TENSOR_FORMAT_NC);
-        auto add_md = memory::desc(dst_dims, MklDnnType<T>(), output_format_tag);
+        auto add_md =
+            add_mkl_shape.IsMklTensor()
+                ? add_mkl_shape.GetMklLayout()
+                : memory::desc(dst_dims, MklDnnType<T>(), output_format_tag);
         auto dst_md =
             memory::desc(dst_dims, MklDnnType<T>(), output_format_tag);
 
@@ -163,7 +176,8 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
                                 this->cpu_engine_, ctx);
       }
     } else {
-      ctx->allocate_output(kOutputIndex_Dst, output_tf_shape, &dst_tensor);
+      AllocateOutputSetMklShape(ctx, 0, &dst_tensor, output_tf_shape,
+                                output_mkl_shape);
     }
 
     // if there's nothing to compute, just return.
@@ -182,7 +196,9 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
       MklDnnData<T> src_mkl(&(this->cpu_engine_));
       MklDnnData<T> weight_mkl(&(this->cpu_engine_));
 
-      auto src_md = memory::desc(src_dims, MklDnnType<T>(), src_format);
+      auto src_md = src_mkl_shape.IsMklTensor()
+                        ? src_mkl_shape.GetMklLayout()
+                        : memory::desc(src_dims, MklDnnType<T>(), src_format);
 
       if (IS_SRC_REORDER_NEEDED(src_md, matmul_pd, matmul_prim)) {
         src_mkl.SetUsrMem(src_md, src_data);
@@ -204,8 +220,13 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
             this->CacheWeight(ctx, matmul_pd, cached_weight_data, weight_tensor,
                               weight_mkl, weight_md);
           }
+#ifdef ENABLE_MKLDNN_V1
           cached_weight_data = this->GetCachedWeight(
               ctx, GET_WEIGHTS_DESC_FROM_OP_PD(matmul_pd));
+#else
+          cached_weight_data = this->GetCachedWeight(
+              ctx, GET_WEIGHTS_DESC_FROM_OP_PD(matmul_pd).desc());
+#endif
         }
 
         // Cache weight may fail when it gets different format in different
@@ -224,22 +245,11 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
         }
       }
       std::shared_ptr<stream> cpu_stream;
-      if (ExecuteSingleThreadedGemm(batch, k, channel)) {
-        MklDnnThreadPool eigen_tp(ctx, 1);
-        cpu_stream.reset(CreateStream(&eigen_tp, matmul_prim->GetEngine()));
-        // Execute fused matmul op.
-        matmul_prim->Execute(src_data, weight_data, bias_data, dst_data,
-                             cpu_stream);
-      } else {
-        MklDnnThreadPool eigen_tp(ctx);
-        cpu_stream.reset(CreateStream(&eigen_tp, matmul_prim->GetEngine()));
-        // Execute fused matmul op.
-        matmul_prim->Execute(src_data, weight_data, bias_data, dst_data,
-                             cpu_stream);
-      }
-      if (do_not_cache)
-        delete matmul_prim;
-    } catch (dnnl::error& e) {
+      cpu_stream.reset(CreateStream(ctx, matmul_prim->GetEngine()));
+      // Execute fused matmul op.
+      matmul_prim->Execute(src_data, weight_data, bias_data, dst_data,
+                           cpu_stream);
+    } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +
                          string(__FILE__) + ":" + std::to_string(__LINE__);
@@ -284,13 +294,13 @@ class MklFusedMatMulOp : public MklDnnMatMulOpBase<T, T> {
   const int kOutputIndex_Dst = 0;
 };
 
-// Register OneDNN kernels for supported operations and types.
+// Register mkl kernels for supported operations and types.
 #define REGISTER_FUSEDMATMUL_MKL_SUPPORTED_KERNELS_TYPES(type) \
   REGISTER_KERNEL_BUILDER(                                     \
       Name("_MklFusedMatMul")                                  \
           .Device(DEVICE_CPU)                                  \
           .TypeConstraint<type>("T")                           \
-          .Label(mkl_op_registry::kMklNameChangeOpLabel),      \
+          .Label(mkl_op_registry::kMklLayoutDependentOpLabel), \
       MklFusedMatMulOp<CPUDevice, type>);
 TF_CALL_float(REGISTER_FUSEDMATMUL_MKL_SUPPORTED_KERNELS_TYPES);
 TF_CALL_bfloat16(REGISTER_FUSEDMATMUL_MKL_SUPPORTED_KERNELS_TYPES);

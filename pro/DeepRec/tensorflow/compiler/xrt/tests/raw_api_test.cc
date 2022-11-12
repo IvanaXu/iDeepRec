@@ -285,12 +285,9 @@ xla::ProgramShape XlaCompiledProgramShape(
   for (int64 i = 0; i < input_program_shape.parameters_size(); ++i) {
     parameters_shapes.push_back(&input_program_shape.parameters(i));
   }
-  std::vector<std::unique_ptr<xla::LocalExecutable>> local_executables =
+  auto local_executable =
       client->Compile(computation, parameters_shapes, exec_options)
-          .ConsumeValueOrDie();
-  EXPECT_EQ(local_executables.size(), 1);
-  std::unique_ptr<xla::LocalExecutable> local_executable =
-      std::move(local_executables[0]);
+          .ValueOrDie();
   return local_executable->executable()
       ->module()
       .entry_computation()

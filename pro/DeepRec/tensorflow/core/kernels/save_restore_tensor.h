@@ -16,14 +16,8 @@ limitations under the License.
 #ifndef TENSORFLOW_CORE_KERNELS_SAVE_RESTORE_TENSOR_H_
 #define TENSORFLOW_CORE_KERNELS_SAVE_RESTORE_TENSOR_H_
 
-#include "tensorflow/core/util/tensor_bundle/tensor_bundle.h"
 #include "tensorflow/core/util/tensor_slice_reader.h"
 #include "tensorflow/core/util/tensor_slice_writer.h"
-#include "tensorflow/core/framework/hash_table/tensible_variable.h"
-#include "tensorflow/core/framework/hash_table/hash_table.h"
-#include "tensorflow/core/framework/hash_table/bloom_filter_strategy.h"
-#include "tensorflow/core/framework/embedding/kv_interface.h"
-#include "tensorflow/core/framework/embedding/value_ptr.h"
 
 namespace tensorflow {
 
@@ -73,133 +67,6 @@ Status RestoreTensorsV2(OpKernelContext* context, const Tensor& prefix,
                         const Tensor& tensor_names,
                         const Tensor& shape_and_slices,
                         gtl::ArraySlice<DataType> dtypes);
-
-Status SaveHashTable(
-    BundleWriter* writer, HashTable* table,
-    const std::vector<TensibleVariable*>& tensibles,
-    const string& table_name, const std::vector<string>& tensibles_name,
-    int64 slice_beg, int64 slice_length, int64 slice_size);
-
-void RestoreHashTable(
-    std::function<void(std::function<void()>)> runner,
-    BundleReader* reader, HashTable* table,
-    const std::vector<TensibleVariable*>& tensibles,
-    const string& table_name, const std::vector<string>& tensibles_name,
-    int64 slice_beg, int64 slice_length, int64 slice_size,
-    std::function<void(Status)> done);
-
-void RestoreCoalescedHashTable(
-    std::function<void(std::function<void()>)> runner,
-    BundleReader* reader, CoalescedHashTable* table,
-    const std::vector<TensibleVariable*>& tensibles,
-    const std::vector<string>& table_names,
-    const std::vector<std::vector<string>>& tensibles_names,
-    int64 slice_beg, int64 slice_length, int64 slice_size,
-    bool clear, std::function<void(Status)> done);
-
-Status SaveBloomFilter(
-    BundleWriter* writer, BloomFilterAdmitStrategy* strategy,
-    const string& name, int64 slice_beg, int64 slice_length, int64 slice_size);
-
-Status RestoreBloomFilter(
-    BundleReader* reader, BloomFilterAdmitStrategy* strategy,
-    const string& name, int64 slice_beg, int64 slice_length, int64 slice_size);
-
-template<class T>
-class DumpIterator {
- public:
-  virtual ~DumpIterator() {}
-  virtual bool HasNext() const = 0;
-  virtual T Next() = 0;
-};
-
-template<typename T>
-Status SaveTensorWithFixedBuffer(const string& tensor_name,
-    BundleWriter* writer,
-    char* dump_buffer,
-    size_t bytes_limit,
-    DumpIterator<T>* dump_iter,
-    const TensorShape& dump_tensor_shape,
-    embedding::Iterator* it = nullptr,
-    int64 value_offset = -1, // -1: save key, x_offset: save embedding(primary or slot offset)
-    bool use_shape = true) {
-  bool dump_happened = false;
-  size_t bytes_written = 0;
-  int buffer_idx = 0;
-  Status st;
-  int64 total_bytes_written = 0;
-  T* key_dump_buffer = (T*)dump_buffer;
-  if (use_shape)
-  st = writer->AddTensorHeader(tensor_name, DataTypeToEnum<T>::v(), dump_tensor_shape);
-  if (!st.ok())
-    return st;
-
-  while (dump_iter->HasNext()) {
-    T key = dump_iter->Next();
-    if (bytes_written + sizeof(T) > bytes_limit) {
-      dump_happened = true;
-      writer->AppendSegmentData(dump_buffer, bytes_written);
-      bytes_written = 0;
-      buffer_idx = 0;
-    }
-    key_dump_buffer[buffer_idx] = key;
-    buffer_idx++;
-    bytes_written += sizeof(T);
-    total_bytes_written += sizeof(T);
-  }
-  if (it != nullptr) {
-    int64 size = 0; 
-    if (value_offset == -1) {
-      size = sizeof(T);
-    } else {
-      size = sizeof(T) * dump_tensor_shape.dim_size(1);
-    }
-    char val[size] = {0};
-    for (it->SeekToFirst(); it->Valid(); it->Next()) {
-      int64 dim = 0;
-      void* start = nullptr;
-      if (value_offset == -1) {
-        it->Key(val, sizeof(T));
-        if (bytes_written + sizeof(T) > bytes_limit) {
-          dump_happened = true;
-          writer->AppendSegmentData(dump_buffer, bytes_written);
-          bytes_written = 0;
-          buffer_idx = 0;
-        }
-        key_dump_buffer[buffer_idx] = *((T*)val);
-        buffer_idx++;
-        bytes_written += sizeof(T);
-        total_bytes_written += sizeof(T);
-
-      } else {
-        dim = dump_tensor_shape.dim_size(1);
-        it->Value(val, dim * sizeof(T), value_offset * sizeof(T));
-
-        for (int j = 0; j < dim; ++j) {
-          if (bytes_written + sizeof(T) > bytes_limit) {
-            dump_happened = true;
-            writer->AppendSegmentData(dump_buffer, bytes_written);
-            bytes_written = 0;
-            buffer_idx = 0;
-          }
-          key_dump_buffer[buffer_idx] = *((T*)val + j);
-          buffer_idx++;
-          bytes_written += sizeof(T);
-          total_bytes_written += sizeof(T);
-        }
-      }
-    }
-  }
-  if (!dump_happened) {
-    VLOG(1) << tensor_name << " only one buffer written, size:" << bytes_written;
-    writer->AddCompeleteData(dump_buffer, bytes_written);
-  } else {
-    VLOG(1) << tensor_name << " mutiple buffer written, size:" << total_bytes_written << ", bytes written:" << bytes_written;
-    writer->AppendSegmentData(dump_buffer, bytes_written);
-    writer->EndSegmentData(total_bytes_written,  bytes_written);
-  }
-  return Status::OK();
-}
 
 }  // namespace tensorflow
 

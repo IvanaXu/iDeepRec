@@ -120,12 +120,6 @@ class BundleWriter {
   // Across calls "key" must be unique but can be added in any order.
   Status Add(StringPiece key, const Tensor& val);
 
-  Status AddTensorHeader(StringPiece key, DataType dtype, TensorShape shape);
-  Status AddTensorHeader(StringPiece key, DataType dtype);
-  void FillTensorShape(TensorShape shape);
-  Status AddCompeleteData(char* content, int64 data_bytes_written);
-  Status AppendSegmentData(char* content, int64 data_bytes_written);
-  void EndSegmentData(int64 total_bytes_written, int64 end_bytes_written);
   // Partitioned variables support.
   // A slice of a full tensor is stored in two entries in the metadata table:
   //
@@ -146,10 +140,6 @@ class BundleWriter {
                   const TensorShape& full_tensor_shape,
                   const TensorSlice& slice_spec, const Tensor& slice_tensor);
 
-  Status AddSliceHeader(
-      string tensor_name, const TensorShape& shape, DataType type, bool is_hash,
-      TensorSliceProto** proto);
-
   // Finishes the writer and flushes.
   Status Finish() TF_MUST_USE_RESULT;
 
@@ -165,7 +155,6 @@ class BundleWriter {
   int64 size_;  // Number of bytes written into out_.
   std::map<string, BundleEntryProto> entries_;
   Status status_;
-  BundleEntryProto* entry_seg_;
 
   TF_DISALLOW_COPY_AND_ASSIGN(BundleWriter);
 };
@@ -229,14 +218,6 @@ class BundleReader {
   // REQUIRES: status().ok()
   Status Lookup(StringPiece key, Tensor* val) TF_MUST_USE_RESULT;
 
-  Status LookupHeader(StringPiece key, int64 total_bytes);
-  Status LookupSegment(StringPiece key, size_t buffer_size, char* destination, size_t& real_bytes_read);
-  Status LookupSegmentOffset(StringPiece key, uint64_t offset, size_t buffer_size, char* destination, size_t& real_bytes_read);
-
-  Status GetTensorInfo(
-      StringPiece key, int64* size,
-      std::unique_ptr<RandomAccessFile>* file, int64* offset);
-
   // Looks up the tensor pointed to by the internal iterator.
   //
   // On error, "val" may contain nonsense data.
@@ -262,10 +243,6 @@ class BundleReader {
   Status LookupSlice(StringPiece full_tensor_key, const TensorSlice& slice_spec,
                      Tensor* val) TF_MUST_USE_RESULT;
 
-  Status LookupTensorSliceProtos(
-      StringPiece key, std::vector<TensorSliceProto>* slices)
-      TF_MUST_USE_RESULT;
-
   // Seeks to the first position in the bundle whose key is no less than "key".
   // REQUIRES: status().ok()
   void Seek(StringPiece key) { return iter_->Seek(key); }
@@ -284,12 +261,6 @@ class BundleReader {
   StringPiece value() const { return iter_->value(); }
 
   string DebugString();
-
-  struct LookupSegItem{
-    BundleEntryProto entry;
-    size_t total_size;
-    size_t bytes_read;
-  };
 
  private:
   // Seeks for "key" and reads the metadata proto.
@@ -325,8 +296,6 @@ class BundleReader {
   // TensorSliceSet).  Populated on-demand.
   std::unordered_map<string, checkpoint::TensorSliceSet*> tensor_slices_;
 
-  std::map<std::string, LookupSegItem> tmp_lookupseg_items_;
-
   // Expected number of data file shards in the bundle.  Extracted by reading
   // the header entry in the metadata table.
   int num_shards_;
@@ -355,7 +324,6 @@ class FileOutputBuffer {
   // Buffered append.
   Status Append(StringPiece data);
 
-  Status AppendSegment(StringPiece data);
   // Returns the running crc32c checksum of all currently appended bytes.
   uint32 crc32c() { return crc32c_; }
   // Clears the running crc32c checksum.
@@ -378,51 +346,6 @@ class FileOutputBuffer {
 
   // Checksum of all appended bytes since construction or last clear_crc32c().
   uint32 crc32c_ = 0;
-};
-
-class SegmentBundleWriter {
- public:
-  SegmentBundleWriter(
-      BundleWriter* writer, const string& name,
-      const TensorShape& shape, DataType type, int64 buffer_size = 4 << 20);
-  Status Begin();
-  Status WriteData(const void* data, int64 size);
-  Status End();
- private:
-  BundleWriter* writer_;
-  string name_;
-  TensorShape shape_;
-  DataType type_;
-  int64 buffer_size_;
-  std::unique_ptr<char[]> buffer_;
-
-  int64 buffer_ptr_;
-  int64 write_counter_;
-};
-
-class SegmentBundleReader {
- public:
-  SegmentBundleReader(
-      BundleReader* reader, const string& name,
-      int64 offset, int64 size, int64 buffer_size = 4 << 20);
-  Status Begin();
-  const TensorShape& shape();
-  DataType type();
-  Status Read(void* data, int64 size);
-  Status Skip(int64 size);
- private:
-  BundleReader* reader_;
-  string name_;
-  int64 buffer_size_;
-  int64 offset_, size_;
-
-  TensorShape shape_;
-  DataType type_;
-
-  int64 remain_size_;
-
-  std::unique_ptr<RandomAccessFile> file_;
-  std::unique_ptr<io::InputBuffer> input_;
 };
 
 }  // namespace tensorflow

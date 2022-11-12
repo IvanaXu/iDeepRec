@@ -24,7 +24,6 @@ limitations under the License.
 #include "tensorflow/core/platform/mem.h"
 #include "tensorflow/core/platform/mutex.h"
 #include "tensorflow/core/platform/types.h"
-#include "tensorflow/core/util/env_var.h"
 
 namespace tensorflow {
 
@@ -37,13 +36,6 @@ string AllocatorStats::DebugString() const {
       "MaxAllocSize: %20lld\n",
       this->bytes_limit ? *this->bytes_limit : 0, this->bytes_in_use,
       this->peak_bytes_in_use, this->num_allocs, this->largest_alloc_size);
-}
-
-bool DisableEVAllocatorFromEnvironment() {
-  bool disable_ev_allocator = false;
-  ReadBoolFromEnvVar("TF_DISABLE_EV_ALLOCATOR", false,
-      &disable_ev_allocator);
-  return disable_ev_allocator;
 }
 
 constexpr size_t Allocator::kAllocatorAlignment;
@@ -89,42 +81,6 @@ Allocator* cpu_allocator(int numa_node) {
   } else {
     return cpu_allocator_base();
   }
-}
-
-Allocator* pmem_allocator() {
-  static Allocator* pmem_alloc =
-      AllocatorFactoryRegistry::singleton()->GetPMEMAllocator();
-      //This is the function when we use pmem as allocation destination
-  if (pmem_alloc && cpu_allocator_collect_full_stats && !pmem_alloc->TracksAllocationSizes()) {
-      pmem_alloc = new TrackingAllocator(pmem_alloc, true);
-  }
-  return pmem_alloc;
-}
-
-Allocator* experimental_pmem_allocator(const std::string& pmem_path, size_t allocator_size) {
-#ifdef TENSORFLOW_USE_PMEM
-  static Allocator* experimental_pmem_allocator =
-      AllocatorFactoryRegistry::singleton()->GetExperimentalPMEMAllocator(pmem_path, allocator_size);
-  if (experimental_pmem_allocator && cpu_allocator_collect_full_stats &&
-      !experimental_pmem_allocator->TracksAllocationSizes()) {
-    experimental_pmem_allocator =
-        new TrackingAllocator(experimental_pmem_allocator, true);
-  }
-  return experimental_pmem_allocator;
-#else
-  return nullptr;
-#endif
-}
-
-Allocator* ev_allocator() {
-  static Allocator* ev_alloc = DisableEVAllocatorFromEnvironment() ?
-    cpu_allocator() : AllocatorFactoryRegistry::singleton()->GetEVAllocator();
-
-  if (ev_alloc && cpu_allocator_collect_full_stats &&
-      !ev_alloc->TracksAllocationSizes()) {
-    ev_alloc = new TrackingAllocator(ev_alloc, true);
-  }
-  return ev_alloc;
 }
 
 SubAllocator::SubAllocator(const std::vector<Visitor>& alloc_visitors,

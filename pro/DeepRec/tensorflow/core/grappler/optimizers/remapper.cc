@@ -56,6 +56,8 @@ namespace grappler {
 //   (1) FusedBatchNorm + <Activation>
 //   (2) FusedBatchNorm + SideInput + <Activation>
 //
+// Sigmoid + Mul -> Swish  // This fusion only work on Intel CPU.
+//
 // In all cases, the supported activation functions are Relu, Relu6, and Elu.
 //
 // Both Conv2D and MatMul implemented as Tensor contraction (on CPU), so all the
@@ -70,24 +72,24 @@ constexpr char kFusedBatchMatMul[] = "_FusedBatchMatMulV2";
 constexpr char kFusedDepthwiseConv2dNative[] = "_FusedDepthwiseConv2dNative";
 constexpr char kFusedBatchNormEx[] = "_FusedBatchNormEx";
 
+constexpr char kSwish[] = "_FusedSwish";
+
 constexpr char kDataFormat[] = "data_format";
 constexpr char kIsTraining[] = "is_training";
 
 constexpr int kMissingIndex = -1;
 
 struct RemapperContext {
-  explicit RemapperContext(GrapplerItem* item, Status* status, bool xla_on)
+  explicit RemapperContext(GrapplerItem* item, Status* status)
       : nodes_to_preserve(item->NodesToPreserve()),
         graph_view(&item->graph, status),
         graph_properties(*item),
-        inferred_graph_properties(false),
-        xla_on_(xla_on) {}
+        inferred_graph_properties(false) {}
 
   std::unordered_set<string> nodes_to_preserve;
   utils::MutableGraphView graph_view;
   GraphProperties graph_properties;
   bool inferred_graph_properties;
-  bool xla_on_;
 };
 
 // FusedBatchNorm that can be replaced with a cheaper set of primitives.
@@ -218,6 +220,19 @@ struct ContractionWithBiasAndAddActivation {
   int port_id = 0;
   int activation = kMissingIndex;
 };
+
+// Constraction Sigmoid and Mul nodes. fuse them into Swish. the port record
+// the common input index for mul and sigmoid.
+struct ContractionWithSwish {
+  ContractionWithSwish() = default;
+  ContractionWithSwish(int contraction, int sigmoid, int mul, int port)
+      : contraction(contraction), sigmoid(sigmoid), mul(mul), port(port) {}
+
+  int contraction = kMissingIndex;
+  int sigmoid = kMissingIndex;
+  int mul = kMissingIndex;
+  int port = kMissingIndex;
+};
 #endif  // INTEL_MKL
 
 #ifndef INTEL_MKL
@@ -327,9 +342,6 @@ bool IsCpuCompatible(const RemapperContext& ctx, const Pattern& matched) {
 // Checks if we can rewrite a pattern to the `_FusedConv2D` on GPU device.
 bool IsGpuCompatible(const RemapperContext& ctx,
                      const ContractionWithBiasAddAndActivation& matched) {
-  // xla does not cluster _FusedConv2D, and knows how to do this optimization
-  if (ctx.xla_on_) return false;
-
   const GraphDef* graph = ctx.graph_view.graph();
   const NodeDef& contraction_node = graph->node(matched.contraction);
   if (!IsConv2D(contraction_node)) return false;
@@ -752,7 +764,7 @@ bool FindContractionWithBiasAddAndAdd(const RemapperContext& ctx,
   const auto* node_def = node_view.node();
   if (!IsAddN(*node_def) && !IsAddWithNoBroadcast(ctx, *node_def)) return false;
 
-  // OneDNN AddN ops only support float and bfloat16 data types.
+  // MKL AddN ops only support float and bfloat16 data types.
   if (!HasDataType(node_def, DT_FLOAT) && !HasDataType(node_def, DT_BFLOAT16))
     return false;
 
@@ -799,7 +811,7 @@ bool FindContractionWithBiasAndAddActivation(
   // Currently, Contraction + Bias + Add + Tanh pattern is not supported
   if (IsTanh(*node_def)) return false;
 
-  // OneDNN activation op only supports float and bfloat16 data types.
+  // MKL activation op only supports float and bfloat16 data types.
   if (!HasDataType(node_def, DT_FLOAT) && !HasDataType(node_def, DT_BFLOAT16))
     return false;
 
@@ -830,6 +842,87 @@ bool FindContractionWithBiasAndAddActivation(
   *matched = pattern;
 
   return true;
+}
+
+// Helper function extracts Sigmoid and Mul to match Swish fusion patterns.
+// sigmoid_index record the sigmoid index of mul, mul_index record another mul
+// input, it is the common input for mul and sigmoid.
+bool HelperContractionWithSwish(
+    const RemapperContext& ctx, int node_index, int sigmoid_index,
+    int mul_index, ContractionWithSwish*& matched) {
+  const auto* node_view = ctx.graph_view.GetNode(node_index);
+  const auto* node_def = node_view->node();
+
+  const auto& regular_fanin_sigmoid = node_view->GetRegularFanin(sigmoid_index);
+  const auto* swish_node_view_sigmoid = regular_fanin_sigmoid.node_view();
+  const auto* swish_node_def_sigmoid = swish_node_view_sigmoid->node();
+  const auto& regular_fanin_mul = node_view->GetRegularFanin(mul_index);
+  const auto* swish_node_view_mul = regular_fanin_mul.node_view();
+  const auto* swish_node_def_mul = swish_node_view_mul->node();
+
+  if (HasControlFaninOrFanout(*swish_node_view_sigmoid) ||
+      !HasAtMostOneFanoutAtPort0(*swish_node_view_sigmoid) ||
+      !HasAtMostOneDataFanoutAtPort0(*swish_node_view_sigmoid) ||
+      IsInPreserveSet(ctx, swish_node_def_sigmoid) ||
+      !HaveSameDataType(node_def, swish_node_def_sigmoid))
+    return false;
+
+  if (swish_node_view_sigmoid->NumRegularFanins() < 1) return false;
+  const auto& sigmoid_fanin_node = swish_node_view_sigmoid->GetRegularFanin(0);
+  const auto* contraction_node_view = sigmoid_fanin_node.node_view();
+  const auto* contraction_node_def = contraction_node_view->node();
+
+  const int mul_index_port =
+      node_view->GetRegularFanin(mul_index).index();
+  const int sigmoid_index_port =
+      swish_node_view_sigmoid->GetRegularFanin(0).index();
+
+  // Make sure Mul's and Sigmoid's input is same and have the same input port.
+  if (swish_node_def_mul != contraction_node_def ||
+      mul_index_port != sigmoid_index_port)
+    return false;
+
+  *matched = {contraction_node_view->node_index(),
+              swish_node_view_sigmoid->node_index(), node_index,
+              mul_index};
+  return true;
+}
+
+bool FindContractionWithSwish(const RemapperContext& ctx,
+                                      int node_index,
+                                      ContractionWithSwish* matched) {
+  const auto* node_view = ctx.graph_view.GetNode(node_index);
+  // TODO(lyandy): Forward controls for patterns with control dependencies.
+  if (HasControlFaninOrFanout(*node_view) || node_view->NumRegularFanins() != 2)
+    return false;
+
+  // Root of the pattern must be an mul node.
+  const auto* node_def = node_view->node();
+  if (node_def == nullptr || !IsMul(*node_def)) return false;
+
+  // MKL mul op only supports float and bfloat16 data types.
+  if (!HasDataType(node_def, DT_FLOAT) && !HasDataType(node_def, DT_BFLOAT16))
+    return false;
+
+  const auto& regular_fanin_0 = node_view->GetRegularFanin(0);
+  const auto* swish_node_view_0 = regular_fanin_0.node_view();
+  const auto* swish_node_def_0 = swish_node_view_0->node();
+  const auto& regular_fanin_1 = node_view->GetRegularFanin(1);
+  const auto* swish_node_view_1 = regular_fanin_1.node_view();
+  const auto* swish_node_def_1 = swish_node_view_1->node();
+
+  if (!IsSigmoid(*swish_node_def_0) && !IsSigmoid(*swish_node_def_1)) return false;
+  if (IsSigmoid(*swish_node_def_0) && !IsSigmoid(*swish_node_def_1)) {
+    return HelperContractionWithSwish(ctx, node_index, 0, 1, matched);
+  }
+  if (!IsSigmoid(*swish_node_def_0) && IsSigmoid(*swish_node_def_1)) {
+    return HelperContractionWithSwish(ctx, node_index, 1, 0, matched);
+  }
+  if (IsSigmoid(*swish_node_def_0) && IsSigmoid(*swish_node_def_1)) {
+    return HelperContractionWithSwish(ctx, node_index, 0, 1, matched) ||
+           HelperContractionWithSwish(ctx, node_index, 1, 0, matched);
+  }
+  return false;
 }
 #endif
 
@@ -974,7 +1067,7 @@ bool FindFusedBatchNormEx(const RemapperContext& ctx, int node_index,
   if (IsAdd(*relu_fanin_0_node_def)) {
     // Currently no CPU implementation for "FusedBatchNorm + SideInput +
     // <Activation>""
-#ifdef INTEL_MKL
+#ifdef ENABLE_MKLDNN_V1
     return false;
 #endif
 
@@ -1081,7 +1174,7 @@ void CopyFusedBatchNormAttributes(const NodeDef& fused_batch_norm,
   if (fused_batch_norm.op() != "FusedBatchNorm") {
     SetAttrValue(src_attr.at("U"), &(*attr)["U"]);
   } else {
-#ifndef INTEL_MKL
+#ifndef ENABLE_MKLDNN_V1
     SetAttrValue(src_attr.at("T"), &(*attr)["U"]);
 #else
     SetAttrValue(DT_FLOAT, &(*attr)["U"]);
@@ -1525,8 +1618,8 @@ Status AddFusedContractionNode(RemapperContext* ctx,
 
   CopyBatchMatMulAttributes(contraction, &fused_op);
   auto* attr = fused_op.mutable_attr();
-  SetAttrValue(absl::Span<const absl::string_view>({"Mul"}),
-               &(*attr)["fused_ops"]);
+  absl::Span<const absl::string_view> fused_ops{"Mul"};
+  SetAttrValue(fused_ops, &(*attr)["fused_ops"]);
   SetAttrValue(1, &(*attr)["num_args"]);
 
   utils::Mutation* mutation = ctx->graph_view.GetMutationBuilder();
@@ -1549,7 +1642,7 @@ Status AddFusedContractionNode(RemapperContext* ctx,
   const NodeDef& contraction = graph->node(matched.contraction);
   const NodeDef& bias_add = graph->node(matched.bias_add);
 
-  // OneDNN version only support fusion for Conv2D and MatMul
+  // MKL version only support fusion for Conv2D and MatMul
   DCHECK(IsConv2D(contraction) || IsMatMul(contraction));
 
   NodeDef contraction_node;
@@ -1591,7 +1684,7 @@ Status AddFusedContractionNode(
     RemapperContext* ctx, const ContractionWithBiasAndAddActivation& matched,
     std::vector<bool>* invalidated_nodes, std::vector<bool>* nodes_to_delete) {
   const GraphDef* graph = ctx->graph_view.graph();
-  // OneDNN version only support fusion for Conv2D
+  // MKL version only support fusion for Conv2D
   const NodeDef& contraction = graph->node(matched.contraction);
   DCHECK(IsConv2D(contraction));
   const NodeDef& activation = graph->node(matched.activation);
@@ -1624,6 +1717,36 @@ Status AddFusedContractionNode(
   (*nodes_to_delete)[matched.bias_add] = true;
   (*nodes_to_delete)[matched.contraction] = true;
 
+  return Status::OK();
+}
+
+Status AddFusedContractionNode(RemapperContext* ctx,
+                               const ContractionWithSwish& matched,
+                               std::vector<bool>* invalidated_nodes,
+                               std::vector<bool>* nodes_to_delete) {
+  const GraphDef* graph = ctx->graph_view.graph();
+  const NodeDef& contraction = graph->node(matched.contraction);
+  const NodeDef& sigmoid = graph->node(matched.sigmoid);
+  const NodeDef& mul = graph->node(matched.mul);
+
+  NodeDef fused_op;
+  fused_op.set_name(mul.name());
+  fused_op.set_op(kSwish);
+  fused_op.set_device(mul.device());
+  fused_op.add_input(mul.input(matched.port));  // 0: input
+
+  auto* attr = fused_op.mutable_attr();
+  auto& src_attr = mul.attr();
+  (*attr)["T"] = src_attr.at("T");
+
+  utils::Mutation* mutation = ctx->graph_view.GetMutationBuilder();
+  Status status;
+  mutation->AddNode(std::move(fused_op), &status);
+  TF_RETURN_IF_ERROR(status);
+  TF_RETURN_IF_ERROR(mutation->Apply());
+
+  (*invalidated_nodes)[matched.mul] = true;
+  (*nodes_to_delete)[matched.sigmoid] = true;
   return Status::OK();
 }
 #endif
@@ -1712,41 +1835,29 @@ Status AddBatchNormNodes(RemapperContext* ctx, const FusedBatchNorm& matched) {
   utils::Mutation* mutation = ctx->graph_view.GetMutationBuilder();
   Status status;
 
-  string x_format = fused_node.attr().at(kDataFormat).s();
-  if (x_format == "NCHW" or x_format == "NCDHW") {
+  if (fused_node.attr().at(kDataFormat).s() == "NCHW") {
     // Need to reshape the last 4 inputs
     NodeDef new_shape;
     const string new_shape_name =
-        AddPrefixToNodeName(x_format + "Shape", fused_node.name());
+        AddPrefixToNodeName("NCHWShape", fused_node.name());
     new_shape.set_name(new_shape_name);
     new_shape.set_op("Const");
     new_shape.set_device(fused_node.device());
     *new_shape.add_input() = AsControlDependency(scale);
     (*new_shape.mutable_attr())["dtype"].set_type(DT_INT32);
-    if (x_format == "NCHW") {
-      Tensor t(DT_INT32, {4});
-      t.flat<int32>()(0) = 1;
-      t.flat<int32>()(1) = -1;
-      t.flat<int32>()(2) = 1;
-      t.flat<int32>()(3) = 1;
-      t.AsProtoTensorContent(
-          (*new_shape.mutable_attr())["value"].mutable_tensor());
-    } else {
-      Tensor t(DT_INT32, {5});
-      t.flat<int32>()(0) = 1;
-      t.flat<int32>()(1) = -1;
-      t.flat<int32>()(2) = 1;
-      t.flat<int32>()(3) = 1;
-      t.flat<int32>()(4) = 1;
-      t.AsProtoTensorContent(
-          (*new_shape.mutable_attr())["value"].mutable_tensor());
-    }
+    Tensor t(DT_INT32, {4});
+    t.flat<int32>()(0) = 1;
+    t.flat<int32>()(1) = -1;
+    t.flat<int32>()(2) = 1;
+    t.flat<int32>()(3) = 1;
+    t.AsProtoTensorContent(
+        (*new_shape.mutable_attr())["value"].mutable_tensor());
     mutation->AddNode(std::move(new_shape), &status);
     TF_RETURN_IF_ERROR(status);
 
     NodeDef reshaped_scale;
     reshaped_scale.set_name(
-			  AddPrefixToNodeName(x_format + "ShapedScale", fused_node.name()));
+        AddPrefixToNodeName("NCHWShapedScale", fused_node.name()));
     reshaped_scale.set_op("Reshape");
     reshaped_scale.set_device(fused_node.device());
     *reshaped_scale.add_input() = scale;
@@ -1759,7 +1870,7 @@ Status AddBatchNormNodes(RemapperContext* ctx, const FusedBatchNorm& matched) {
 
     NodeDef reshaped_offset;
     reshaped_offset.set_name(
-        AddPrefixToNodeName(x_format + "ShapedOffset", fused_node.name()));
+        AddPrefixToNodeName("NCHWShapedOffset", fused_node.name()));
     reshaped_offset.set_op("Reshape");
     reshaped_offset.set_device(fused_node.device());
     *reshaped_offset.add_input() = offset;
@@ -1772,7 +1883,7 @@ Status AddBatchNormNodes(RemapperContext* ctx, const FusedBatchNorm& matched) {
 
     NodeDef reshaped_mean;
     reshaped_mean.set_name(
-        AddPrefixToNodeName("NCHWShapedOffset", fused_node.name()));
+        AddPrefixToNodeName("NCHWShapedMean", fused_node.name()));
     reshaped_mean.set_op("Reshape");
     reshaped_mean.set_device(fused_node.device());
     *reshaped_mean.add_input() = mean;
@@ -1785,7 +1896,7 @@ Status AddBatchNormNodes(RemapperContext* ctx, const FusedBatchNorm& matched) {
 
     NodeDef reshaped_variance;
     reshaped_variance.set_name(
-				AddPrefixToNodeName(x_format + "ShapedVariance", fused_node.name()));
+        AddPrefixToNodeName("NCHWShapedVariance", fused_node.name()));
     reshaped_variance.set_op("Reshape");
     reshaped_variance.set_device(fused_node.device());
     *reshaped_variance.add_input() = variance;
@@ -2045,7 +2156,7 @@ Status Remapper::Optimize(Cluster* cluster, const GrapplerItem& item,
                           GraphDef* optimized_graph) {
   GrapplerItem mutable_item = item;
   Status status;
-  RemapperContext ctx(&mutable_item, &status, xla_on_);
+  RemapperContext ctx(&mutable_item, &status);
   TF_RETURN_IF_ERROR(status);
   // Processing graph in reverse-topological sorted order allows to remap
   // longer chains of dependent ops in one pass.
@@ -2084,6 +2195,7 @@ Status Remapper::Optimize(Cluster* cluster, const GrapplerItem& item,
       ContractionWithBiasAddAndAdd contract_with_bias_and_add;
       ContractionWithBiasAndAddActivation contract_with_bias_and_add_activation;
       ContractionWithMul contract_with_mul;
+      ContractionWithSwish contract_with_swish;
 
       if (!item.optimization_options().is_eager_mode) {
         // Remap Conv2D+BiasAdd+Add+relu into the _FusedConv2D.
@@ -2127,6 +2239,14 @@ Status Remapper::Optimize(Cluster* cluster, const GrapplerItem& item,
               &ctx, node_label_to_index, &invalidated_nodes, false));
           continue;
         };
+        // Remap Mul(x, Sigmoid(x)) pattern, fuse then into the Swish(x).
+        // Now INTEL do not support native format.
+        if (FindContractionWithSwish(ctx, i, &contract_with_swish)) {
+          TF_RETURN_IF_ERROR(
+              AddFusedContractionNode(&ctx, contract_with_swish,
+                                      &invalidated_nodes, &nodes_to_delete));
+          continue;
+        }
       }
     }
 #endif  //! INTEL_MKL
@@ -2158,7 +2278,7 @@ Status Remapper::Optimize(Cluster* cluster, const GrapplerItem& item,
     // real Tensorflow graphs.
 
     // TODO(penporn):
-    // Remove this once TF-OneDNN supports _FusedConv2D with these operations.
+    // Remove this once TF-MKL supports _FusedConv2D with these operations.
     if (DisableMKL()) {
       // Remap Conv2D+Squeeze+BiasAdd into the _FusedConv2D+Squeeze.
       ContractionWithSqueezeAndBiasAdd contract_with_squeeze_and_bias;

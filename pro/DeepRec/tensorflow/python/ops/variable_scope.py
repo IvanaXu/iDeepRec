@@ -38,10 +38,8 @@ from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import init_ops
-from tensorflow.python.ops import kv_variable_ops
 from tensorflow.python.ops import resource_variable_ops
 from tensorflow.python.ops import variables
-from tensorflow.python.ops import math_ops
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.util import deprecation
 from tensorflow.python.util import function_utils
@@ -52,9 +50,7 @@ from tensorflow.python.util.tf_export import tf_export
 __all__ = [
     "AUTO_REUSE", "VariableScope", "get_variable_scope", "get_variable",
     "get_local_variable", "variable_scope", "variable_op_scope",
-    "no_regularizer", "VariableSynchronization", "VariableAggregation",
-    "get_embedding_variable", "get_dynamic_dimension_embedding_variable",
-    "get_multihash_variable", "get_hash_table"
+    "no_regularizer", "VariableSynchronization", "VariableAggregation"
 ]
 
 _api_usage_gauge = monitoring.BoolGauge(
@@ -287,216 +283,9 @@ class _VariableStore(object):
     self._partitioned_vars = {}  # A dict of the stored PartitionedVariables.
     self._store_eager_variables = False
 
-  def get_hashtable(self,
-                    name,
-                    shape=None,
-                    dtype=dtypes.float32,
-                    initializer=None,
-                    collections=None,
-                    reuse=None,
-                    trainable=None,
-                    synchronization=VariableSynchronization.AUTO,
-                    partitioner=None,
-                    children=None):
-    if context.executing_eagerly():
-      if not self._store_eager_variables and reuse:
-        raise RuntimeError(
-            "When eager execution is enabled variable reuse is only supported"
-            " when an EagerVariableStore is active. See the documentation on"
-            " EagerVariableStore for example usage.")
-      if self._store_eager_variables:
-        reuse = AUTO_REUSE
-    try:
-      dtype = dtype.base_dtype
-    except AttributeError:
-      # .base_dtype not existing means that we will try and use the raw dtype
-      # which was passed in - this might be a NumPy type which is valid.
-      pass
-    def _hashtable_getter(name,
-                          shape=None,
-                          dtype=dtypes.float32,
-                          initializer=None,
-                          collections=None,
-                          reuse=None,
-                          trainable=None,
-                          partitioner=None,
-                          children=None):
-      # HashTable cases
-      if partitioner is not None:
-        if not callable(partitioner):
-          raise ValueError(
-              "Partitioner must be callable, but received: %s" % partitioner)
-        return self._get_distribute_hashtable(name=name,
-                                              shape=shape,
-                                              dtype=dtype,
-                                              initializer=initializer,
-                                              collections=collections,
-                                              reuse=reuse,
-                                              trainable=trainable,
-                                              partitioner=partitioner,
-                                              children=children)
-      else:
-        return self._get_hashtable(name=name,
-                                   shape=shape,
-                                   dtype=dtype,
-                                   initializer=initializer,
-                                   reuse=reuse,
-                                   collections=collections,
-                                   trainable=trainable,
-                                   partitioner=partitioner,
-                                   children=children)
-
-    return _hashtable_getter(name,
-                             shape=shape,
-                             dtype=dtype,
-                             initializer=initializer,
-                             collections=collections,
-                             reuse=reuse,
-                             trainable=trainable,
-                             partitioner=partitioner,
-                             children=children)
-
-  def _get_hashtable(self,
-                     name,
-                     shape=None,
-                     dtype=dtypes.float32,
-                     initializer=None,
-                     reuse=None,
-                     collections=None,
-                     trainable=None,
-                     partitioner=None,
-                     children=None):
-
-    from tensorflow.python.ops.hash_table import hash_table
-    if context.executing_eagerly():
-      raise NotImplementedError("Hashtable variables are not yet supported "
-                                "when eager execution is enabled.")
-    if partitioner is not None:
-      raise ValueError(
-          "Trying to get a hashtable %s, but partitioner is not None." % name)
-
-    if name in self._vars:
-      if reuse is False:
-        raise ValueError(
-            "Hashtable variable with name %s already exists. Did you mean to "
-            "set reuse=True or reuse=tf.AUTO_REUSE in VarScope?"
-            % name)
-      existing_var = self._vars[name]
-      shape = tensor_shape.as_shape(shape)
-      if not isinstance(existing_var, hash_table.HashTable):
-        raise ValueError(
-            "Trying to reuse hashtable variable %s, but an existing variable is not"
-            " a HashTable, can not reuse it." % (name))
-      if not shape.is_compatible_with(existing_var.shape):
-        raise ValueError(
-            "Trying to reuse hashtable variable %s, but specified shape %s "
-            "and found shape %s."
-            % (name, shape, existing_var.get_shape()))
-      if not dtype.is_compatible_with(existing_var.dtype):
-        raise ValueError(
-            "Trying to reuse hashtable variable %s, but specified dtype %s "
-            "and found dtype %s."
-            % (name, dtype.name, existing_var.dtype.name))
-      return existing_var
-
-    if reuse is True:
-      raise ValueError("Hashtable %s does not exist, or was not "
-                       "created with tf.get_variable(). Did you mean to set "
-                       "reuse=False or reuse=tf.AUTO_REUSE in VarScope?" % name)
-
-    hashtable_var = hash_table.HashTable(shape=shape,
-                                         dtype=dtype,
-                                         distributed_name=name,
-                                         initializer=initializer,
-                                         collections=collections,
-                                         trainable=trainable,
-                                         children=children,
-                                         name=name)
-    self._vars[name] = hashtable_var
-
-    return hashtable_var
-
-  def _get_distribute_hashtable(self,
-                                name,
-                                shape=None,
-                                dtype=dtypes.float32,
-                                initializer=None,
-                                reuse=None,
-                                collections=None,
-                                trainable=None,
-                                partitioner=None,
-                                children=None):
-
-    from tensorflow.python.ops.hash_table import hash_table
-    if context.executing_eagerly():
-      raise NotImplementedError("Distribute Hashtable variables are not yet supported "
-                                "when eager execution is enabled.")
-
-    if partitioner is None:
-      raise ValueError(
-          "Trying to get a distribute hashtable %s, but partitioner is not specified." % name)
-
-    if name in self._vars:
-      raise ValueError(
-          "A distribute hashtable was provided, but an single version of the "
-          "variable was found: %s.  Perhaps a variable of the same name was "
-          "already created with single?" % name)
-    if name in self._partitioned_vars:
-      if reuse is False:
-        raise ValueError(
-            "Hashtable variable with name %s already exists. Did you mean to "
-            "set reuse=True or reuse=tf.AUTO_REUSE in VarScope?"
-            % name)
-      existing_var = self._partitioned_vars[name]
-      if not isinstance(existing_var, hash_table.DistributedHashTable):
-        raise ValueError(
-            "Trying to reuse distribute hashtable variable %s, but an existing variable is not"
-            " a DistributedHashTable, can not reuse it." % (name))
-      shape = tensor_shape.as_shape(shape)
-      if not shape.is_compatible_with(existing_var.shape):
-        raise ValueError(
-            "Trying to reuse distribute hashtable variable %s, but specified shape %s "
-            "and found shape %s."
-            % (name, shape, existing_var.get_shape()))
-      if not dtype.is_compatible_with(existing_var.dtype):
-        raise ValueError(
-            "Trying to reuse distribute hashtable variable %s, but specified dtype %s "
-            "and found dtype %s."
-            % (name, dtype.name, existing_var.dtype.name))
-      cur_slicer = partitioner(hash_table.DistributedHashTable._DEFAULT_SLICER_SIZE)
-      if cur_slicer != existing_var._slicer:
-        raise ValueError(
-            "Trying to reuse distribute hashtable variable %s, but specified partitioner split result is not equal to origin: [{}, {}]".format(cur_slicer, existing_var._slicer))
-
-      return existing_var
-
-    if reuse is True:
-      raise ValueError("Distribute hashtable %s does not exist, or was not "
-                       "created with tf.get_variable(). Did you mean to set "
-                       "reuse=False or reuse=tf.AUTO_REUSE in VarScope?" % name)
-
-    distribute_hashtable_var = hash_table.DistributedHashTable(shape=shape,
-                                                              dtype=dtype,
-                                                              initializer=initializer,
-                                                              collections=collections,
-                                                              trainable=trainable,
-                                                              partitioner=partitioner,
-                                                              children=children,
-                                                              name=name)
-    for i in range(len(distribute_hashtable_var.partitions)):
-      hashtable_full_name = "%s/HashTable_%d" % (name, i)
-      if hashtable_full_name in self._vars:
-        raise ValueError("Hashtable variable with name %s already exists. Conflict when create "
-                         "distribute hashtable with partition %d." % (hashtable_full_name, i))
-      self._vars[hashtable_full_name] = distribute_hashtable_var.partitions[i]
-
-    self._partitioned_vars[name] = distribute_hashtable_var
-    return distribute_hashtable_var
-
   def get_variable(self,
                    name,
                    shape=None,
-                   embedding_block_num=None,
                    dtype=dtypes.float32,
                    initializer=None,
                    regularizer=None,
@@ -510,10 +299,7 @@ class _VariableStore(object):
                    custom_getter=None,
                    constraint=None,
                    synchronization=VariableSynchronization.AUTO,
-                   aggregation=VariableAggregation.NONE,
-                   invalid_key=None,
-                   evconfig=variables.EmbeddingVariableConfig(),
-                   ht_partition_num=1000):
+                   aggregation=VariableAggregation.NONE):
     """Gets an existing variable with these parameters or create a new one.
 
     If a variable with the given name is already stored, we return the stored
@@ -649,7 +435,6 @@ class _VariableStore(object):
     def _true_getter(  # pylint: disable=missing-docstring
         name,
         shape=None,
-        embedding_block_num=None,
         dtype=dtypes.float32,
         initializer=None,
         regularizer=None,
@@ -662,10 +447,7 @@ class _VariableStore(object):
         use_resource=None,
         constraint=None,
         synchronization=VariableSynchronization.AUTO,
-        aggregation=VariableAggregation.NONE,
-        invalid_key=None,
-        evconfig=variables.EmbeddingVariableConfig(),
-        ht_partition_num=1000):
+        aggregation=VariableAggregation.NONE):
       is_scalar = (
           shape is not None and isinstance(shape, collections_lib.Sequence) and
           not shape)
@@ -678,7 +460,6 @@ class _VariableStore(object):
           return self._get_partitioned_variable(
               name=name,
               shape=shape,
-              embedding_block_num=embedding_block_num,
               dtype=dtype,
               initializer=initializer,
               regularizer=regularizer,
@@ -691,10 +472,7 @@ class _VariableStore(object):
               use_resource=use_resource,
               constraint=constraint,
               synchronization=synchronization,
-              aggregation=aggregation,
-              invalid_key=invalid_key,
-              evconfig=evconfig,
-              ht_partition_num=ht_partition_num)
+              aggregation=aggregation)
 
       # Special case for partitioned variable to allow reuse without having to
       # specify partitioner.
@@ -703,7 +481,6 @@ class _VariableStore(object):
         return self._get_partitioned_variable(
             name=name,
             shape=shape,
-            embedding_block_num=embedding_block_num,
             dtype=dtype,
             initializer=initializer,
             regularizer=regularizer,
@@ -716,10 +493,7 @@ class _VariableStore(object):
             use_resource=use_resource,
             constraint=constraint,
             synchronization=synchronization,
-            aggregation=aggregation,
-            invalid_key=invalid_key,
-            evconfig=evconfig,
-            ht_partition_num=ht_partition_num)
+            aggregation=aggregation)
 
       # Single variable case
       if "%s/part_0" % name in self._vars:
@@ -731,7 +505,6 @@ class _VariableStore(object):
       return self._get_single_variable(
           name=name,
           shape=shape,
-          embedding_block_num=embedding_block_num,
           dtype=dtype,
           initializer=initializer,
           regularizer=regularizer,
@@ -743,10 +516,7 @@ class _VariableStore(object):
           use_resource=use_resource,
           constraint=constraint,
           synchronization=synchronization,
-          aggregation=aggregation,
-          invalid_key=invalid_key,
-          evconfig=evconfig,
-          ht_partition_num=ht_partition_num)
+          aggregation=aggregation)
 
     synchronization, aggregation, trainable = (
         variables.validate_synchronization_aggregation_trainable(
@@ -759,7 +529,6 @@ class _VariableStore(object):
           "getter": _true_getter,
           "name": name,
           "shape": shape,
-          "embedding_block_num": embedding_block_num,
           "dtype": dtype,
           "initializer": initializer,
           "regularizer": regularizer,
@@ -772,9 +541,6 @@ class _VariableStore(object):
           "use_resource": use_resource,
           "synchronization": synchronization,
           "aggregation": aggregation,
-          "invalid_key": invalid_key,
-          "evconfig": evconfig,
-          "ht_partition_num": ht_partition_num,
       }
       # `fn_args` and `has_kwargs` can handle functions, `functools.partial`,
       # `lambda`.
@@ -786,7 +552,6 @@ class _VariableStore(object):
       return _true_getter(
           name,
           shape=shape,
-          embedding_block_num=embedding_block_num,
           dtype=dtype,
           initializer=initializer,
           regularizer=regularizer,
@@ -799,16 +564,12 @@ class _VariableStore(object):
           use_resource=use_resource,
           constraint=constraint,
           synchronization=synchronization,
-          aggregation=aggregation,
-          invalid_key=invalid_key,
-          evconfig=evconfig,
-          ht_partition_num=ht_partition_num)
+          aggregation=aggregation)
 
   def _get_partitioned_variable(self,
                                 name,
                                 partitioner,
                                 shape=None,
-                                embedding_block_num=None,
                                 dtype=dtypes.float32,
                                 initializer=None,
                                 regularizer=None,
@@ -820,10 +581,7 @@ class _VariableStore(object):
                                 use_resource=None,
                                 constraint=None,
                                 synchronization=VariableSynchronization.AUTO,
-                                aggregation=VariableAggregation.NONE,
-                                invalid_key=None,
-                                evconfig=variables.EmbeddingVariableConfig(),
-                                ht_partition_num=1000):
+                                aggregation=VariableAggregation.NONE):
     """Gets or creates a sharded variable list with these parameters.
 
     The `partitioner` must be a callable that accepts a fully defined
@@ -918,12 +676,6 @@ class _VariableStore(object):
     shape = tensor_shape.as_shape(shape)
     if initializing_from_value:
       shape = shape.merge_with(initializer.get_shape())
-    if invalid_key is not None:
-      # EmbedingVariable: extend shape to reuse Variable partition process
-      # first demension is unused
-      shape_t = tensor_shape.as_shape([sys.maxsize]).concatenate(shape)
-      fd_partition_num = partitioner(shape=shape_t, dtype=dtype)[0]
-      shape = tensor_shape.as_shape([fd_partition_num]).concatenate(shape)
 
     partitions = None
     if not reuse or partitioner:
@@ -936,11 +688,6 @@ class _VariableStore(object):
             "set reuse=True or reuse=tf.AUTO_REUSE in VarScope?" % name)
 
       existing_var = self._partitioned_vars[name]
-      from tensorflow.python.ops.hash_table import hash_table
-      if isinstance(existing_var, (hash_table.HashTable, hash_table.DistributedHashTable)):
-        raise ValueError(
-            "Trying to reuse partitioned variable %s, but an existing variable is a"
-            " HashTable or DistributedHashTable, can not reuse it." % (name))
       if not shape.is_compatible_with(existing_var.get_shape()):
         raise ValueError(
             "Trying to reuse partitioned variable %s, but specified shape %s "
@@ -1009,14 +756,11 @@ class _VariableStore(object):
           init = ops.convert_to_tensor(initializer, dtype=dtype)
           init = array_ops.slice(init, var_offset, var_shape)
           init_shape = None
-      if invalid_key is not None:
-          init_shape = shape.as_list()[1:]
 
       with ops.name_scope(None):
         var = self._get_single_variable(
             name=var_full_name,
             shape=init_shape,
-            embedding_block_num=embedding_block_num,
             dtype=dtype,
             initializer=init,
             partition_info=partition_info,
@@ -1029,19 +773,12 @@ class _VariableStore(object):
             use_resource=use_resource,
             constraint=constraint,
             synchronization=synchronization,
-            aggregation=aggregation,
-            invalid_key=invalid_key,
-            evconfig=evconfig,
-            ht_partition_num=ht_partition_num)
+            aggregation=aggregation)
 
       # pylint: disable=protected-access
       var._set_save_slice_info(
           variables.Variable.SaveSliceInfo(name, shape.as_list(), var_offset,
-                                           var_shape, var_full_name=var_full_name))
-      if isinstance(var, kv_variable_ops.DynamicEmbeddingVariable):
-        for ev in var._ev_list:
-          ev._set_save_slice_info(variables.Variable.SaveSliceInfo(
-            ev.name, shape.as_list(), var_offset, var_shape, var_full_name=var_full_name))
+                                           var_shape))
       vs.append(var)
       # pylint: enable=protected-access
 
@@ -1058,7 +795,6 @@ class _VariableStore(object):
   def _get_single_variable(self,
                            name,
                            shape=None,
-                           embedding_block_num=None,
                            dtype=dtypes.float32,
                            initializer=None,
                            regularizer=None,
@@ -1071,10 +807,7 @@ class _VariableStore(object):
                            use_resource=None,
                            constraint=None,
                            synchronization=VariableSynchronization.AUTO,
-                           aggregation=VariableAggregation.NONE,
-                           invalid_key=None,
-                           evconfig=variables.EmbeddingVariableConfig(),
-                           ht_partition_num=1000):
+                           aggregation=VariableAggregation.NONE):
     """Get or create a single Variable (e.g.
 
     a shard or entire variable).
@@ -1134,11 +867,6 @@ class _VariableStore(object):
         raise ValueError("%s Originally defined at:\n\n%s" %
                          (err_msg, "".join(traceback.format_list(tb))))
       found_var = self._vars[name]
-      from tensorflow.python.ops.hash_table import hash_table
-      if isinstance(found_var, (hash_table.HashTable, hash_table.DistributedHashTable)):
-        raise ValueError(
-            "Trying to reuse variable %s, but an existing variable is a"
-            " HashTable or DistributedHashTable, can not reuse it." % (name))
       if not shape.is_compatible_with(found_var.get_shape()):
         raise ValueError("Trying to share variable %s, but specified shape %s"
                          " and found shape %s." %
@@ -1171,13 +899,8 @@ class _VariableStore(object):
         if tf_inspect.isclass(initializer):
           initializer = initializer()
         if shape is not None and shape.is_fully_defined():
-          if use_resource and invalid_key is not None:
-            s = [1 if isinstance(initializer, init_ops.Constant) else evconfig.default_value_dim] + shape.as_list()
-            evconfig.default_value_dim = 1 if isinstance(initializer, init_ops.Constant) else evconfig.default_value_dim
-          else:
-            s = shape.as_list()
           init_val = lambda: initializer(  # pylint: disable=g-long-lambda
-              s,
+              shape.as_list(),
               dtype=dtype,
               partition_info=partition_info)
           variable_dtype = dtype.base_dtype
@@ -1202,17 +925,12 @@ class _VariableStore(object):
         trainable=trainable,
         collections=collections,
         caching_device=caching_device,
-        embedding_block_num=embedding_block_num,
         dtype=variable_dtype,
         validate_shape=validate_shape,
         constraint=constraint,
         use_resource=use_resource,
         synchronization=synchronization,
-        aggregation=aggregation,
-        invalid_key=invalid_key,
-        evconfig=evconfig,
-        embedding_initializer=initializer,
-        ht_partition_num=ht_partition_num)
+        aggregation=aggregation)
     if context.executing_eagerly() and self._store_eager_variables:
       if collections:
         ops.add_to_collections(collections, v)
@@ -1523,191 +1241,6 @@ class VariableScope(object):
           constraint=constraint,
           synchronization=synchronization,
           aggregation=aggregation)
-
-  def get_hash_table(self,
-                     var_store,
-                     name,
-                     shape=None,
-                     dtype=None,
-                     initializer=None,
-                     collections=None,
-                     reuse=None,
-                     trainable=True,
-                     synchronization=VariableSynchronization.AUTO,
-                     partitioner=None,
-                     children=None):
-    """Gets an existing variable with this name or create a new one."""
-    if partitioner is None:
-      partitioner = self._partitioner
-    if not context.executing_eagerly():
-      if reuse is None:
-        reuse = self._reuse
-    else:
-      reuse = AUTO_REUSE
-
-    full_name = self.name + "/" + name if self.name else name
-    # Variable names only depend on variable_scope (full_name here),
-    # not name_scope, so we reset it below for the time of variable creation.
-    with ops.name_scope(None):
-      # Check that `initializer` dtype and `dtype` are consistent before
-      # replacing them with defaults.
-      if (dtype is not None and initializer is not None and
-          not callable(initializer)):
-        init_dtype = ops.convert_to_tensor(initializer).dtype.base_dtype
-        if init_dtype != dtype:
-          raise ValueError("Initializer type '%s' and explicit dtype '%s' "
-                           "don't match." % (init_dtype, dtype))
-      if initializer is None:
-        initializer = self._initializer
-      if dtype is None:
-        dtype = self._dtype
-      return var_store.get_hashtable(full_name,
-                                     shape=shape,
-                                     dtype=dtype,
-                                     initializer=initializer,
-                                     reuse=reuse,
-                                     collections=collections,
-                                     trainable=trainable,
-                                     synchronization=synchronization,
-                                     partitioner=partitioner,
-                                     children=children)
-
-  def get_embedding_variable(self,
-                             var_store,
-                             name,
-                             shape=None,
-                             dtype=None,
-                             initializer=None,
-                             regularizer=None,
-                             reuse=None,
-                             trainable=True,
-                             collections=None,
-                             caching_device=None,
-                             partitioner=None,
-                             validate_shape=True,
-                             use_resource=None,
-                             custom_getter=None,
-                             constraint=None,
-                             invalid_key=None,
-                             evconfig=variables.EmbeddingVariableConfig(),
-                             ht_partition_num=1000):
-    """Gets an existing variable with this name or create a new one."""
-    if regularizer is None:
-      regularizer = self._regularizer
-    if caching_device is None:
-      caching_device = self._caching_device
-    if partitioner is None:
-      partitioner = self._partitioner
-    if custom_getter is None:
-      custom_getter = self._custom_getter
-    if not context.executing_eagerly():
-      if reuse is None:
-        reuse = self._reuse
-      if use_resource is None:
-        use_resource = self._use_resource
-    else:
-      reuse = AUTO_REUSE
-      use_resource = True
-
-    full_name = self.name + "/" + name if self.name else name
-    # Variable names only depend on variable_scope (full_name here),
-    # not name_scope, so we reset it below for the time of variable creation.
-    with ops.name_scope(None):
-      # Check that `initializer` dtype and `dtype` are consistent before
-      # replacing them with defaults.
-      if (dtype is not None and initializer is not None and
-          not callable(initializer)):
-        init_dtype = ops.convert_to_tensor(initializer).dtype.base_dtype
-        if init_dtype != dtype:
-          raise ValueError("Initializer type '%s' and explicit dtype '%s' "
-                           "don't match." % (init_dtype, dtype))
-      if initializer is None:
-        initializer = self._initializer
-      if constraint is None:
-        constraint = self._constraint
-      if dtype is None:
-        dtype = self._dtype
-      if invalid_key is None:
-        invalid_key = -1
-      return var_store.get_variable(
-          full_name, shape=shape, dtype=dtype, initializer=initializer,
-          regularizer=regularizer, reuse=reuse, trainable=trainable,
-          collections=collections, caching_device=caching_device,
-          partitioner=partitioner, validate_shape=validate_shape,
-          use_resource=use_resource, custom_getter=custom_getter,
-          constraint=constraint, invalid_key=invalid_key,
-          evconfig=evconfig,
-          ht_partition_num=ht_partition_num)
-
-  def get_dynamic_dimension_embedding_variable(self,
-                             var_store,
-                             name,
-                             shape=None,
-                             embedding_block_num=None,
-                             dtype=None,
-                             initializer=None,
-                             regularizer=None,
-                             reuse=None,
-                             trainable=True,
-                             collections=None,
-                             caching_device=None,
-                             partitioner=None,
-                             validate_shape=True,
-                             use_resource=None,
-                             custom_getter=None,
-                             constraint=None,
-                             invalid_key=None,
-                             evconfig=variables.EmbeddingVariableConfig(),
-                             ht_partition_num=1000):
-    """Gets an existing variable with this name or create a new one."""
-    if regularizer is None:
-      regularizer = self._regularizer
-    if caching_device is None:
-      caching_device = self._caching_device
-    if partitioner is None:
-      partitioner = self._partitioner
-    if custom_getter is None:
-      custom_getter = self._custom_getter
-    if not context.executing_eagerly():
-      if reuse is None:
-        reuse = self._reuse
-      if use_resource is None:
-        use_resource = self._use_resource
-    else:
-      reuse = AUTO_REUSE
-      use_resource = True
-
-    full_name = self.name + "/" + name if self.name else name
-    # Variable names only depend on variable_scope (full_name here),
-    # not name_scope, so we reset it below for the time of variable creation.
-    with ops.name_scope(None):
-      # Check that `initializer` dtype and `dtype` are consistent before
-      # replacing them with defaults.
-      if (dtype is not None and initializer is not None and
-          not callable(initializer)):
-        init_dtype = ops.convert_to_tensor(initializer).dtype.base_dtype
-        if init_dtype != dtype:
-          raise ValueError("Initializer type '%s' and explicit dtype '%s' "
-                           "don't match." % (init_dtype, dtype))
-      if initializer is None:
-        initializer = self._initializer
-      if constraint is None:
-        constraint = self._constraint
-      if dtype is None:
-        dtype = self._dtype
-      if invalid_key is None:
-        invalid_key = -1
-      return var_store.get_variable(
-          full_name, shape=shape, embedding_block_num=embedding_block_num,
-          dtype=dtype, initializer=initializer,
-          regularizer=regularizer, reuse=reuse, trainable=trainable,
-          collections=collections, caching_device=caching_device,
-          partitioner=partitioner, validate_shape=validate_shape,
-          use_resource=use_resource, custom_getter=custom_getter,
-          constraint=constraint, invalid_key=invalid_key,
-          evconfig=evconfig,
-          ht_partition_num=ht_partition_num)
-
 
   def _get_partitioned_variable(self,
                                 var_store,
@@ -2120,291 +1653,6 @@ get_local_variable.__doc__ = get_variable_or_local_docstring % (
     "added to the `LOCAL_VARIABLES` collection and `trainable` is set to\n"
     "`False`.\n", "", "GraphKeys.LOCAL_VARIABLES")
 
-@tf_export(v1=["get_hash_table"])
-def get_hash_table(name,
-                   embedding_dim,
-                   dtype=None,
-                   initializer=None,
-                   collections=None,
-                   trainable=True,
-                   synchronization=VariableSynchronization.AUTO,
-                   partitioner=None,
-                   children=None):
-  return get_variable_scope().get_hash_table(
-          _get_default_variable_store(),
-          name,
-          shape=embedding_dim,
-          dtype=dtype,
-          initializer=initializer,
-          collections=collections,
-          trainable=trainable,
-          synchronization=synchronization,
-          partitioner=partitioner,
-          children=children)
-
-
-@tf_export(v1=["get_embedding_variable"])
-def get_embedding_variable(name,
-                           embedding_dim,
-                           key_dtype=dtypes.int64,
-                           value_dtype=None,
-                           initializer=None,
-                           regularizer=None,
-                           trainable=True,
-                           collections=None,
-                           caching_device=None,
-                           partitioner=None,
-                           validate_shape=True,
-                           custom_getter=None,
-                           constraint=None,
-                           steps_to_live=None,
-                           init_data_source=None,
-                           ev_option = variables.EmbeddingVariableOption()):
-  if key_dtype == dtypes.int64:
-    invalid_key = 9223372036854775807
-  elif key_dtype == dtypes.int32:
-    invalid_key = -1
-  elif key_dtype == dtypes.string:
-    invalid_key = ""
-  else:
-    raise ValueError("Not support key_dtype: %s, only support int64/int32/string" % key_dtype)
-  l2_weight_threshold = -1.0
-  if initializer is None and ev_option.init.initializer is None:
-    initializer = init_ops.truncated_normal_initializer()
-  elif ev_option.init.initializer is not None:
-    if initializer is not None:
-      print("use initializer give in InitializerOption.")
-    initializer = ev_option.init.initializer
-  if steps_to_live != None:
-    logging.warn("steps_to_live is deprecated,"
-               " use tf.GlobaStepEvcit(steps_to_live)")
-  if ev_option.evict != None:
-    if isinstance(ev_option.evict, variables.GlobalStepEvict):
-      if steps_to_live != None:
-        logging.warning("Warning: steps_to_live is double set, the steps_to_live in GlobalStepEvict is valid")
-      steps_to_live = ev_option.evict.steps_to_live
-    elif isinstance(ev_option.evict, variables.L2WeightEvict):
-      l2_weight_threshold = ev_option.evict.l2_weight_threshold
-  else:
-    l2_weight_threshold = -1.0
-  if steps_to_live != None and l2_weight_threshold > 0:
-      raise ValueError("step_to_live and l2_weight_threshold can't be enabled at same time.")
-  return get_variable_scope().get_embedding_variable(
-      _get_default_variable_store(), name, shape=embedding_dim, dtype=value_dtype,
-      initializer=initializer, regularizer=regularizer, trainable=trainable,
-      collections=collections, caching_device=caching_device,
-      partitioner=partitioner, validate_shape=validate_shape,
-      use_resource=True, custom_getter=custom_getter,
-      constraint=constraint, invalid_key=invalid_key,
-      evconfig=variables.EmbeddingVariableConfig(
-        steps_to_live=steps_to_live,init_data_source=init_data_source,ht_type=ev_option.ht_type,
-        l2_weight_threshold=l2_weight_threshold,
-        filter_strategy=ev_option.filter_strategy,
-        storage_type = ev_option.storage_option.storage_type,
-        storage_path = ev_option.storage_option.storage_path,
-        storage_size = ev_option.storage_option.storage_size,
-        default_value_dim=ev_option.init.default_value_dim),
-        ht_partition_num=ev_option.ht_partition_num)
-
-
-
-#@tf_export(v1=["get_embedding_variable"])
-def get_embedding_variable_internal(name,
-                           embedding_dim,
-                           key_dtype=dtypes.int64,
-                           value_dtype=None,
-                           initializer=None,
-                           regularizer=None,
-                           trainable=True,
-                           collections=None,
-                           caching_device=None,
-                           partitioner=None,
-                           validate_shape=True,
-                           custom_getter=None,
-                           constraint=None,
-                           steps_to_live=None,
-                           init_data_source=None,
-                           ev_option = variables.EmbeddingVariableOption()):
-  if key_dtype == dtypes.int64:
-    invalid_key = 9223372036854775807
-  elif key_dtype == dtypes.int32:
-    invalid_key = -1
-  elif key_dtype == dtypes.string:
-    invalid_key = ""
-  else:
-    raise ValueError("Not support key_dtype: %s, only support int64/int32/string" % key_dtype)
-  l2_weight_threshold = -1.0
-  if initializer is None and ev_option.init.initializer is None:
-    initializer = init_ops.truncated_normal_initializer()
-  elif ev_option.init.initializer is not None:
-    if initializer is not None:
-      logging.warning("Use initializer in InitializerOption.")
-    initializer = ev_option.init.initializer
-  if ev_option.evict != None:
-    if isinstance(ev_option.evict, variables.GlobalStepEvict):
-      if steps_to_live != None:
-        logging.warning("Warning: steps_to_live is double set, the steps_to_live in EvcitConfig is valid")
-      steps_to_live = ev_option.evict.steps_to_live
-    elif isinstance(ev_option.evict, variables.L2WeightEvict):
-      l2_weight_threshold = ev_option.evict.l2_weight_threshold
-  else:
-    l2_weight_threshold = -1.0
-  if steps_to_live != None and l2_weight_threshold > 0:
-      raise ValueError("step_to_live and l2_weight_threshold can't be enabled at same time.")
-  return get_variable_scope().get_embedding_variable(
-      _get_default_variable_store(), name, shape=embedding_dim, dtype=value_dtype,
-      initializer=initializer, regularizer=regularizer, trainable=trainable,
-      collections=collections, caching_device=caching_device,
-      partitioner=partitioner, validate_shape=validate_shape,
-      use_resource=True, custom_getter=custom_getter,
-      constraint=constraint, invalid_key=invalid_key,
-      evconfig=variables.EmbeddingVariableConfig(
-        steps_to_live=steps_to_live, init_data_source=init_data_source,
-        ht_type=ev_option.ht_type,
-        l2_weight_threshold=l2_weight_threshold,
-        filter_strategy=ev_option.filter_strategy,
-        storage_type=ev_option.storage_option.storage_type,
-        storage_path=ev_option.storage_option.storage_path,
-        storage_size=ev_option.storage_option.storage_size,
-        default_value_dim=ev_option.init.default_value_dim),
-      ht_partition_num=ev_option.ht_partition_num)
-
-
-#@tf_export(v1=["get_embedding_variable_v2"])
-def get_embedding_variable_v2_internal(name,
-                           embedding_dim,
-                           key_dtype=dtypes.int64,
-                           value_dtype=None,
-                           initializer=None,
-                           regularizer=None,
-                           trainable=True,
-                           collections=None,
-                           caching_device=None,
-                           partitioner=None,
-                           validate_shape=True,
-                           custom_getter=None,
-                           constraint=None,
-                           evconfig=variables.EmbeddingVariableConfig(),
-                           ht_partition_num=1000):
-  if key_dtype == dtypes.int64:
-    invalid_key = 9223372036854775807
-  elif key_dtype == dtypes.int32:
-    invalid_key = -1
-  elif key_dtype == dtypes.string:
-    invalid_key = ""
-  else:
-    raise ValueError("Not support key_dtype: %s, only support int64/int32/string" % key_dtype)
-  if initializer is None:
-    initializer = init_ops.truncated_normal_initializer()
-  return get_variable_scope().get_embedding_variable(
-      _get_default_variable_store(), name, shape=embedding_dim, dtype=value_dtype,
-      initializer=initializer, regularizer=regularizer, trainable=trainable,
-      collections=collections, caching_device=caching_device,
-      partitioner=partitioner, validate_shape=validate_shape,
-      use_resource=True, custom_getter=custom_getter,
-      constraint=constraint, invalid_key=invalid_key,
-      evconfig=evconfig,
-      ht_partition_num=ht_partition_num)
-
-
-@tf_export(v1=["get_multihash_variable"])
-def get_multihash_variable(name,
-                           dims,
-                           complementary_strategy="Q-R",
-                           operation="add",
-                           dtype=float,
-                           initializer=None,
-                           regularizer=None,
-                           trainable=None,
-                           collections=None,
-                           caching_device=None,
-                           partitioner=None,
-                           validate_shape=True,
-                           use_resource = None,
-                           custom_getter=None,
-                           constraint=None,
-                           synchronization=VariableSynchronization.AUTO,
-                           aggregation=VariableAggregation.NONE):
-  strategy_list = ["Q-R"]
-  op_list = ["add", "mul", "concat"]
-  num_of_partitions = len(dims)
-  if complementary_strategy not in strategy_list:
-    raise ValueError("The strategy %s is not supported" % complementary_strategy)
-  if operation not in op_list: 
-    raise ValueError("The operation %s is not supported" % operation)
-  if initializer is None:
-    initializer = init_ops.truncated_normal_initializer()
-  if complementary_strategy == 'Q-R':
-    if num_of_partitions != 2:
-      raise ValueError("the num_of_partitions must be 2 when using Q-R strategy.")
-    val_Q = get_variable_scope().get_variable(
-            _get_default_variable_store(), name +'/multhash_Q',
-            shape=dims[0], dtype=dtype,
-            initializer=initializer, regularizer=regularizer, trainable=trainable,
-            collections=collections, caching_device=caching_device,
-            partitioner=partitioner, validate_shape=validate_shape,
-            use_resource=use_resource, custom_getter=custom_getter,
-            constraint=constraint,synchronization=synchronization,
-            aggregation=aggregation)
-    val_R = get_variable_scope().get_variable(
-            _get_default_variable_store(), name +'/multhash_R',
-            shape=dims[1], dtype=dtype,
-            initializer=initializer, regularizer=regularizer, trainable=trainable,
-            collections=collections, caching_device=caching_device,
-            partitioner=partitioner, validate_shape=validate_shape,
-            use_resource=use_resource, custom_getter=custom_getter,
-            constraint=constraint,synchronization=synchronization,
-            aggregation=aggregation)
-    mhv = kv_variable_ops.MultiHashVariable(name, [val_Q, val_R],
-                                            variables.MultihashOption(num_of_partitions,
-                                                                      complementary_strategy,
-                                                                      operation,
-                                                                      dims))
-    return mhv
-  
-
-@tf_export(v1=["get_dynamic_dimension_embedding_variable"])
-def get_dynamic_dimension_embedding_variable(name,
-                          embedding_block_dimension,
-                          embedding_block_num,
-                          key_dtype=dtypes.int64,
-                          value_dtype=None,
-                          initializer=None,
-                          regularizer=None,
-                          trainable=True,
-                          collections=None,
-                          caching_device=None,
-                          partitioner=None,
-                          validate_shape=True,
-                          custom_getter=None,
-                          constraint=None,
-                          steps_to_live=None,
-                          init_data_source=None,
-                          ht_partition_num=1000,
-                          storage_type=None):
-  if key_dtype == dtypes.int64:
-    invalid_key = 9223372036854775807
-  elif key_dtype == dtypes.int32:
-    invalid_key = -1
-  elif key_dtype == dtypes.string:
-    invalid_key = ""
-  else:
-    raise ValueError("Not support key_dtype: %s, only support int64/int32/string" % key_dtype)
-  if initializer is None:
-    initializer = init_ops.truncated_normal_initializer()
-  return get_variable_scope().get_dynamic_dimension_embedding_variable(
-      _get_default_variable_store(), name, shape=embedding_block_dimension, 
-      embedding_block_num = embedding_block_num,
-      dtype=value_dtype,
-      initializer=initializer, regularizer=regularizer, trainable=trainable,
-      collections=collections, caching_device=caching_device,
-      partitioner=partitioner, validate_shape=validate_shape,
-      use_resource=True, custom_getter=custom_getter,
-      constraint=constraint, invalid_key=invalid_key,
-      evconfig=variables.EmbeddingVariableConfig(
-        steps_to_live=steps_to_live, init_data_source=init_data_source,
-        storage_type=storage_type),
-      ht_partition_num=ht_partition_num)
 
 def _get_partitioned_variable(name,
                               shape=None,
@@ -2953,76 +2201,6 @@ class variable_scope(object):
                       "while get {}".format(auxiliary_name_scope))
     self._auxiliary_name_scope = auxiliary_name_scope
 
-  def _get_custom_getter(self, dtype):
-    """Returns a custom getter that this class's methods must be called under.
-
-    All methods of this class must be called under a variable scope that was
-    passed this custom getter. Example:
-
-    ```python
-    network = ConvNetBuilder(...)
-    with tf.compat.v1.variable_scope('cg',
-                                    custom_getter=network.get_custom_getter()):
-      network.conv(...)
-      # Call more methods of network here
-    ```
-
-    Currently, this custom getter only does anything if self.use_tf_layers is
-    True. In that case, it causes variables to be stored as dtype
-    self.variable_type, then casted to the requested dtype, instead of directly
-    storing the variable as the requested dtype.
-    """
-
-    def inner_custom_getter(getter, *args, **kwargs):
-      """Custom getter that forces variables to have type self.variable_type."""
-      cast_to_bfloat16 = False
-      requested_dtype = kwargs['dtype']
-      if requested_dtype == dtypes.bfloat16:
-        # Only change the variable dtype if doing so does not decrease variable
-        # precision.
-        kwargs['dtype'] = dtype
-        cast_to_bfloat16 = True
-      var = getter(*args, **kwargs)
-      # This if statement is needed to guard the cast, because batch norm
-      # assigns directly to the return value of this custom getter. The cast
-      # makes the return value not a variable so it cannot be assigned. Batch
-      # norm variables are always in fp32 so this if statement is never
-      # triggered for them.
-      if cast_to_bfloat16:
-        index = var.name.rfind(':')
-        if index != -1: # found
-          cast_name = var.name[:index] + '/cast'
-          var = math_ops.cast(var, dtypes.bfloat16, name=cast_name)
-        else:
-          var = math_ops.cast(var, dtypes.bfloat16)
-      return var
-
-    return inner_custom_getter
-
-  def keep_weights(self, dtype=dtypes.float32):
-    """Scope class for bfloat16 variables so that the model uses custom getter.
-
-    This enables variables to be read as bfloat16 type when using get_variable.
-
-    ```python
-    import tensorflow as tf
-    from tensorflow.contrib import layers
-
-    with tf.variable_scope(...).keep_weights(dtype=tf.float32):
-      data_bf16 = tf.cast(data, dtype=tf.bfloat16)
-
-      matmul_0 = tf.layers.dense(data_bf16, 64, activation=tf.nn.relu)
-      matmul_0 = tf.layers.batch_normalization(matmul_0, training=True)
-      matmul_0 = tf.cast(matmul_0, dtype=tf.float32)
-
-      matmul_1 = layers.fully_connected(data_bf16, 128,
-                                        activation_fn=tf.nn.leaky_relu)
-      matmul_1 = tf.cast(matmul_1, dtype=tf.float32)
-    ```
-    """
-    self._custom_getter = self._get_custom_getter(dtype=dtype)
-    return self
-
   def __enter__(self):
     # If the default graph is building a function, then we should not replace it
     # with the cached graph.
@@ -3293,7 +2471,6 @@ def default_variable_creator(next_creator=None, **kwargs):
   name = kwargs.get("name", None)
   variable_def = kwargs.get("variable_def", None)
   dtype = kwargs.get("dtype", None)
-  embedding_block_num=kwargs.get("embedding_block_num", None),
   expected_shape = kwargs.get("expected_shape", None)
   import_scope = kwargs.get("import_scope", None)
   constraint = kwargs.get("constraint", None)
@@ -3301,17 +2478,13 @@ def default_variable_creator(next_creator=None, **kwargs):
   synchronization = kwargs.get("synchronization", None)
   aggregation = kwargs.get("aggregation", None)
   shape = kwargs.get("shape", None)
-  invalid_key = kwargs.get("invalid_key", None)
-  evconfig = kwargs.get("evconfig", None)
-  initializer = kwargs.get("embedding_initializer", None)
-  ht_partition_num = kwargs.get("ht_partition_num", None)
 
   if use_resource is None:
     use_resource = get_variable_scope().use_resource
   if use_resource is None:
     use_resource = _DEFAULT_USE_RESOURCE
   use_resource = use_resource or context.executing_eagerly()
-  if use_resource and invalid_key is None:
+  if use_resource:
     distribute_strategy = kwargs.get("distribute_strategy", None)
     return resource_variable_ops.ResourceVariable(
         initial_value=initial_value,
@@ -3328,57 +2501,6 @@ def default_variable_creator(next_creator=None, **kwargs):
         synchronization=synchronization,
         aggregation=aggregation,
         shape=shape)
-  elif use_resource and invalid_key is not None:
-    emb_blocknum = embedding_block_num[0]
-    if emb_blocknum is None: 
-      ev = kv_variable_ops.EmbeddingVariable(
-          initial_value=initial_value, trainable=trainable,
-          collections=collections, validate_shape=validate_shape,
-          caching_device=caching_device, name=name, dtype=dtype,
-          constraint=constraint, variable_def=variable_def,
-          import_scope=import_scope, invalid_key=invalid_key,
-          evconfig=evconfig,
-          initializer=initializer, ht_partition_num=ht_partition_num)
-      if evconfig.init_data_source is not None:
-        ev.set_init_data_source_initializer(evconfig.init_data_source)
-      return ev
-    else:
-      evconfig.block_num = emb_blocknum 
-      evlist = []
-      block_evconfig = copy.copy(evconfig)
-      block_evconfig.handle_name = name
-      block_evconfig.emb_index = 0
-      primary_ev = kv_variable_ops.EmbeddingVariable(
-        initial_value=initial_value, trainable=trainable,
-        collections=collections, validate_shape=validate_shape,
-        caching_device=caching_device, name=name + "/block0", dtype=dtype,
-        constraint=constraint, variable_def=variable_def,
-        import_scope=import_scope, invalid_key=invalid_key,
-        evconfig=block_evconfig,
-        initializer=initializer, ht_partition_num=ht_partition_num)
-      if evconfig.init_data_source is not None:
-        primary_ev.set_init_data_source_initializer(evconfig.init_data_source)
-      evlist.append(primary_ev)
-      block_evconfig.primary = primary_ev
-      with ops.colocate_with(primary_ev):
-        block_evconfig.handle_name = primary_ev._block_handle_name
-        for i in range(emb_blocknum - 1):
-          slave_evconfig = copy.copy(block_evconfig)
-          slave_evconfig.emb_index = i + 1
-          slave_evconfig._slot_num = primary_ev._slot_num
-          slave_ev = kv_variable_ops.EmbeddingVariable(
-            initial_value=initial_value, trainable=trainable,
-            collections=collections, validate_shape=validate_shape,
-            caching_device=caching_device, name=name + "/block" + str(i + 1), dtype=dtype,
-            constraint=constraint, variable_def=variable_def,
-            import_scope=import_scope, invalid_key=invalid_key,
-            evconfig=slave_evconfig,
-            initializer=initializer, ht_partition_num=ht_partition_num)
-          if evconfig.init_data_source is not None:
-            slave_ev._set_init_data_source_initializer(evconfig.init_data_source)
-          evlist.append(slave_ev)
-        dyn_ev =  kv_variable_ops.DynamicEmbeddingVariable(name, evlist)
-        return dyn_ev
   else:
     return variables.RefVariable(
         initial_value=initial_value,

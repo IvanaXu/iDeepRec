@@ -88,14 +88,12 @@ def _GetMatMulTest(a_np_, b_np_, use_static_shape_, **kwargs_):
       if use_static_shape_:
         a = constant_op.constant(effective_a_np)
         b = constant_op.constant(effective_b_np)
-        with ops.device("/cpu:0"):
-          res = math_ops.matmul(a, b, **kwargs_)
+        res = math_ops.matmul(a, b, **kwargs_)
         tf_val = self.evaluate(res)
       else:
         a = array_ops.placeholder(a_np_.dtype)
         b = array_ops.placeholder(b_np_.dtype)
-        with ops.device("/cpu:0"):
-          res = math_ops.matmul(a, b, **kwargs_)
+        res = math_ops.matmul(a, b, **kwargs_)
         tf_val = sess.run(res, feed_dict={a: effective_a_np, b: effective_b_np})
 
     self.assertAllCloseAccordingToType(

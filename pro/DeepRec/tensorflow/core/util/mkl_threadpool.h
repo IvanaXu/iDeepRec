@@ -26,15 +26,14 @@ limitations under the License.
 #include <vector>
 
 #include "dnnl_threadpool.hpp"
-#include "dnnl.hpp"
+#include "mkldnn.hpp"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/lib/core/threadpool.h"
 #define EIGEN_USE_THREADS
+#ifdef ENABLE_MKLDNN_THREADPOOL
+using dnnl::threadpool_interop::threadpool_iface;
 
 namespace tensorflow {
-
-#ifdef ENABLE_DNNL_THREADPOOL
-using dnnl::threadpool_interop::threadpool_iface;
 
 // Divide 'n' units of work equally among 'teams' threads. If 'n' is not
 // divisible by 'teams' and has a remainder 'r', the first 'r' teams have one
@@ -66,37 +65,9 @@ struct MklDnnThreadPool : public threadpool_iface {
   MklDnnThreadPool(OpKernelContext* ctx)
       : eigen_interface_(ctx->device()
                              ->tensorflow_cpu_worker_threads()
-                             ->workers->AsEigenThreadPool()) {
-    // Set MKL intra thread pool number.
-    int intra_num = 0;
-    const char* intra_num_str = getenv("TF_MKL_NUM_INTRAOP");
-    const int tf_intra_num = eigen_interface_->NumThreads();
-
-    if (intra_num_str != NULL) {
-      intra_num = std::stoi(intra_num_str);
-    }
-    intra_num_ =
-        intra_num > 0 ? std::min(tf_intra_num, intra_num) : tf_intra_num;
-  }
-
-  MklDnnThreadPool(OpKernelContext* ctx, int user_intra_num)
-      : eigen_interface_(ctx->device()
-                             ->tensorflow_cpu_worker_threads()
-                             ->workers->AsEigenThreadPool()),
-        intra_num_(user_intra_num) {
-    // Set MKL intra thread pool number.
-    int intra_num = 0;
-    const char* intra_num_str = getenv("TF_MKL_NUM_INTRAOP");
-
-    if (intra_num_str != NULL) {
-      intra_num = std::stoi(intra_num_str);
-    }
-    intra_num_ =
-        intra_num > 0 ? std::min(user_intra_num, intra_num) : user_intra_num;
-  }
-
+                             ->workers->AsEigenThreadPool()) {}
   virtual int get_num_threads() const override {
-    return intra_num_;
+    return eigen_interface_->NumThreads();
   }
   virtual bool get_in_parallel() const override {
     return (eigen_interface_->CurrentThreadId() != -1) ? true : false;
@@ -134,20 +105,41 @@ struct MklDnnThreadPool : public threadpool_iface {
 
  private:
   Eigen::ThreadPoolInterface* eigen_interface_ = nullptr;
-  int intra_num_ = 0;
 };
 
-#else
+class MklDnnThreadPoolWrapper {
+ public:
+  static MklDnnThreadPoolWrapper& GetInstance() {
+    static MklDnnThreadPoolWrapper instance_;
+    return instance_;
+  }
+  MklDnnThreadPool* CreateThreadPoolPtr(OpKernelContext* ctx) {
+    mutex_lock l(m_);
+    if (threadpool_map_.empty() ||
+        threadpool_map_.find(ctx->device()) == threadpool_map_.end()) {
+      auto tp_iface = new MklDnnThreadPool(ctx);
+      threadpool_map_.emplace(std::make_pair(ctx->device(), tp_iface));
+      return tp_iface;
+    } else {
+      auto entry = threadpool_map_.find(ctx->device());
+      return entry->second;
+    }
+  }
 
-// This struct was just added to enable successful OMP-based build.
-struct MklDnnThreadPool {
-  MklDnnThreadPool() = default;
-  MklDnnThreadPool(OpKernelContext* ctx) {}
+ private:
+  mutex m_;
+  std::unordered_map<DeviceBase*, MklDnnThreadPool*> threadpool_map_;
+  MklDnnThreadPoolWrapper() {}
+  MklDnnThreadPoolWrapper(const MklDnnThreadPoolWrapper&) = delete;
+  MklDnnThreadPoolWrapper& operator=(const MklDnnThreadPoolWrapper&) = delete;
+  ~MklDnnThreadPoolWrapper() {
+    for (auto& tp : threadpool_map_) {
+      delete tp.second;
+    }
+  }
 };
-
-#endif  // ENABLE_DNNL_THREADPOOL
 
 }  // namespace tensorflow
-
+#endif  // ENABLE_MKLDNN_THREADPOOL
 #endif  // INTEL_MKL
 #endif  // TENSORFLOW_CORE_UTIL_MKL_THREADPOOL_H_

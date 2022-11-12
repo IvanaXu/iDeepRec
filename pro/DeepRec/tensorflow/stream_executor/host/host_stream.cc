@@ -24,20 +24,9 @@ limitations under the License.
 namespace stream_executor {
 namespace host {
 
-namespace {
-
-port::ThreadOptions GetThreadOptions(size_t stack_size_in_bytes) {
-  port::ThreadOptions options;
-  options.stack_size = stack_size_in_bytes;
-  return options;
-}
-
-}  // namespace
-
-HostStream::HostStream(size_t stack_size_in_bytes)
+HostStream::HostStream()
     : thread_(port::Env::Default()->StartThread(
-          GetThreadOptions(stack_size_in_bytes), "host_executor",
-          [this]() { WorkLoop(); })) {}
+          port::ThreadOptions(), "host_executor", [this]() { WorkLoop(); })) {}
 
 HostStream::~HostStream() {
   {

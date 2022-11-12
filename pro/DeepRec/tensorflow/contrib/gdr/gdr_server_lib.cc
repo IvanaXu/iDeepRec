@@ -140,12 +140,6 @@ class GdrServerFactory : public ServerFactory {
 class GdrServerRegistrar {
  public:
   GdrServerRegistrar() {
-    gpr_allocation_functions alloc_fns;
-    memset(&alloc_fns, 0, sizeof(alloc_fns));
-    alloc_fns.malloc_fn = port::Malloc;
-    alloc_fns.realloc_fn = port::Realloc;
-    alloc_fns.free_fn = port::Free;
-    gpr_set_allocation_functions(alloc_fns);
     ServerFactory::Register("GDR_SERVER", new GdrServerFactory());
   }
 };

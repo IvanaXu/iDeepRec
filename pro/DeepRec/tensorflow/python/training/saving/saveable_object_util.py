@@ -21,11 +21,8 @@ import six
 
 from tensorflow.python.eager import context
 from tensorflow.python.framework import device as pydev
-from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import gen_kv_variable_ops
-from tensorflow.python.ops import kv_variable_ops
 from tensorflow.python.ops import resource_variable_ops
 from tensorflow.python.ops import state_ops
 from tensorflow.python.ops import variables
@@ -61,13 +58,9 @@ def set_cpu0(device_string):
 class ReferenceVariableSaveable(saveable_object.SaveableObject):
   """SaveableObject implementation that handles reference variables."""
 
-  def __init__(self, var, slice_spec, name, full_name=None):
+  def __init__(self, var, slice_spec, name):
     spec = saveable_object.SaveSpec(var, slice_spec, name, dtype=var.dtype)
     super(ReferenceVariableSaveable, self).__init__(var, [spec], name)
-    self._full_name = full_name
-    variable = ops.get_default_graph().get_variale_by_name(full_name or name)
-    if variable is not None:
-      self.is_sparse = variable._is_sparse
 
   def restore(self, restored_tensors, restored_shapes):
     restored_tensor = restored_tensors[0]
@@ -80,27 +73,10 @@ class ReferenceVariableSaveable(saveable_object.SaveableObject):
         self.op.get_shape().is_fully_defined())
 
 
-class CoalescedVariableSaveable(saveable_object.SaveableObject):
-  """SaveableObject implementation that handles CoalescedVariables."""
-
-  def __init__(self, var, save_info, name, full_name=None):
-    specs = []
-    for info, ts in zip(save_info.save_slices, save_info.tensor_slices):
-      specs.append(saveable_object.SaveSpec(
-          var[ts], info.spec, info.full_name, dtype=var.dtype))
-    super(CoalescedVariableSaveable, self).__init__(
-        var, specs, name)
-    self._full_name = full_name
-
-  def restore(self, restored_tensors, restored_shapes):
-    restored_tensor = array_ops.concat(restored_tensors, axis=0)
-    return state_ops.assign(self.op, restored_tensor)
-
-
 class ResourceVariableSaveable(saveable_object.SaveableObject):
   """SaveableObject implementation that handles ResourceVariables."""
 
-  def __init__(self, var, slice_spec, name, full_name=None):
+  def __init__(self, var, slice_spec, name):
     self._var_device = var.device
     self._var_shape = var.shape
     if isinstance(var, ops.Tensor):
@@ -127,10 +103,6 @@ class ResourceVariableSaveable(saveable_object.SaveableObject):
     spec = saveable_object.SaveSpec(tensor, slice_spec, name,
                                     dtype=var.dtype, device=var.device)
     super(ResourceVariableSaveable, self).__init__(var, [spec], name)
-    self._full_name = full_name
-    variable = ops.get_default_graph().get_variale_by_name(full_name or name)
-    if variable is not None:
-      self.is_sparse = variable._is_sparse
 
   def restore(self, restored_tensors, restored_shapes):
     restored_tensor = restored_tensors[0]
@@ -141,93 +113,6 @@ class ResourceVariableSaveable(saveable_object.SaveableObject):
       restored_tensor = array_ops.identity(restored_tensor)
       return resource_variable_ops.shape_safe_assign_variable_handle(
           self.handle_op, self._var_shape, restored_tensor)
-
-
-class EmbeddingVariableSaveable(saveable_object.SaveableObject):
-  """SaveableObject implementation that handles EmbeddingVariables."""
-  def __init__(self, var, name):
-    self.handle_op = var.handle
-    self.invalid_key = var.invalid_key
-    self.dtype = var._dtype
-    self.key_type = var._invalid_key_type
-    self.steps_to_live = var.steps_to_live
-    self.ht_type = var._ht_type
-    self.ht_partition_num= var._ht_partition_num
-    name = var._shared_name
-    self.var = var
-    is_partitioned_ev = not isinstance(self.var._save_slice_info, str)
-    self.partition_id = 0
-    self.partition_num = 1
-    if self.var._save_slice_info is not None:
-      self.partition_id = self.var._save_slice_info.var_offset[0] if is_partitioned_ev else 0
-      self.partition_num = self.var._save_slice_info.full_shape[0] if is_partitioned_ev else 1
-
-    def _read_variable_closure(v):
-      def f():
-        with ops.device(v.device):
-          x = v.read_value()
-          return array_ops.identity(x)
-      return f
-    #unused_tensor = _read_variable_closure(var)
-    unused_tensor = var.handle
-
-    specs = []
-    specs.append(saveable_object.SaveSpec(unused_tensor, "", name + "-keys", dtype=self.key_type, device=var.device))
-    specs.append(saveable_object.SaveSpec(unused_tensor, "", name + "-values", dtype=dtypes.float32, device=var.device))
-    specs.append(saveable_object.SaveSpec(unused_tensor, "", name + "-versions", dtype=dtypes.int64, device=var.device))
-    specs.append(saveable_object.SaveSpec(unused_tensor, "", name + "-freqs", dtype=dtypes.int64, device=var.device))
-    # pylint: disable=protected-access
-    super(EmbeddingVariableSaveable, self).__init__(var, specs, name)
-    self.is_sparse = var._is_sparse
-
-  def restore(self, restored_tensors, unused_restored_shapes):
-    # pylint: disable=protected-access
-    name_tensor = ops.convert_to_tensor(self.name)
-    with ops.colocate_with(self.handle_op):
-      handle_name = ops.name_from_scope_name(self.name)
-      is_partitioned_ev = not isinstance(self.var._save_slice_info, str)
-      if self.var._init_data_source is not None:
-        return self.var.recover_from_init_data_source(self.var._init_data_source, self.partition_id, self.partition_num)
-      else:
-        rank = self.op.initial_value.get_shape().rank - 1
-        return gen_kv_variable_ops.kv_resource_import_v2(
-            restored_tensors[0],
-            self.handle_op, self.var._primary_handle,
-            variables._try_guard_against_uninitialized_dependencies(self.name, self.op.initial_value),
-            name_tensor,
-            ops.convert_to_tensor(self.invalid_key),
-            slot_num=self.var._slot_num,
-            shape=self.op.initial_value.get_shape()[rank:], steps_to_live=self.steps_to_live,
-            emb_index=self.var._emb_index, slot_index=self.var._slot_index,
-            block_num=self.var.block_num,
-            ht_type=self.ht_type,
-            ht_partition_num=self.ht_partition_num,
-            filter_freq = self.var._filter_freq,
-            max_freq = 99999,
-            l2_weight_threshold = self.var._l2_weight_threshold,
-            max_element_size = self.var._max_element_size,
-            false_positive_probability = self.var._false_positive_probability,
-            counter_type = self.var._counter_type,
-            layout = self.var._layout,
-            storage_type=self.var._storage_type,
-            storage_path=self.var._storage_path,
-            storage_size=self.var._storage_size,
-            partition_id=self.partition_id, partition_num=self.partition_num,
-            default_value_dim=self.var._default_value_dim,
-            record_freq=self.var._record_freq,
-            record_version=self.var._record_version)
-
-  def incr_restore(self, restored_tensors, unused_restored_shapes):
-    # pylint: disable=protected-access
-    name_tensor = ops.convert_to_tensor(self.name)
-    with ops.colocate_with(self.handle_op):
-      handle_name = ops.name_from_scope_name(self.name)
-      return gen_kv_variable_ops.kv_resource_incr_import(
-              restored_tensors[0], self.handle_op, name_tensor,
-              ops.convert_to_tensor(self.invalid_key),
-              variables._try_guard_against_uninitialized_dependencies(self.name, self.op.initial_value),
-              partition_id=self.partition_id, partition_num=self.partition_num)
-
 
 
 def _tensor_comes_from_variable(v):
@@ -274,17 +159,11 @@ def saveable_objects_for_op(op, name):
             (slice_name, variable._save_slice_info.full_name))
       if variable.op.type in ["Variable", "VariableV2",
                               "AutoReloadVariable"]:
-        if isinstance(variable._save_slice_info, variables.Variable.SaveSliceInfo):
-          yield ReferenceVariableSaveable(
-              variable, variable._save_slice_info.spec, name, variable._save_slice_info.var_full_name)
-        else:
-          yield CoalescedVariableSaveable(
-              variable, variable._save_slice_info, name)
-      elif isinstance(variable, kv_variable_ops.EmbeddingVariable):
-        yield EmbeddingVariableSaveable(variable, name)
+        yield ReferenceVariableSaveable(
+            variable, variable._save_slice_info.spec, name)
       else:
         yield ResourceVariableSaveable(
-            variable, variable._save_slice_info.spec, name, variable._save_slice_info.var_full_name)
+            variable, variable._save_slice_info.spec, name)
     # pylint: enable=protected-access
   elif isinstance(op, trackable.Trackable) and not isinstance(
       op, variables.Variable):
@@ -299,8 +178,6 @@ def saveable_objects_for_op(op, name):
       for op in saveable_objects_for_op(op, op.name):
         yield op
     # pylint: enable=protected-access
-  elif isinstance(op, kv_variable_ops.EmbeddingVariable):
-    yield EmbeddingVariableSaveable(op, name)
   else:
     # A variable or tensor.
     if isinstance(op, resource_variable_ops.BaseResourceVariable):
@@ -323,7 +200,7 @@ def saveable_objects_for_op(op, name):
                         variable)
       if variable.op.type in ["Variable", "VariableV2",
                               "AutoReloadVariable"]:
-        yield ReferenceVariableSaveable(variable, "", name, variable.op.name)
+        yield ReferenceVariableSaveable(variable, "", name)
       else:
         yield ResourceVariableSaveable(
             variable, "", name)
@@ -382,8 +259,6 @@ def op_list_to_dict(op_list, convert_variable_to_tensor=True):
           for factory in var._gather_saveables_for_checkpoint().values()]
       names_to_saveables.update(
           op_list_to_dict(trackable_saveables))
-    elif isinstance(var, kv_variable_ops.EmbeddingVariable):
-      names_to_saveables[var.op.name] = var
     else:
       # Variables (reference and resource) have an _in_graph_mode property
       # indicating whether they were created in a graph building context. We
@@ -465,11 +340,6 @@ def validate_and_slice_inputs(names_to_saveables):
   for name, op in sorted(names_to_saveables.items(),
                          # Avoid comparing ops, sort only by name.
                          key=lambda x: x[0]):
-    from tensorflow.python.ops import hash_table
-    if isinstance(name, hash_table.HashTable):
-      from tensorflow.python.training import saver
-      _add_saveable(saveables, seen_ops, saver.HashTableSaveable(op[1], op[0]))
-    else:
-      for converted_saveable_object in saveable_objects_for_op(op, name):
-        _add_saveable(saveables, seen_ops, converted_saveable_object)
+    for converted_saveable_object in saveable_objects_for_op(op, name):
+      _add_saveable(saveables, seen_ops, converted_saveable_object)
   return saveables

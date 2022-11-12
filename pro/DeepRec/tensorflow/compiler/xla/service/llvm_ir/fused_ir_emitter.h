@@ -28,6 +28,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/elemental_ir_emitter.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/llvm_ir/ir_array.h"
+#include "tensorflow/compiler/xla/service/llvm_ir/kernel_tiling.h"
 #include "tensorflow/compiler/xla/service/llvm_ir/loop_emitter.h"
 #include "tensorflow/compiler/xla/statusor.h"
 #include "tensorflow/compiler/xla/xla_data.pb.h"
@@ -51,7 +52,7 @@ namespace xla {
 // created produces an LLVM struct with N elements, one for each element of the
 // arrays in the tuple.  It follows that the arrays in the tuple must have the
 // same length.
-class FusedIrEmitter : public ConstDfsHloVisitorWithDefault {
+class FusedIrEmitter : public DfsHloVisitorWithDefault {
  public:
   using IndexedGenerator = llvm_ir::ElementGenerator;
   using NonIndexedGenerator = std::function<StatusOr<llvm::Value*>()>;
@@ -60,32 +61,31 @@ class FusedIrEmitter : public ConstDfsHloVisitorWithDefault {
 
   FusedIrEmitter(GeneratorForOperandIrArrays operand_arrays_generator,
                  ElementalIrEmitter* elemental_emitter,
-                 llvm::Value* thread_id_x = nullptr,
-                 llvm::Value* thread_id_y = nullptr,
+                 llvm::Value* tile_param_x = nullptr,
+                 llvm::Value* tile_param_y = nullptr,
                  absl::Span<llvm::Value* const> param_shmem_buffers = {})
       : operand_arrays_(),
         operand_arrays_generator_(std::move(operand_arrays_generator)),
-        thread_id_x_(thread_id_x),
-        thread_id_y_(thread_id_y),
+        tile_param_x_(tile_param_x),
+        tile_param_y_(tile_param_y),
         param_shmem_buffers_(param_shmem_buffers.begin(),
                              param_shmem_buffers.end()),
         elemental_emitter_(elemental_emitter),
         b_(elemental_emitter->b()),
         module_(elemental_emitter->module()) {}
 
-  Status DefaultAction(const HloInstruction* hlo) override;
+  Status DefaultAction(HloInstruction* hlo) override;
 
-  Status HandleConstant(const HloInstruction* constant) override;
+  Status HandleConstant(HloInstruction* constant) override;
 
-  Status HandleGetTupleElement(
-      const HloInstruction* get_tuple_element) override;
+  Status HandleGetTupleElement(HloInstruction* get_tuple_element) override;
 
-  Status HandleParameter(const HloInstruction* parameter) override;
+  Status HandleParameter(HloInstruction* parameter) override;
 
   // Emits the ir value for each element in the tuple.
-  Status HandleTuple(const HloInstruction* tuple) override;
+  Status HandleTuple(HloInstruction* tuple) override;
 
-  Status FinishVisit(const HloInstruction* root) override;
+  Status FinishVisit(HloInstruction* root) override;
 
   // Returns the generator function for the root of the fused computation.
   IndexedGenerator GetRootGenerator() const;
@@ -121,10 +121,10 @@ class FusedIrEmitter : public ConstDfsHloVisitorWithDefault {
   GeneratorForOperandIrArrays operand_arrays_generator_;
 
   // The x coordinate within a tile.
-  llvm::Value* thread_id_x_;
+  llvm::Value* tile_param_x_;
 
   // The y coordinate within a tile.
-  llvm::Value* thread_id_y_;
+  llvm::Value* tile_param_y_;
 
   // Param_buffers_[i] stores the tile buffer for the ith parameter or nullptr
   // if the parameter is not tiled.

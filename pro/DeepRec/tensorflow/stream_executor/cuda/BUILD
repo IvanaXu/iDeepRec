@@ -88,7 +88,7 @@ cc_library(
 cc_library(
     name = "cuda_stub",
     srcs = if_cuda_is_configured(["cuda_stub.cc"]),
-    textual_hdrs = glob(["cuda_*.inc"]),
+    textual_hdrs = ["cuda_10_0.inc"],
     deps = if_cuda_is_configured([
         "@local_config_cuda//cuda:cuda_headers",
         "//tensorflow/stream_executor/lib",
@@ -280,7 +280,6 @@ cc_library(
     textual_hdrs = ["cufft_10_0.inc"],
     deps = if_cuda_is_configured([
         "@local_config_cuda//cuda:cuda_headers",
-        "@local_config_cuda//cuda:cufft_headers",
         "//tensorflow/stream_executor/lib",
         "//tensorflow/stream_executor/platform:dso_loader",
     ]),
@@ -344,7 +343,6 @@ cc_library(
     name = "cudnn_plugin",
     srcs = if_cuda_is_configured(["cuda_dnn.cc"]),
     hdrs = if_cuda_is_configured(["cuda_dnn.h"]),
-    copts = ["-DNV_CUDNN_DISABLE_EXCEPTION"],
     visibility = ["//visibility:public"],
     deps = if_cuda_is_configured([
         ":cuda_activation",
@@ -354,14 +352,12 @@ cc_library(
         ":cuda_platform_id",
         ":cuda_stream",
         ":cuda_timer",
-        ":cuda_helpers",
         ":cudnn_version",
         ":cudnn_lib",
         "@com_google_absl//absl/strings",
         "//third_party/eigen3",
         "@local_config_cuda//cuda:cuda_headers",
         "@local_config_cuda//cuda:cudnn_header",
-        "@cudnn_frontend_archive//:cudnn_frontend",
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
         "//tensorflow/stream_executor:dnn",
@@ -382,7 +378,6 @@ cc_library(
     textual_hdrs = ["curand_10_0.inc"],
     deps = if_cuda_is_configured([
         "@local_config_cuda//cuda:cuda_headers",
-        "@local_config_cuda//cuda:curand_headers",
         "//tensorflow/stream_executor/lib",
         "//tensorflow/stream_executor/platform:dso_loader",
     ]),
@@ -436,12 +431,11 @@ cc_library(
 cc_library(
     name = "cusolver_stub",
     srcs = if_cuda_is_configured(["cusolver_stub.cc"]),
-    textual_hdrs = glob(["cusolver_dense_*.inc"]),
+    textual_hdrs = ["cusolver_dense_10_0.inc"],
     deps = if_cuda_is_configured([
         # LINT.IfChange
         "@local_config_cuda//cuda:cublas_headers",
         # LINT.ThenChange(//tensorflow/copy.bara.sky:cublas_headers)
-        "@local_config_cuda//cuda:cusolver_headers",
         "@local_config_cuda//cuda:cuda_headers",
         "//tensorflow/stream_executor/lib",
         "//tensorflow/stream_executor/platform:dso_loader",
@@ -463,7 +457,6 @@ cc_library(
     textual_hdrs = glob(["cusparse_*.inc"]),
     deps = if_cuda_is_configured([
         "@local_config_cuda//cuda:cuda_headers",
-        "@local_config_cuda//cuda:cusparse_headers",
         "//tensorflow/stream_executor/lib",
         "//tensorflow/stream_executor/platform:dso_loader",
     ]),
@@ -496,8 +489,7 @@ cc_library(
 # TODO(leary) we likely need to canonicalize/eliminate this.
 cc_library(
     name = "cuda_helpers",
-    srcs = if_cuda_is_configured(["cuda_helpers.cc"]),
-    hdrs = if_cuda_is_configured(["cuda_helpers.h"]),
+    textual_hdrs = if_cuda_is_configured(["cuda_helpers.h"]),
     deps = if_cuda_is_configured([
         "//tensorflow/stream_executor/gpu:gpu_helpers_header",
     ]),

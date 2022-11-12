@@ -132,9 +132,6 @@ bool PruneForReverseReachability(Graph* g,
 // Returns true if and only if 'g' is mutated.
 bool FixupSourceAndSinkEdges(Graph* g);
 
-std::unordered_set<const Node*> FindExcludeDuplicationNodes(Graph* g,
-    std::unordered_set<const Node*>& visited);
-
 }  // namespace tensorflow
 
 #endif  // TENSORFLOW_CORE_GRAPH_ALGORITHM_H_

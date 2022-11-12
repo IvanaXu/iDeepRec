@@ -76,9 +76,9 @@ class MklRequantizationRangePerChannelOp : public OpKernel {
     // Find the ranges of each channel in parallel.
     float out_min_max = std::numeric_limits<float>::min();
 
-#ifndef ENABLE_DNNL_THREADPOOL
+#ifndef ENABLE_MKLDNN_THREADPOOL
 #pragma omp parallel for reduction(max : out_min_max)
-#endif  // !ENABLE_DNNL_THREADPOOL
+#endif  // !ENABLE_MKLDNN_THREADPOOL
     // TODO: Add eigen parallel_for
     for (size_t i = 0; i < depth; ++i) {
       Eigen::Tensor<qint32, 0, Eigen::RowMajor> min =

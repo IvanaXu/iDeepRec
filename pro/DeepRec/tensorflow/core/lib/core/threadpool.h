@@ -18,7 +18,6 @@ limitations under the License.
 
 #include <functional>
 #include <memory>
-#include <sched.h>
 
 #include "tensorflow/core/lib/core/threadpool_interface.h"
 #include "tensorflow/core/platform/env.h"
@@ -77,11 +76,8 @@ class ThreadPool {
   // set of threads.
   ~ThreadPool();
 
-  void SetThreadPoolAffinity(const cpu_set_t& cpuset);
-
   // Schedules fn() for execution in the pool of threads.
   void Schedule(std::function<void()> fn);
-  void CostSchedule(std::function<void()> fn, int64 cost);
 
   void SetStealPartitions(
       const std::vector<std::pair<unsigned, unsigned>>& partitions);

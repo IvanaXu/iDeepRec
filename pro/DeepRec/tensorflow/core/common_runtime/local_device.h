@@ -26,7 +26,6 @@ namespace test {
 class Benchmark;
 }
 struct SessionOptions;
-struct DeviceResourceMgrMap;
 
 // This class is shared by ThreadPoolDevice and GPUDevice and
 // initializes a shared Eigen compute device used by both.  This
@@ -36,15 +35,9 @@ class LocalDevice : public Device {
  public:
   LocalDevice(const SessionOptions& options,
               const DeviceAttributes& attributes);
-  LocalDevice(const SessionOptions& options,
-              const DeviceAttributes& attributes,
-              const DeviceResourceMgrMap* dev_rmgr_map);
   ~LocalDevice() override;
 
  private:
-  void Init(const SessionOptions& options,
-            const DeviceAttributes& attributes);
-
   static bool use_global_threadpool_;
 
   static void set_use_global_threadpool(bool use_global_threadpool) {

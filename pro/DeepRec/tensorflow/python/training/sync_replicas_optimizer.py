@@ -157,9 +157,7 @@ class SyncReplicasOptimizer(optimizer.Optimizer):
                variable_averages=None,
                variables_to_average=None,
                use_locking=False,
-               name="sync_replicas",
-               sparse_reduction_type='MEAN',
-               sparse_accumulator_type='multi_map'):
+               name="sync_replicas"):
     """Construct a sync_replicas optimizer.
 
     Args:
@@ -193,8 +191,6 @@ class SyncReplicasOptimizer(optimizer.Optimizer):
     self._gradients_applied = False
     self._variable_averages = variable_averages
     self._variables_to_average = variables_to_average
-    self._sparse_accumulator_type = sparse_accumulator_type
-    self._sparse_reduction_type = sparse_reduction_type
     self._total_num_replicas = total_num_replicas
     self._tokens_per_step = max(total_num_replicas, replicas_to_aggregate)
     self._global_step = None
@@ -299,9 +295,7 @@ class SyncReplicasOptimizer(optimizer.Optimizer):
             if not isinstance(grad, ops.IndexedSlices):
               raise ValueError("Unknown grad type!")
             grad_accum = data_flow_ops.SparseConditionalAccumulator(
-                grad.dtype, shape=(), shared_name=var.name + "/grad_accum",
-                reduction_type=self._sparse_reduction_type,
-                accumulator_type=self._sparse_accumulator_type)
+                grad.dtype, shape=(), shared_name=var.name + "/grad_accum")
             train_ops.append(grad_accum.apply_indexed_slices_grad(
                 grad, local_step=self._local_step))
             aggregated_grad.append(grad_accum.take_indexed_slices_grad(

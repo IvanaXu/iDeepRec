@@ -33,10 +33,8 @@ from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import parsing_ops
-from tensorflow.python.ops import partitioned_variables
 from tensorflow.python.ops import sparse_ops
 from tensorflow.python.ops import variable_scope
-from tensorflow.python.ops import variables
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.util import nest
 
@@ -100,8 +98,7 @@ def _input_from_feature_columns(columns_to_tensors,
                                 scope,
                                 output_rank,
                                 default_name,
-                                cols_to_outs=None,
-                                blocknums=None):
+                                cols_to_outs=None):
   """Implementation of `input_from(_sequence)_feature_columns`."""
   columns_to_tensors = columns_to_tensors.copy()
   check_feature_columns(feature_columns)
@@ -131,26 +128,14 @@ def _input_from_feature_columns(columns_to_tensors,
           # pylint: disable=protected-access
           arguments = column._deep_embedding_lookup_arguments(
               transformed_tensor)
-          if isinstance(column, fc._DynamicDimensionEmbeddingColumn):
-            if arguments.do_fusion:
-              raise ValueError("do_fusion is set but feature column is a _DynamicDimensionEmbeddingColumn."
-                               "Not support yet.")
+          output_tensors.append(
+              fc._embeddings_from_arguments(  # pylint: disable=protected-access
+                  column,
+                  arguments,
+                  weight_collections,
+                  trainable,
+                  output_rank=output_rank))
 
-            output = fc._dynamic_dimension_embeddings_from_arguments(  # pylint: disable=protected-access
-                  column,
-                  arguments,
-                  weight_collections,
-                  trainable,
-                  output_rank=output_rank,
-                  blocknums=blocknums)
-          else:
-            output = fc._embeddings_from_arguments(  # pylint: disable=protected-access
-                  column,
-                  arguments,
-                  weight_collections,
-                  trainable,
-                  output_rank=output_rank)
-          output_tensors.append(output)
         except NotImplementedError as ee:
           try:
             # pylint: disable=protected-access
@@ -172,8 +157,7 @@ def input_from_feature_columns(columns_to_tensors,
                                weight_collections=None,
                                trainable=True,
                                scope=None,
-                               cols_to_outs=None,
-                               blocknums=None):
+                               cols_to_outs=None):
   """A tf.contrib.layers style input layer builder based on FeatureColumns.
 
   Generally a single example in training data is described with feature columns.
@@ -234,8 +218,7 @@ def input_from_feature_columns(columns_to_tensors,
                                      scope,
                                      output_rank=2,
                                      default_name='input_from_feature_columns',
-                                     cols_to_outs=cols_to_outs,
-                                     blocknums=blocknums)
+                                     cols_to_outs=cols_to_outs)
 
 
 @experimental
@@ -304,34 +287,15 @@ def _create_embedding_lookup(column,
   variables: the created embeddings.
   predictions: the computed predictions.
   """
-  partition_num = embedding_lookup_arguments.embedding_var_part_num
-  if partition_num is None:
-    partitioner = None
-  else:
-    partitioner = partitioned_variables.fixed_size_partitioner(partition_num)
   with variable_scope.variable_scope(
       None, default_name=column.name, values=columns_to_tensors.values()):
-    if embedding_lookup_arguments.use_embedding_var:
-      graph = ops.get_default_graph()
-      variable = variable_scope.get_embedding_variable_internal(
-          name="weights",
-          embedding_dim=num_outputs,
-          key_dtype=dtypes.int64,
-          initializer=embedding_lookup_arguments.initializer,
-          trainable=trainable,
-          collections=weight_collections,
-          partitioner=partitioner,
-          steps_to_live=embedding_lookup_arguments.steps_to_live,
-          ev_option=embedding_lookup_arguments.ev_option)
-      graph.add_to_collection(ops.GraphKeys.EMBEDDING_VARIABLES, variable)
-    else:
-      variable = contrib_variables.model_variable(
-          name='weights',
-          shape=[embedding_lookup_arguments.vocab_size, num_outputs],
-          dtype=dtypes.float32,
-          initializer=embedding_lookup_arguments.initializer,
-          trainable=trainable,
-          collections=weight_collections)
+    variable = contrib_variables.model_variable(
+        name='weights',
+        shape=[embedding_lookup_arguments.vocab_size, num_outputs],
+        dtype=dtypes.float32,
+        initializer=embedding_lookup_arguments.initializer,
+        trainable=trainable,
+        collections=weight_collections)
     if fc._is_variable(variable):  # pylint: disable=protected-access
       variable = [variable]
     else:

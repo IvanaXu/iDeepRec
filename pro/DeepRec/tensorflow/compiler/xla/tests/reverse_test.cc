@@ -14,7 +14,6 @@ limitations under the License.
 ==============================================================================*/
 
 #include <memory>
-#include <vector>
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
@@ -40,8 +39,8 @@ static std::array<bool, 1> use_bfloat16_params{false};
 #endif
 
 struct ReverseSpec {
-  std::vector<int64> input_dims;
-  std::vector<int64> reversal;
+  absl::Span<const int64> input_dims;
+  absl::Span<const int64> reversal;
   bool use_bfloat16;
 
   string ToTestCaseName() const {

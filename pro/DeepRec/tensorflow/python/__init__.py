@@ -53,7 +53,6 @@ from tensorflow.core.framework.graph_pb2 import *
 from tensorflow.core.framework.node_def_pb2 import *
 from tensorflow.core.framework.summary_pb2 import *
 from tensorflow.core.framework.attr_value_pb2 import *
-from tensorflow.core.framework.embedding.config_pb2 import StorageType
 from tensorflow.core.protobuf.meta_graph_pb2 import TensorInfo
 from tensorflow.core.protobuf.meta_graph_pb2 import MetaGraphDef
 from tensorflow.core.protobuf.config_pb2 import *
@@ -93,7 +92,6 @@ from tensorflow.python.ops import metrics
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import ragged
 from tensorflow.python.ops import sets
-from tensorflow.python.ops import prefetch
 from tensorflow.python.ops import stateful_random_ops
 from tensorflow.python.ops.distributions import distributions
 from tensorflow.python.ops.linalg import linalg
@@ -144,8 +142,6 @@ from tensorflow.python.eager.remote import connect_to_remote_host
 from tensorflow.python.eager.def_function import function
 from tensorflow.python.framework.ops import enable_eager_execution
 
-from tensorflow.python.ops import hash_table
-
 # Check whether TF2_BEHAVIOR is turned on.
 from tensorflow.python.eager import monitoring as _monitoring
 from tensorflow.python import tf2 as _tf2
@@ -193,8 +189,6 @@ tf_export(v1=['summary.SummaryDescription'])(SummaryDescription)
 tf_export(v1=['SummaryMetadata'])(SummaryMetadata)
 tf_export(v1=['summary.TaggedRunMetadata'])(TaggedRunMetadata)
 tf_export(v1=['TensorInfo'])(TensorInfo)
-tf_export(v1=['StorageType'])(StorageType)
-tf_export(v1=['ExecutorPolicy'])(ExecutorPolicy)
 # pylint: enable=undefined-variable
 
 # Special dunders that we choose to export:

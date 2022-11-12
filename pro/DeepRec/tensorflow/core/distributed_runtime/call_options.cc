@@ -19,8 +19,7 @@ limitations under the License.
 
 namespace tensorflow {
 
-CallOptions::CallOptions()
-  : timeout_in_ms_(0), use_wait_for_ready_(false) {}
+CallOptions::CallOptions() {}
 
 void CallOptions::StartCancel() {
   mutex_lock l(mu_);
@@ -50,16 +49,6 @@ int64 CallOptions::GetTimeout() {
 void CallOptions::SetTimeout(int64 ms) {
   mutex_lock l(mu_);
   timeout_in_ms_ = ms;
-}
-
-bool CallOptions::UseWaitForReady() {
-  mutex_lock l(mu_);
-  return use_wait_for_ready_;
-}
-
-void CallOptions::SetUseWaitForReady(bool wait_for_ready) {
-  mutex_lock l(mu_);
-  use_wait_for_ready_ = wait_for_ready;
 }
 
 }  // end namespace tensorflow

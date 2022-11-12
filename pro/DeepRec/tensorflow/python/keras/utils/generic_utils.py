@@ -338,8 +338,7 @@ class Progbar(object):
     self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
                               sys.stdout.isatty()) or
                              'ipykernel' in sys.modules or
-                             'posix' in sys.modules or
-                             'PYCHARM_HOSTED' in os.environ)
+                             'posix' in sys.modules)
     self._total_width = 0
     self._seen_so_far = 0
     # We use a dict + list to avoid garbage collection

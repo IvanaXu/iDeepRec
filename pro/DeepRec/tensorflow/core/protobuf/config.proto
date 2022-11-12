@@ -15,15 +15,6 @@ import "tensorflow/core/protobuf/cluster.proto";
 import "tensorflow/core/protobuf/debug.proto";
 import "tensorflow/core/protobuf/rewriter_config.proto";
 
-enum ExecutorPolicy {
-  // Tensorflow executor
-  USE_NORMAL_EXECUTOR = 0;
-  // Cost model executor
-  USE_COST_MODEL_EXECUTOR = 1;
-  // Inline executor
-  USE_INLINE_EXECUTOR = 2;
-}
-
 message GPUOptions {
   // Fraction of the available GPU memory to allocate for each process.
   // 1 means to allocate all of the GPU memory, 0.5 means the process
@@ -194,9 +185,6 @@ message GPUOptions {
     // launch an additional kernel will stall until an event
     // completes.
     int32 kernel_tracker_max_pending = 9;
-
-    // When true, use CUDA cudaMallocAsync API instead of TF gpu allocator.
-    bool use_cuda_malloc_async = 10;
   }
 
   // Everything inside experimental is subject to change and is not subject
@@ -251,11 +239,6 @@ message OptimizerOptions {
     ON_2 = 2;
   }
   GlobalJitLevel global_jit_level = 5;
-
-  bool do_op_fusion = 7;
-  int32 micro_batch_num = 9;
-  bool do_smart_stage = 10;
-  bool do_smart_stage_gpu = 11;
 }
 
 message GraphOptions {
@@ -562,16 +545,6 @@ message ConfigProto {
   Experimental experimental = 16;
 
   // Next: 17
-
-  // Whether tensor fuse is used in distributed running mode.
-  bool tensor_fuse = 201;
-
-  bool run_graph_mode = 203;
-  bool run_graph_mode_lite = 204;
-
-  ExecutorPolicy executor_policy = 205;
-
-  // Next: 206
 }
 
 // Options for a single Run() call.

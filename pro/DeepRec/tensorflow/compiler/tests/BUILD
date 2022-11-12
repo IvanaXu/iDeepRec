@@ -125,6 +125,20 @@ tf_xla_py_test(
 )
 
 tf_xla_py_test(
+    name = "adamax_test",
+    size = "small",
+    srcs = ["adamax_test.py"],
+    deps = [
+        ":xla_test",
+        "//tensorflow/contrib/opt:opt_py",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:client_testlib",
+        "//tensorflow/python:framework",
+        "//tensorflow/python:training",
+    ],
+)
+
+tf_xla_py_test(
     name = "add_n_test",
     size = "small",
     srcs = ["add_n_test.py"],
@@ -137,6 +151,34 @@ tf_xla_py_test(
         "//tensorflow/python:list_ops",
         "//tensorflow/python:math_ops",
         "//tensorflow/python:platform_test",
+    ],
+)
+
+tf_xla_py_test(
+    name = "addsign_test",
+    size = "small",
+    srcs = ["addsign_test.py"],
+    deps = [
+        ":xla_test",
+        "//tensorflow/contrib/opt:opt_py",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:client_testlib",
+        "//tensorflow/python:framework",
+        "//tensorflow/python:training",
+    ],
+)
+
+tf_xla_py_test(
+    name = "powersign_test",
+    size = "small",
+    srcs = ["powersign_test.py"],
+    deps = [
+        ":xla_test",
+        "//tensorflow/contrib/opt:opt_py",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:client_testlib",
+        "//tensorflow/python:framework",
+        "//tensorflow/python:training",
     ],
 )
 
@@ -553,7 +595,7 @@ tf_xla_py_test(
     name = "image_ops_test",
     size = "small",
     srcs = ["image_ops_test.py"],
-    shard_count = 30,
+    shard_count = 10,
     tags = [
         "optonly",  # Times out frequently in fastbuild mode.
     ],
@@ -754,27 +796,10 @@ tf_xla_py_test(
 )
 
 tf_xla_py_test(
-    name = "unstack_test",
-    size = "medium",
-    srcs = ["unstack_test.py"],
-    shard_count = 5,
-    tags = ["optonly"],
-    deps = [
-        ":xla_test",
-        "//tensorflow/python:array_ops",
-        "//tensorflow/python:framework_for_generated_wrappers",
-        "//tensorflow/python:math_ops",
-        "//tensorflow/python:platform_test",
-        "//tensorflow/python:training",
-        "@absl_py//absl/testing:parameterized",
-    ],
-)
-
-tf_xla_py_test(
     name = "random_ops_test",
     size = "small",
     srcs = ["random_ops_test.py"],
-    shard_count = 10,
+    shard_count = 5,
     deps = [
         ":xla_test",
         "//tensorflow/python:array_ops",

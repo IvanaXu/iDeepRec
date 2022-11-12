@@ -31,9 +31,7 @@ namespace host {
 
 class HostStream : public internal::StreamInterface {
  public:
-  // stack_size_in_bytes may be '0', meaning "use the default thread stack
-  // size".
-  explicit HostStream(size_t stack_size_in_bytes);
+  HostStream();
   ~HostStream() override;
 
   bool EnqueueTask(std::function<void()> task);

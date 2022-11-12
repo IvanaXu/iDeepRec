@@ -3990,15 +3990,6 @@ class Graph(object):
       if name in self._collections:
         del self._collections[name]
 
-  def get_variale_by_name(self, name):
-    """
-     Get Variable/ResourceVariable by name
-    """
-    for var in get_collection(GraphKeys.GLOBAL_VARIABLES):
-      if hasattr(var, '_shared_name'):
-        if var._shared_name == name:
-          return var
-
   @tf_contextlib.contextmanager
   def _original_op(self, op):
     """Python 'with' handler to help annotate ops with their originator.
@@ -6059,8 +6050,6 @@ class GraphKeys(object):
   # Key to collect Variable objects that will be trained by the
   # optimizers.
   TRAINABLE_VARIABLES = "trainable_variables"
-  # Indicate EmbeddingVariable in CollectionDef
-  EMBEDDING_VARIABLES = "embedding_variables"
   # Key to collect summaries.
   SUMMARIES = "summaries"
   # Key to collect QueueRunners.
@@ -6098,9 +6087,6 @@ class GraphKeys(object):
   LOCAL_RESOURCES = "local_resources"
   # Trainable resource-style variables.
   TRAINABLE_RESOURCE_VARIABLES = "trainable_resource_variables"
-
-  EV_INIT_VAR_OPS = "ev_init_var_ops"
-  EV_INIT_SLOT_OPS = "ev_init_slot_ops"
 
   # Key to indicate various ops.
   INIT_OP = "init_op"

@@ -4,10 +4,7 @@ licenses(["notice"])
 
 glob_lit_tests(
     data = [":test_utilities"],
-    driver = "@llvm-project//mlir:run_lit.sh",
-    tags_override = {
-        "preserve-entry-func-names.mlir": ["nomac"],  # TODO(b/148403706): flaky on Mac, to be fixed.
-    },
+    driver = "@local_config_mlir//:run_lit.sh",
     test_file_exts = ["mlir"],
 )
 
@@ -17,7 +14,6 @@ filegroup(
     testonly = True,
     data = [
         "//tensorflow/compiler/mlir:tf-mlir-translate",
-        "@llvm-project//llvm:FileCheck",
-        "@llvm-project//llvm:not",
+        "@llvm//:FileCheck",
     ],
 )

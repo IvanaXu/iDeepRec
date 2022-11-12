@@ -16,7 +16,7 @@ limitations under the License.
 #ifdef INTEL_MKL
 
 #include "absl/strings/match.h"
-#include "dnnl.hpp"
+#include "mkldnn.hpp"
 #include "tensorflow/cc/ops/const_op.h"
 #include "tensorflow/cc/ops/math_ops.h"
 #include "tensorflow/cc/ops/math_ops_internal.h"
@@ -40,13 +40,13 @@ limitations under the License.
 #include "tensorflow/core/util/mkl_util.h"
 
 // Compare performance of default Tensorflow cwise kernels (Eigen) with
-// OneDNN kernels on CPU.
+// MKL kernels on CPU.
 // Before running these benchmarks configure OpenMP environment variables:
 //   export KMP_BLOCKTIME=0
 //   export OMP_NUM_THREADS=${num_threads}
 //   export KMP_AFFINITY=granularity=fine,verbose,compact,1,0
 //
-// Then you could run below command to test OneDNN kernels performance:
+// Then you could run below command to test MKL kernels performance:
 // $bazel run --config opt --config=mkl
 // //tensorflow/core/kernels/mkl:mkl_cwise_ops_test \
 //   --  --benchmarks=..
@@ -54,7 +54,7 @@ limitations under the License.
 namespace tensorflow {
 
 // --------------------------------------------------------------------------//
-//  Test OneDNN cwise kernels accuracy with Eigen kernels                       //
+//  Test Mkl cwise kernels accuracy with Eigen kernels                       //
 // --------------------------------------------------------------------------//
 static const uint8 dummy_tensor[] = {0, 0, 0, 0, 0, 0, 0, 0};
 static const TensorShape dummy_shape({8});
@@ -68,10 +68,10 @@ class CommonTestUtilities : public OpsTestBase {
  public:
   void PerformConversion(DataType dtype, const Tensor& tensor,
                          const Tensor& mkl_meta_tensor, Tensor* output) {
-    // Create an OneDNN to TF conversion node and execute it
+    // Create an MKL to TF conversion node and execute it
     TF_EXPECT_OK(NodeDefBuilder("mkl_to_tf_op", "_MklToTf")
                      .Input(FakeInput(dtype))     // Input
-                     .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
+                     .Input(FakeInput(DT_UINT8))  // Mkl second tensor
                      .Attr("T", dtype)
                      .Attr("_kernel", "MklLayoutDependentOp")
                      .Finalize(node_def()));
@@ -293,7 +293,7 @@ using CwiseOpsDataTypes = ::testing::Types<float, bfloat16>;
 INSTANTIATE_TYPED_TEST_SUITE_P(Test, CwiseOpsTest, CwiseOpsDataTypes);
 
 // --------------------------------------------------------------------------//
-// Test OneDNN element-wise kernels performance with Eigen                      //
+// Test Mkl element-wise kernels performance with Eigen                      //
 // --------------------------------------------------------------------------//
 template <typename T>
 static Graph* Cwise(const string& op_name, const string& kind,
@@ -301,7 +301,6 @@ static Graph* Cwise(const string& op_name, const string& kind,
   auto* graph = new Graph(OpRegistry::Global());
   const string node_name = kind + "_" + op_name;
   const bool isDefault = (kind == "Default");
-
   DataType dtype = DataTypeToEnum<T>::v();
 
   auto init_input = [&](const TensorShape& shape, const std::string& name) {
@@ -317,65 +316,64 @@ static Graph* Cwise(const string& op_name, const string& kind,
   Node* not_mkl_shape =
       test::graph::Constant(graph, GetMklMetaTensor(), "not_mkl");
 
-  auto nodeBuilder = NodeBuilder(graph->NewName(node_name), isDefault ? op_name : "_Mkl" + op_name)
+  Node* cwise;
+  // Default forward op.
+  if (isDefault) {
+    TF_CHECK_OK(NodeBuilder(graph->NewName(node_name), op_name)
                     .Input(input0)
                     .Input(input1)
-                    .Attr("T", dtype);
-
-  isDefault ? nodeBuilder : nodeBuilder.Input(not_mkl_shape)
-                                       .Input(not_mkl_shape)
-                                       .Attr("_kernel", "MklLayoutDependentOp");
+                    .Attr("T", dtype)
+                    .Finalize(graph, &cwise));
+    return graph;
+  }
 
   // MKL forward op.
-  TF_CHECK_OK(nodeBuilder.Finalize(graph, nullptr));
+  TF_CHECK_OK(NodeBuilder(graph->NewName(node_name), "_Mkl" + op_name)
+                  .Input(input0)
+                  .Input(input1)
+                  .Input(not_mkl_shape)
+                  .Input(not_mkl_shape)
+                  .Attr("T", dtype)
+                  .Attr("_kernel", "MklLayoutDependentOp")
+                  .Finalize(graph, &cwise));
   return graph;
 }
 
-#define BM_Cwise_Base(op, kind, name, shape_info_0, shape_info_1, T, DEVICE, NTH)     \
-  static void BM_##kind##_##name##_##NTH(int iters) {                                 \
-    int64 num_computed_elements =                                                     \
-        shape_info_0.num_elements() > shape_info_1.num_elements()                     \
-            ? shape_info_0.num_elements()                                             \
-            : shape_info_1.num_elements();                                            \
-    int64 flops_per_iter = num_computed_elements;                                     \
-    testing::UseRealTime();                                                           \
-    SessionOptions opts;                                                              \
-    opts.config.set_intra_op_parallelism_threads(NTH);                                \
-    testing::ItemsProcessed(static_cast<int64>(iters) * flops_per_iter);              \
-    test::Benchmark(#DEVICE, Cwise<T>(#op, #kind, shape_info_0, shape_info_1), &opts) \
-        .Run(iters);                                                                  \
-  }                                                                                   \
-  BENCHMARK(BM_##kind##_##name##_##NTH);                                              \
+#define BM_Cwise(op, kind, name, shape_info_0, shape_info_1, T, type)        \
+  static void BM_##name(int iters) {                                         \
+    int64 num_computed_elements =                                            \
+        shape_info_0.num_elements() > shape_info_1.num_elements()            \
+            ? shape_info_0.num_elements()                                    \
+            : shape_info_1.num_elements();                                   \
+    int64 flops_per_iter = num_computed_elements;                            \
+    testing::UseRealTime();                                                  \
+    testing::ItemsProcessed(static_cast<int64>(iters) * flops_per_iter);     \
+    test::Benchmark(#type, Cwise<T>(#op, #kind, shape_info_0, shape_info_1)) \
+        .Run(iters);                                                         \
+  }                                                                          \
+  BENCHMARK(BM_##name);
 
-#define BM_Cwise_kind(op, name, shape_info_0, shape_info_1, T, DEVICE, NTH)     \
-  BM_Cwise_Base(op, Default, name, shape_info_0, shape_info_1, T, DEVICE, NTH); \
-  BM_Cwise_Base(op, Mkl, name, shape_info_0, shape_info_1, T, DEVICE, NTH);     \
+#define BM_Cwise_2D(op, kind, A0, B0, A1, B1, T, type)                    \
+  BM_Cwise(op, kind, op##_##kind##type##_##A0##_##B0##_##A1##_##B1##_##T, \
+           TensorShape({A0, B0}), TensorShape({A1, B1}), T, type)
+#define BM_2D(op, A0, B0, A1, B1, T, type)           \
+  BM_Cwise_2D(op, Default, A0, B0, A1, B1, T, type); \
+  BM_Cwise_2D(op, Mkl, A0, B0, A1, B1, T, type);
 
-#define BM_Cwise_NTH(op, name, shape_info_0, shape_info_1, T, DEVICE) \
-  BM_Cwise_kind(op, name, shape_info_0, shape_info_1, T, DEVICE, 1);  \
-  BM_Cwise_kind(op, name, shape_info_0, shape_info_1, T, DEVICE, 4);  \
-  BM_Cwise_kind(op, name, shape_info_0, shape_info_1, T, DEVICE, 8);  \
+#define BM_Cwise_4D(op, kind, A0, B0, C0, D0, A1, B1, C1, D1, T, type)                 \
+  BM_Cwise(                                                                            \
+      op, kind,                                                                        \
+      op##_##kind##type##_##A0##_##B0##_##C0##_##D0##_##A1##_##B1##_##C1##_##D1##_##T, \
+      TensorShape({A0, B0, C0, D0}), TensorShape({A1, B1, C1, D1}), T, type)
+#define BM_4D(op, A0, B0, C0, D0, A1, B1, C1, D1, T, type)           \
+  BM_Cwise_4D(op, Default, A0, B0, C0, D0, A1, B1, C1, D1, T, type); \
+  BM_Cwise_4D(op, Mkl, A0, B0, C0, D0, A1, B1, C1, D1, T, type);
 
-#define BM_Cwise_2D(op, A0, B0, A1, B1, T, DEVICE)                  \
-  BM_Cwise_NTH(op, op##_##DEVICE##_##A0##x##B0##_##A1##x##B1##_##T, \
-           TensorShape({A0, B0}), TensorShape({A1, B1}), T, DEVICE) \
-
-#define BM_2D(op, A0, B0, A1, B1, T, DEVICE)  \
-  BM_Cwise_2D(op, A0, B0, A1, B1, T, DEVICE); \
-
-#define BM_Cwise_4D(op, A0, B0, C0, D0, A1, B1, C1, D1, T, DEVICE)                     \
-  BM_Cwise_NTH(                                                                        \
-      op, op##_##DEVICE##_##A0##x##B0##x##C0##x##D0##_##A1##x##B1##x##C1##x##D1##_##T, \
-      TensorShape({A0, B0, C0, D0}), TensorShape({A1, B1, C1, D1}), T, DEVICE)         \
-
-#define BM_4D(op, A0, B0, C0, D0, A1, B1, C1, D1, T, DEVICE)  \
-  BM_Cwise_4D(op, A0, B0, C0, D0, A1, B1, C1, D1, T, DEVICE); \
-
-#define TEST_ALL_SIZES(op, T)                          \
-  BM_2D(op, 1, 384, 384, 384, T, cpu);                 \
-  BM_2D(op, 384, 384, 384, 384, T, cpu);               \
-  BM_4D(op, 1, 12, 384, 384, 1, 1, 384, 384, T, cpu);  \
-  BM_4D(op, 1, 12, 384, 384, 1, 12, 384, 384, T, cpu); \
+#define TEST_ALL_SIZES(op, T)                         \
+  BM_2D(op, 1, 384, 384, 384, T, cpu);                \
+  BM_2D(op, 384, 384, 384, 384, T, cpu);              \
+  BM_4D(op, 1, 12, 384, 384, 1, 1, 384, 384, T, cpu); \
+  BM_4D(op, 1, 12, 384, 384, 1, 12, 384, 384, T, cpu);
 
 TEST_ALL_SIZES(Add, float)
 TEST_ALL_SIZES(Add, bfloat16)

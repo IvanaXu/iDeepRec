@@ -375,9 +375,8 @@ class Layer(base_layer.Layer):
         set as `ON_READ`.
     """
     for kwarg in kwargs:
-      if kwarg not in  ['experimental_autocast', 'ev_option']:
+      if kwarg != 'experimental_autocast':
         raise TypeError('Unknown keyword argument:', kwarg)
-    ev_option = kwargs.get('ev_option', None)
     if self._keras_style:
       return super(Layer, self).add_weight(
           name=name,
@@ -447,8 +446,7 @@ class Layer(base_layer.Layer):
                         scope.use_resource)
         if initializer is None:
           initializer = scope.initializer
-        if ev_option != None:
-          variable = super(Layer, self).add_weight(
+        variable = super(Layer, self).add_weight(
             name,
             shape,
             dtype=dtypes.as_dtype(dtype),
@@ -459,22 +457,8 @@ class Layer(base_layer.Layer):
             use_resource=use_resource,
             synchronization=synchronization,
             aggregation=aggregation,
-            getter=vs.get_embedding_variable_internal,
+            getter=vs.get_variable,
             **kwargs)
-        else:
-          variable = super(Layer, self).add_weight(
-              name,
-              shape,
-              dtype=dtypes.as_dtype(dtype),
-              initializer=initializer,
-              trainable=trainable and self.trainable,
-              constraint=constraint,
-              partitioner=partitioner,
-              use_resource=use_resource,
-              synchronization=synchronization,
-              aggregation=aggregation,
-              getter=vs.get_variable,
-              **kwargs)
 
         if regularizer:
           if (ops.executing_eagerly_outside_functions()

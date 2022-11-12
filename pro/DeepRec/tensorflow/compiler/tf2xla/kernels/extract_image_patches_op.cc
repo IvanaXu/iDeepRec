@@ -21,7 +21,6 @@ limitations under the License.
 #include "tensorflow/compiler/xla/client/lib/matrix.h"
 #include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/compiler/xla/shape_util.h"
-#include "tensorflow/compiler/xla/util.h"
 #include "tensorflow/core/util/tensor_format.h"
 
 namespace tensorflow {
@@ -154,8 +153,7 @@ class ExtractImagePatchesOp : public XlaOpKernel {
                                 lhs_dilation, rhs_dilation, dims, depth);
     // Feature group convolution, will end up with the kernel_size change more
     // rapidly than the depth. Reshape, transpose and reshape to reorder them.
-    std::vector<int64> conv_dims =
-        xla::SpanToVector(builder->GetShape(conv).ValueOrDie().dimensions());
+    auto conv_dims = builder->GetShape(conv).ValueOrDie().dimensions();
     conv_dims.back() = depth;
     conv_dims.push_back(kernel_size);
     conv = xla::TransposeInMinorDims(xla::Reshape(conv, conv_dims));

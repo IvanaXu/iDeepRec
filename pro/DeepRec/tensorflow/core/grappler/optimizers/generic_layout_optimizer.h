@@ -26,11 +26,8 @@ namespace grappler {
 class GenericLayoutOptimizer : public GraphOptimizer {
  public:
   GenericLayoutOptimizer() : GenericLayoutOptimizer(RewriterConfig::DEFAULT) {}
-  GenericLayoutOptimizer(bool force)
-      : GenericLayoutOptimizer(RewriterConfig::DEFAULT, force) {}
-  explicit GenericLayoutOptimizer(RewriterConfig::Toggle opt_level,
-                                  bool force=false)
-      : force_(force), opt_level_(opt_level) {}
+  explicit GenericLayoutOptimizer(RewriterConfig::Toggle opt_level)
+      : opt_level_(opt_level) {}
   ~GenericLayoutOptimizer() override = default;
 
   string name() const override { return "layout"; };
@@ -45,9 +42,6 @@ class GenericLayoutOptimizer : public GraphOptimizer {
 
  private:
   RewriterConfig::Toggle opt_level_;
-  // This boolean determines whether we should force the generic layout
-  // optimizer even when there is no convolution nodes.
-  bool force_ = false;
 };
 
 }  // namespace grappler

@@ -26,7 +26,6 @@ from tensorflow.python.util import compat
 from tensorflow.python.util import deprecation
 from tensorflow.python.util.tf_export import tf_export
 
-import os
 
 def _make_server_def(server_or_cluster_def, job_name, task_index, protocol,
                      config):
@@ -143,8 +142,6 @@ class Server(object):
       tf.errors.OpError: Or one of its subclasses if an error occurs while
         creating the TensorFlow server.
     """
-    os.environ['TASK_INDEX'] = str(task_index)
-
     self._server_def = _make_server_def(server_or_cluster_def, job_name,
                                         task_index, protocol, config)
     self._server = c_api.TF_NewServer(self._server_def.SerializeToString())
@@ -158,7 +155,9 @@ class Server(object):
       # we leak instead of calling c_api.TF_DeleteServer here.
       # See:
       # https://github.com/tensorflow/tensorflow/blob/0495317a6e9dd4cac577b9d5cf9525e62b571018/tensorflow/core/distributed_runtime/rpc/grpc_server_lib.h#L73
-    except:  # pylint: disable=bare-except
+    except errors.UnimplementedError:
+      pass
+    except AttributeError:
       # At shutdown, `c_api` may have been garbage collected.
       pass
     self._server = None

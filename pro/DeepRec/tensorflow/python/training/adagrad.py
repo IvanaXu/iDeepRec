@@ -21,14 +21,10 @@ from __future__ import print_function
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import gen_array_ops
-from tensorflow.python.ops import gen_hash_training_ops
 from tensorflow.python.ops import init_ops
-from tensorflow.python.ops import kv_variable_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.training import optimizer
 from tensorflow.python.training import training_ops
-from tensorflow.python.training import training_util
-from tensorflow.python.training import slot_creator
 from tensorflow.python.util.tf_export import tf_export
 
 
@@ -81,8 +77,7 @@ class AdagradOptimizer(optimizer.Optimizer):
       else:
         init = self._init_constant_op(v, dtype)
       self._get_or_make_slot_with_initializer(v, init, v.get_shape(), dtype,
-                                              "accumulator", self._name,
-                                              slot_config=slot_creator.SlotConfig(slot_index=1, slot_num=1))
+                                              "accumulator", self._name)
 
   def _init_constant_op(self, v, dtype):
     def init():
@@ -126,30 +121,9 @@ class AdagradOptimizer(optimizer.Optimizer):
         grad.indices,
         use_locking=self._use_locking)
 
-  def _hash_table_apply_sparse(self, grad, var, indices):
-    acc = self.get_slot(var, "accumulator")
-    return gen_hash_training_ops.tensible_variable_apply_adagrad(
-        var.handle,
-        acc.handle,
-        math_ops.cast(self._learning_rate_tensor, grad.dtype),
-        grad,
-        indices,
-        use_locking=self._use_locking)
-
   def _resource_apply_sparse(self, grad, var, indices):
     acc = self.get_slot(var, "accumulator")
-    if isinstance(var, kv_variable_ops.EmbeddingVariable):
-      global_step = training_util.get_or_create_global_step()
-      return training_ops.kv_resource_sparse_apply_adagrad(
-        var.handle,
-        acc.handle,
-        math_ops.cast(self._learning_rate_tensor, grad.dtype),
-        grad,
-        indices,
-        global_step,
-        use_locking=self._use_locking)
-    else:
-      return training_ops.resource_sparse_apply_adagrad(
+    return training_ops.resource_sparse_apply_adagrad(
         var.handle,
         acc.handle,
         math_ops.cast(self._learning_rate_tensor, grad.dtype),

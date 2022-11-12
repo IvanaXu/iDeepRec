@@ -139,7 +139,6 @@ py_test(
     tags = tf_cuda_tests_tags() + [
         "notap",
         "no_pip",
-        "no_oss",  # fails on this branch
     ],
     deps = [
         ":cuda_op",

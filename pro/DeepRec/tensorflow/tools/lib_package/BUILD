@@ -147,7 +147,7 @@ genrule(
         "@double_conversion//:LICENSE",
         "@eigen_archive//:COPYING.MPL2",
         "@farmhash_archive//:COPYING",
-        "@fft2d//:fft2d/readme2d.txt",
+        "@fft2d//:readme2d.txt",
         "@gemmlowp//:LICENSE",
         "@gif_archive//:COPYING",
         "@highwayhash//:LICENSE",
@@ -162,17 +162,8 @@ genrule(
         "@png_archive//:LICENSE",
         "@com_google_protobuf//:LICENSE",
         "@snappy//:COPYING",
-        "@zlib_archive//:zlib.h",
+        "@zlib//:zlib.h",
     ] + select({
-        "//tensorflow:android": [],
-        "//tensorflow:ios": [],
-        "//tensorflow:linux_s390x": [],
-        "//tensorflow:windows": [],
-        "//tensorflow:no_aws_support": [],
-        "//conditions:default": [
-            "@aws//:LICENSE",
-        ],
-    }) + select({
         "//tensorflow:android": [],
         "//tensorflow:ios": [],
         "//tensorflow:linux_s390x": [],
@@ -193,10 +184,10 @@ genrule(
         "//third_party/mkl:LICENSE",
         "//third_party/mkl_dnn:LICENSE",
     ]) + if_not_system_lib(
-        "grpc",
+        "com_github_grpc_grpc",
         [
-            "@grpc//:LICENSE",
-            "@grpc//third_party/address_sorting:LICENSE",
+            "@com_github_grpc_grpc//:LICENSE",
+            "@com_github_grpc_grpc//third_party/address_sorting:LICENSE",
         ],
     ) + if_rocm([
         "@rocprim_archive//:LICENSE.txt",
@@ -219,7 +210,7 @@ genrule(
         "@double_conversion//:LICENSE",
         "@eigen_archive//:COPYING.MPL2",
         "@farmhash_archive//:COPYING",
-        "@fft2d//:fft2d/readme2d.txt",
+        "@fft2d//:readme2d.txt",
         "@gemmlowp//:LICENSE",
         "@gif_archive//:COPYING",
         "@highwayhash//:LICENSE",
@@ -234,19 +225,10 @@ genrule(
         "@png_archive//:LICENSE",
         "@com_google_protobuf//:LICENSE",
         "@snappy//:COPYING",
-        "@zlib_archive//:zlib.h",
-        "@grpc//:LICENSE",
-        "@grpc//third_party/address_sorting:LICENSE",
+        "@zlib//:zlib.h",
+        "@com_github_grpc_grpc//:LICENSE",
+        "@com_github_grpc_grpc//third_party/address_sorting:LICENSE",
     ] + select({
-        "//tensorflow:android": [],
-        "//tensorflow:ios": [],
-        "//tensorflow:linux_s390x": [],
-        "//tensorflow:windows": [],
-        "//tensorflow:no_aws_support": [],
-        "//conditions:default": [
-            "@aws//:LICENSE",
-        ],
-    }) + select({
         "//tensorflow:android": [],
         "//tensorflow:ios": [],
         "//tensorflow:linux_s390x": [],

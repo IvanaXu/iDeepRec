@@ -39,7 +39,6 @@ limitations under the License.
 #include "tensorflow/core/platform/mutex.h"
 #include "tensorflow/core/platform/tracing.h"
 #include "tensorflow/core/profiler/lib/traceme.h"
-#include "tensorflow/core/profiler/nvtx_utils.h"
 #include "tensorflow/core/public/version.h"
 #include "tensorflow/core/util/tensor_slice_reader_cache.h"
 #if !defined(IS_MOBILE_PLATFORM)
@@ -250,6 +249,15 @@ Status KernelAndDeviceOp::Run(ScopedStepContainer* step_container,
                              tensorflow::HOST_MEMORY);
   }
 
+  gtl::InlinedVector<DeviceContext*, 4> input_device_contexts;
+  for (int i = 0; i < inputs.size(); i++) {
+    DeviceContext* device_context = nullptr;
+    if (device_->tensorflow_gpu_device_info() != nullptr) {
+      device_context = device_->tensorflow_gpu_device_info()->default_context;
+    }
+    input_device_contexts.push_back(device_context);
+  }
+
   OpKernelContext::Params params;
   params.is_eager = true;
   params.device = device_;
@@ -292,17 +300,10 @@ Status KernelAndDeviceOp::Run(ScopedStepContainer* step_container,
   params.step_container = step_container;
   params.collective_executor =
       collective_executor_ ? collective_executor_->get() : nullptr;
+  params.input_device_contexts = &input_device_contexts;
 
   OpKernelContext context(&params);
 
-  nvtx::ScopedRangeIfEnabled<nvtx::CoreDomain> nvtx_range(
-      kernel_->def().op(), [&]() {
-        return nvtx::GetNodeExecutionRangeMessage(
-            kernel_.get(), inputs.size(), inputs,
-            [](const TensorValue& tensor_value) {
-              return tensor_value.tensor;
-            });
-      });
   if (kernel_->def().op() == "_Recv") {
     // TODO(apassos) do not special-case _Recv. Currently the GPU device fails
     // if trying to run _Recv->Compute(), specifically checking for _Recv. To go
@@ -315,7 +316,11 @@ Status KernelAndDeviceOp::Run(ScopedStepContainer* step_container,
     const string& op_name = kernel_->name();
     // 'ScopedActivity' will trace the OpKernel scheduling time on host.
     profiler::TraceMe activity(
-        [&] { return absl::StrCat(op_name, ":", kernel_->type_string()); },
+        [&] {
+          return absl::StrCat(op_name, ":", kernel_->type_string(), "#id=",
+                              step_container ? step_container->step_id() : 0,
+                              ",device=", device_->name(), ",async=false#");
+        },
         profiler::TraceMeLevel::kInfo);
     // 'ScopedAnnotation' will trace the OpKernel execution time on device.
     tracing::ScopedAnnotation annotation(
@@ -333,18 +338,12 @@ Status KernelAndDeviceOp::Run(ScopedStepContainer* step_container,
   if (outputs != nullptr) {
     outputs->clear();
     for (int i = 0; i < context.num_outputs(); ++i) {
-      const auto* output_tensor = context.mutable_output(i);
-      if (output_tensor != nullptr) {
-        outputs->push_back(Tensor(*output_tensor));
-      } else {
-        outputs->push_back(Tensor());
-      }
+      outputs->push_back(Tensor(*context.mutable_output(i)));
     }
   }
   if (stats != nullptr) {
     UpdateStats(&context, step_stats_collector.get(), stats);
   }
-
   return Status::OK();
 }
 
@@ -391,10 +390,7 @@ Status KernelAndDeviceFunc::Run(
   }
   {
     profiler::TraceMe activity(
-        [&] {
-          return absl::StrCat("FunctionRun#name=", name(), ",id=", opts.step_id,
-                              "#");
-        },
+        [&] { return absl::StrCat("FunctionRun:", name()); },
         profiler::TraceMeLevel::kInfo);
     pflr_->Run(opts, handle_, input_vector, outputs,
                [&status, &done](const Status& s) {

@@ -20,72 +20,27 @@ func @variantref(!tf.variantref) -> ()
 
 // -----
 
-// expected-error @+1 {{encountered unexpected token}}
+// expected-error @+1 {{tf.variant delimiter <...> mismatch}}
 func @invalid_type(!tf<"variant>">) -> ()
 
 // -----
 
-// expected-error @+1 {{expected non-function type}}
+// expected-error @+1 {{invalid type: tf.variant<>}}
 func @invalid_type(!tf.variant<>) -> ()
 
 // -----
 
-// expected-error @+1 {{expected 'x' in dimension list}}
+// expected-error @+1 {{invalid type: tensor<??xf32>}}
 func @invalid_type(!tf.variant<tensor<??xf32>>) -> ()
 
 // -----
 
-// expected-error @+1 {{invalid kind of type specified}}
+// expected-error @+1 {{expected TensorType. Found: 'vector<3xf32>'}}
 func @invalid_type(!tf.variant<vector<3xf32>>) -> ()
 
 // -----
 
 // expected-error @+1 {{invalid VariantType subtype: 'tensor<vector<2xf32>>'}}
 func @invalid_type(!tf.variant<tensor<vector<2xf32>>>) -> ()
-
-// -----
-
-// CHECK: !tf.resource
-func @resource_without_type(!tf.resource) -> ()
-
-// CHECK: !tf.resource<tensor<?xf32>>
-func @resource_with_type(!tf.resource<tensor<?xf32>>) -> ()
-
-// CHECK: !tf.resource<tensor<3xf32>, tensor<2xi32>>
-func @resource_with_multiple_types(!tf.resource<tensor<3xf32>, tensor<2xi32>>) -> ()
-
-// CHECK: tensor<*x!tf.resource<tensor<?xf32>>>
-func @resource_element_type(tensor<*x!tf.resource<tensor<?xf32>>>) -> ()
-
-// CHECK: tensor<!tf.resource<tensor<?x!tf.resource<tensor<?xf32>>>>>
-func @nested_resource(tensor<!tf.resource<tensor<?x!tf.resource<tensor<?xf32>>>>>) -> ()
-
-// CHECK: !tf.resourceref
-func @resourceref(!tf.resourceref) -> ()
-
-// -----
-
-// expected-error @+1 {{encountered unexpected token}}
-func @invalid_type(!tf<"resource>">) -> ()
-
-// -----
-
-// expected-error @+1 {{expected non-function type}}
-func @invalid_type(!tf.resource<>) -> ()
-
-// -----
-
-// expected-error @+1 {{expected 'x' in dimension list}}
-func @invalid_type(!tf.resource<tensor<??xf32>>) -> ()
-
-// -----
-
-// expected-error @+1 {{invalid kind of type specified}}
-func @invalid_type(!tf.resource<vector<3xf32>>) -> ()
-
-// -----
-
-// expected-error @+1 {{invalid ResourceType subtype: 'tensor<vector<2xf32>>'}}
-func @invalid_type(!tf.resource<tensor<vector<2xf32>>>) -> ()
 
 // -----

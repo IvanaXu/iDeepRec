@@ -130,8 +130,6 @@ renames = {
         'tf.compat.v1.TFRecordReader',
     'tf.TensorInfo':
         'tf.compat.v1.TensorInfo',
-    'tf.StorageType':
-        'tf.compat.v1.StorageType',
     'tf.TextLineReader':
         'tf.compat.v1.TextLineReader',
     'tf.VERSION':

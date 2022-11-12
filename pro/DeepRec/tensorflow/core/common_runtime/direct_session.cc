@@ -18,8 +18,6 @@ limitations under the License.
 #include <atomic>
 #include <string>
 #include <vector>
-#include <memory>
-#include <unordered_map>
 
 #include "absl/container/flat_hash_set.h"
 #include "tensorflow/core/common_runtime/collective_executor_mgr.h"
@@ -33,8 +31,6 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/function.h"
 #include "tensorflow/core/common_runtime/graph_optimizer.h"
 #include "tensorflow/core/common_runtime/memory_types.h"
-#include "tensorflow/core/common_runtime/memory_planner.h"
-#include "tensorflow/core/common_runtime/gpu_memory_planner.h"
 #include "tensorflow/core/common_runtime/metrics.h"
 #include "tensorflow/core/common_runtime/optimization_registry.h"
 #include "tensorflow/core/common_runtime/process_util.h"
@@ -156,23 +152,6 @@ string GetRendezvousKey(const string& tensor_name,
                          frame_iter.frame_id, ":", frame_iter.iter_id);
 }
 
-// TODO: Any better allocate policy?
-void AllocateVisibleCpusForSession(const std::vector<unsigned>& visible_cpus, int session_num,
-                                   std::vector<std::vector<unsigned> >& visible_cpus_per_session) {
-  if (session_num > 0) {
-    int cpus_count_per_session = visible_cpus.size() / session_num;
-    for (int i = 0; i < session_num; ++i) {
-      std::vector<unsigned> tmp;
-      int start_idx = i*cpus_count_per_session;
-      tmp.insert(tmp.end(), visible_cpus.begin()+start_idx,
-                 visible_cpus.begin()+start_idx+cpus_count_per_session);
-      visible_cpus_per_session.push_back(tmp);
-    }
-  } else {
-    LOG(FATAL) << "Session num of session group is " << session_num << ", should session_num > 0";
-  }
-}
-
 }  // namespace
 
 class DirectSessionFactory : public SessionFactory {
@@ -210,119 +189,13 @@ class DirectSessionFactory : public SessionFactory {
     TF_RETURN_IF_ERROR(DeviceFactory::AddDevices(
         options, "/job:localhost/replica:0/task:0", &devices));
 
-#ifdef TENSORFLOW_USE_NUMA
-    std::vector<unsigned> visible_cpus;
     DirectSession* session =
-        new DirectSession(options, new DeviceMgr(std::move(devices)),
-                          true, this, visible_cpus);
-#else
-    DirectSession* session =
-        new DirectSession(options, new DeviceMgr(std::move(devices)), true, this);
-#endif
+        new DirectSession(options, new DeviceMgr(std::move(devices)), this);
     {
       mutex_lock l(sessions_lock_);
       sessions_.push_back(session);
     }
     *out_session = session;
-    return Status::OK();
-  }
-
-  Status NewSessionGroup(const SessionOptions& options,
-                         SessionGroup** out_session_group,
-                         int session_num = 1) {
-    if (session_num < 1) {
-      return errors::InvalidArgument(
-          "Must specify session_num of NewSessionGroup");
-    }
-
-    const auto& experimental_config = options.config.experimental();
-    if (experimental_config.has_session_metadata()) {
-      if (experimental_config.session_metadata().version() < 0) {
-        return errors::InvalidArgument(
-            "Session version shouldn't be negative: ",
-            experimental_config.session_metadata().DebugString());
-      }
-      const string key = GetMetadataKey(experimental_config.session_metadata());
-      mutex_lock l(sessions_lock_);
-      if (!session_metadata_keys_.insert(key).second) {
-        return errors::InvalidArgument(
-            "A session with the same name and version has already been "
-            "created: ",
-            experimental_config.session_metadata().DebugString());
-      }
-    }
-
-    // Must do this before the CPU allocator is created.
-    if (options.config.graph_options().build_cost_model() > 0) {
-      EnableCPUAllocatorFullStats(true);
-    }
-
-#ifdef TENSORFLOW_USE_NUMA
-    int numa_num = port::NUMANumNodes();
-    std::vector<unsigned> visible_cpus;
-    for (int i = 0; i < numa_num; ++i) {
-      std::vector<unsigned> cpus;
-      port::NUMANodeCPUs(i, &cpus);
-      visible_cpus.insert(visible_cpus.end(), cpus.begin(), cpus.end());
-    }
-    std::vector<std::vector<unsigned> > visible_cpus_per_session;
-    AllocateVisibleCpusForSession(visible_cpus, session_num,
-                                  visible_cpus_per_session);
-#endif  // TENSORFLOW_USE_NUMA
-
-    // Create shared resource for cpu devices
-    ResourceMgr* shared_rmgr = new ResourceMgr("localhost");
-    DeviceResourceMgrMap dev_rmgr_map;
-    std::string dev_prefix("/job:localhost/replica:0/task:0");
-    dev_rmgr_map.device_rmgr_map[dev_prefix+"/device:CPU:0"] = shared_rmgr;
-    dev_rmgr_map.device_rmgr_map[dev_prefix+"/device:cpu:0"] = shared_rmgr;
-    dev_rmgr_map.device_rmgr_map["/device:CPU:0"] = shared_rmgr;
-    dev_rmgr_map.device_rmgr_map["/device:cpu:0"] = shared_rmgr;
-
-    std::vector<std::unique_ptr<Device>> devices;
-    TF_RETURN_IF_ERROR(DeviceFactory::AddDevices(
-        options, "/job:localhost/replica:0/task:0",
-        &devices, &dev_rmgr_map));
-
-    DeviceMgr* device_mgr = new DeviceMgr(std::move(devices));
-
-    SessionGroup* session_group = new SessionGroup(shared_rmgr);
-#ifdef TENSORFLOW_USE_NUMA
-    DirectSession* leader_session =
-        new DirectSession(options, device_mgr, true, this,
-                          visible_cpus_per_session[0]);
-#else
-    DirectSession* leader_session =
-        new DirectSession(options, device_mgr, true, this);
-#endif  // TENSORFLOW_USE_NUMA
-    session_group->CreateLeaderSession(leader_session);
-    for (int i = 1; i < session_num; ++i) {
-      std::vector<std::unique_ptr<Device>> dev;
-      TF_RETURN_IF_ERROR(DeviceFactory::AddDevices(
-          options, "/job:localhost/replica:0/task:0", &dev, &dev_rmgr_map));
-      DeviceMgr* dev_mgr = new DeviceMgr(std::move(dev));
-
-#ifdef TENSORFLOW_USE_NUMA
-      DirectSession* follower_session =
-          new DirectSession(options, dev_mgr,true, this,
-                            visible_cpus_per_session[i]);
-#else
-      DirectSession* follower_session =
-          new DirectSession(options, dev_mgr, true, this);
-#endif  // TENSORFLOW_USE_NUMA
-      session_group->CreateFollowerSession(follower_session);
-      {
-        mutex_lock l(sessions_lock_);
-        sessions_.push_back(follower_session);
-      }
-    }
-
-    {
-      mutex_lock l(sessions_lock_);
-      sessions_.push_back(leader_session);
-    }
-    *out_session_group = session_group;
-
     return Status::OK();
   }
 
@@ -433,15 +306,8 @@ bool DirectSession::ShouldUseRunHandlerPool(
 
 DirectSession::DirectSession(const SessionOptions& options,
                              const DeviceMgr* device_mgr,
-                             bool owd_device_mgr,
-#ifdef TENSORFLOW_USE_NUMA
-                             DirectSessionFactory* factory,
-                             const std::vector<unsigned>& visible_cpus)
-#else
                              DirectSessionFactory* const factory)
-#endif
     : options_(options),
-      own_device_mgr_(owd_device_mgr),
       device_mgr_(device_mgr),
       factory_(factory),
       cancellation_manager_(new CancellationManager()),
@@ -470,36 +336,7 @@ DirectSession::DirectSession(const SessionOptions& options,
          env_num_threads < 0)) {
       run_in_caller_thread_ = true;
     }
-    MemoryPlannerFactory::GetMemoryPlanner()->SetThreadPool(GlobalThreadPool(options));
   }
-
-  bool use_cost_model_executor = false;
-  bool use_inline_executor = false;
-  bool pin_threadpool_to_cpu_core = false;
-  Status s =
-      ReadBoolFromEnvVar("USE_COST_MODEL_EXECUTOR", false, &use_cost_model_executor);
-  if (!s.ok()) {
-    LOG(FATAL) << s.error_message();
-  }
-  s = ReadBoolFromEnvVar("USE_INLINE_EXECUTOR", false, &use_inline_executor);
-  if (!s.ok()) {
-    LOG(FATAL) << s.error_message();
-  }
-  s = ReadBoolFromEnvVar("SET_SESSION_THREAD_POOL_AFFINITY", false,
-                         &pin_threadpool_to_cpu_core);
-  if (!s.ok()) {
-    LOG(FATAL) << s.error_message();
-  }
-
-  // Select which executor to use
-  if (options_.config.executor_policy() ==
-      ExecutorPolicy::USE_COST_MODEL_EXECUTOR || use_cost_model_executor) {
-    run_cost_model_executor_ = true;
-  } else if (options_.config.executor_policy() ==
-             ExecutorPolicy::USE_INLINE_EXECUTOR || use_inline_executor) {
-    run_in_caller_thread_ = true;
-  }
-
   // The default value of sync_on_finish will be flipped soon and this
   // environment variable will be removed as well.
   const Status status =
@@ -534,23 +371,6 @@ DirectSession::DirectSession(const SessionOptions& options,
     }
     ++devices_added;
   }
-
-#ifdef TENSORFLOW_USE_NUMA
-  // thread pool set affinity
-  if (pin_threadpool_to_cpu_core && options_.config.use_per_session_threads()) {
-    if (thread_pools_.size() != 1) {
-      LOG(FATAL) << "Thread pool num is not 1 with 'use_per_session_threads' option.";
-    }
-
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    for(auto c : visible_cpus) {
-      CPU_SET(c, &cpuset);
-      LOG(INFO) << "Current DirectSession " << this << " will be pinned to core: " << c;
-    }
-    thread_pools_[0].first->SetThreadPoolAffinity(cpuset);
-  }
-#endif
 }
 
 DirectSession::~DirectSession() {
@@ -573,10 +393,6 @@ DirectSession::~DirectSession() {
 
   execution_state_.reset(nullptr);
   flib_def_.reset(nullptr);
-
-  if (own_device_mgr_) {
-    delete device_mgr_;
-  }
 }
 
 Status DirectSession::Create(const GraphDef& graph) {
@@ -702,7 +518,7 @@ Status DirectSession::RunInternal(
                             executor_step_count, &debugger_state));
   }
 
-  run_state.rendez = new IntraProcessRendezvous(device_mgr_);
+  run_state.rendez = new IntraProcessRendezvous(device_mgr_.get());
 #ifndef __ANDROID__
   // Set up for collectives if ExecutorsAndKeys declares a key.
   if (executors_and_keys->collective_graph_key !=
@@ -722,13 +538,13 @@ Status DirectSession::RunInternal(
     }
     if (!collective_executor_mgr_) {
       std::unique_ptr<DeviceResolverInterface> drl(
-          new DeviceResolverLocal(device_mgr_));
+          new DeviceResolverLocal(device_mgr_.get()));
       std::unique_ptr<ParamResolverInterface> cprl(
-          new CollectiveParamResolverLocal(options_.config, device_mgr_,
+          new CollectiveParamResolverLocal(options_.config, device_mgr_.get(),
                                            drl.get(),
                                            "/job:localhost/replica:0/task:0"));
       collective_executor_mgr_.reset(new CollectiveExecutorMgr(
-          options_.config, device_mgr_, std::move(drl), std::move(cprl)));
+          options_.config, device_mgr_.get(), std::move(drl), std::move(cprl)));
     }
     run_state.collective_executor.reset(new CollectiveExecutor::Handle(
         collective_executor_mgr_->FindOrCreate(step_id), true /*inherit_ref*/));
@@ -750,7 +566,6 @@ Status DirectSession::RunInternal(
   args.step_id = step_id;
   args.call_frame = call_frame;
   args.rendezvous = run_state.rendez;
-  args.global_rendezvous = run_state.rendez;
   args.collective_executor =
       (run_state.collective_executor ? run_state.collective_executor->get()
                                      : nullptr);
@@ -762,13 +577,6 @@ Status DirectSession::RunInternal(
   args.step_container = &run_state.step_container;
   args.sync_on_finish = sync_on_finish_;
   args.user_intra_op_threadpool = threadpool_options.intra_op_threadpool;
-  if (run_in_caller_thread_) {
-    args.executor_policy = ExecutorPolicy::USE_INLINE_EXECUTOR;
-  } else if (run_cost_model_executor_) {
-    args.executor_policy = ExecutorPolicy::USE_COST_MODEL_EXECUTOR;
-  } else {
-    args.executor_policy = ExecutorPolicy::USE_NORMAL_EXECUTOR;
-  }
 
   const bool do_trace = (run_options.trace_level() > RunOptions::NO_TRACE);
 
@@ -855,26 +663,16 @@ Status DirectSession::RunInternal(
   auto* handler_ptr = handler.get();
 
   Executor::Args::Runner default_runner = nullptr;
-  // CostRunner will schedule ops according cost model.
-  Executor::Args::CostRunner default_cost_runner = nullptr;
 
   if (pool == nullptr) {
     default_runner = [](Executor::Args::Closure c) { c(); };
-    default_cost_runner = [](Executor::Args::Closure c, int64 cost) { c(); };
   } else if (handler_ptr != nullptr) {
     default_runner = [handler_ptr](Executor::Args::Closure c) {
-      handler_ptr->ScheduleInterOpClosure(std::move(c));
-    };
-    // TODO: Consider RunHandlePool cost schedule.
-    default_cost_runner = [handler_ptr](Executor::Args::Closure c, int64 cost) {
       handler_ptr->ScheduleInterOpClosure(std::move(c));
     };
   } else {
     default_runner = [this, pool](Executor::Args::Closure c) {
       pool->Schedule(std::move(c));
-    };
-    default_cost_runner = [this, pool](Executor::Args::Closure c, int64 cost) {
-      pool->CostSchedule(std::move(c), cost);
     };
   }
 
@@ -888,12 +686,8 @@ Status DirectSession::RunInternal(
     // thread pool(s).
     if (!device_thread_pool) {
       args.runner = default_runner;
-      args.cost_runner = default_cost_runner;
     } else {
-      args.runner = [this, device_thread_pool](Executor::Args::Closure c) { 
-        device_thread_pool->Schedule(std::move(c));
-      };
-      args.cost_runner = [this, device_thread_pool](Executor::Args::Closure c, int64 cost) { 
+      args.runner = [this, device_thread_pool](Executor::Args::Closure c) {
         device_thread_pool->Schedule(std::move(c));
       };
     }
@@ -974,21 +768,6 @@ Status DirectSession::RunInternal(
   return Status::OK();
 }
 
-bool DirectSession::EnableTensorPoolTracking(ExecutorsAndKeys* executors_and_keys) {
-  static std::unordered_map<ExecutorsAndKeys*, bool> has_training_graph;
-  if (has_training_graph.find(executors_and_keys) == has_training_graph.end()) {
-    for (const PerPartitionExecutorsAndLib& partition :
-        executors_and_keys->items) {
-      if (partition.graph->IsTrainingGraph()) {
-        has_training_graph[executors_and_keys] = true;
-        return true;
-      }
-    }
-    has_training_graph[executors_and_keys] = false;
-  }
-  return has_training_graph[executors_and_keys];
-}
-
 Status DirectSession::Run(const RunOptions& run_options,
                           const NamedTensorList& inputs,
                           const std::vector<string>& output_names,
@@ -998,9 +777,6 @@ Status DirectSession::Run(const RunOptions& run_options,
   TF_RETURN_IF_ERROR(CheckNotClosed());
   TF_RETURN_IF_ERROR(CheckGraphCreated("Run()"));
   direct_session_runs->GetCell()->IncrementBy(1);
-
-  ScopedMemoryCollector scoped_memory_collector;
-  std::unique_ptr<GPUScopedMemoryCollector> scoped_memory_collector_gpu_ptr;
 
   // Extract the inputs names for this run of the session.
   std::vector<string> input_tensor_names;
@@ -1024,9 +800,6 @@ Status DirectSession::Run(const RunOptions& run_options,
   {
     mutex_lock l(collective_graph_key_lock_);
     collective_graph_key_ = executors_and_keys->collective_graph_key;
-    if (EnableTensorPoolTracking(executors_and_keys)) {
-      scoped_memory_collector_gpu_ptr.reset(new GPUScopedMemoryCollector);
-    }
   }
 
   // Configure a call frame for the step, which we use to feed and
@@ -1130,17 +903,10 @@ Status DirectSession::PRunSetup(const std::vector<string>& input_names,
 
   // Create the run state and save it for future PRun calls.
   Executor::Args args;
-  if (run_in_caller_thread_) {
-    args.executor_policy = ExecutorPolicy::USE_INLINE_EXECUTOR;
-  } else if (run_cost_model_executor_) {
-    args.executor_policy = ExecutorPolicy::USE_COST_MODEL_EXECUTOR;
-  } else {
-    args.executor_policy = ExecutorPolicy::USE_NORMAL_EXECUTOR;
-  }
   args.step_id = step_id_counter_.fetch_add(1);
   RunState* run_state =
       new RunState(input_names, output_names, args.step_id, &devices_);
-  run_state->rendez = new IntraProcessRendezvous(device_mgr_);
+  run_state->rendez = new IntraProcessRendezvous(device_mgr_.get());
   {
     mutex_lock l(executor_lock_);
     if (!partial_runs_
@@ -1164,7 +930,6 @@ Status DirectSession::PRunSetup(const std::vector<string>& input_names,
       });
 
   args.rendezvous = run_state->rendez;
-  args.global_rendezvous = run_state->rendez;
   args.cancellation_manager = cancellation_manager_;
   // Note that Collectives are not supported in partial runs
   // because RunOptions is not passed in so we can't know whether
@@ -1172,9 +937,6 @@ Status DirectSession::PRunSetup(const std::vector<string>& input_names,
   args.collective_executor = nullptr;
   args.runner = [this, pool](Executor::Args::Closure c) {
     pool->Schedule(std::move(c));
-  };
-  args.cost_runner = [this, pool](Executor::Args::Closure c, int64 cost) {
-    pool->CostSchedule(std::move(c), cost);
   };
   args.session_state = &session_state_;
   args.session_handle = session_handle_;
@@ -1525,7 +1287,7 @@ Status DirectSession::CreateExecutors(
           ? &options_.config.experimental().session_metadata()
           : nullptr;
   func_info->proc_flr.reset(new ProcessFunctionLibraryRuntime(
-      device_mgr_, options_.env, graph_def_version,
+      device_mgr_.get(), options_.env, graph_def_version,
       func_info->flib_def.get(), optimizer_opts, thread_pools_[0].first,
       nullptr, nullptr, session_metadata));
 

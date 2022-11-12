@@ -27,7 +27,7 @@ if (systemlib_ZLIB)
 else (systemlib_ZLIB)
   include (ExternalProject)
 
-  set(zlib_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/external/zlib_archive)
+  set(zlib_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/external/zlib)
   set(ZLIB_URL https://github.com/madler/zlib)
   set(ZLIB_BUILD ${CMAKE_CURRENT_BINARY_DIR}/zlib/src/zlib)
   set(ZLIB_INSTALL ${CMAKE_CURRENT_BINARY_DIR}/zlib/install)

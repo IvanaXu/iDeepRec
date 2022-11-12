@@ -58,7 +58,6 @@ cuda_py_test(
         "//tensorflow/python:variables",
     ],
     tags = [
-        "no_mac",
         "no_pip",
         "notap",
         "oss_serial",

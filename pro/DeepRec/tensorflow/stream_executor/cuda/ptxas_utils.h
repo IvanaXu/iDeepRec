@@ -17,9 +17,7 @@ limitations under the License.
 #define TENSORFLOW_STREAM_EXECUTOR_CUDA_PTXAS_UTILS_H_
 
 #include <string>
-#include <vector>
 
-#include "absl/types/span.h"
 #include "absl/types/span.h"
 #include "tensorflow/stream_executor/lib/statusor.h"
 #include "tensorflow/stream_executor/platform/port.h"
@@ -34,20 +32,15 @@ struct PtxCompilationOptions {
   // CUDA directory which would be searched first.
   std::string preferred_cuda_dir;
 
-  std::vector<std::string> extra_flags;
-
   explicit PtxCompilationOptions(bool disable_ptxas_optimizations = false,
-                                 absl::string_view preferred_cuda_dir = "",
-				 absl::Span<const std::string> extra_flags = {})
+                                 absl::string_view preferred_cuda_dir = "")
       : disable_ptxas_optimizations(disable_ptxas_optimizations),
-        preferred_cuda_dir(preferred_cuda_dir),
-        extra_flags(extra_flags.begin(), extra_flags.end()) {}
+        preferred_cuda_dir(preferred_cuda_dir) {}
 
-  using PtxOptionsTuple =
-      std::tuple<bool, std::string, std::vector<std::string>>;
+  using PtxOptionsTuple = std::tuple<bool, std::string>;
 
   PtxOptionsTuple ToTuple() {
-    return std::make_tuple(disable_ptxas_optimizations, preferred_cuda_dir, extra_flags);
+    return std::make_tuple(disable_ptxas_optimizations, preferred_cuda_dir);
   }
 };
 
@@ -67,8 +60,6 @@ port::StatusOr<std::vector<uint8>> CompilePtx(int device_ordinal,
 port::StatusOr<absl::Span<const uint8>> CompilePtxOrGetCached(
     int device_ordinal, const char* ptx,
     PtxCompilationOptions compilation_options);
-
-char* GetTFExtraPTXOptions();
 
 }  // namespace cuda
 }  // namespace stream_executor

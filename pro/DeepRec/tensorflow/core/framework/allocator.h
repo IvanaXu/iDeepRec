@@ -122,27 +122,9 @@ class Allocator {
     return AllocateRaw(alignment, num_bytes);
   }
 
-  virtual size_t BatchAllocateRaw(size_t num,
-      size_t alignment, size_t num_bytes, void** ret) {
-    for (size_t i = 0; i < num; ++i) {
-      auto ptr = AllocateRaw(alignment, num_bytes);
-      if (ptr == nullptr) {
-        return i;
-      }
-      ret[i] = ptr;
-    }
-    return num;
-  }
-
   // Deallocate a block of memory pointer to by "ptr"
   // REQUIRES: "ptr" was previously returned by a call to AllocateRaw
   virtual void DeallocateRaw(void* ptr) = 0;
-
-  // Used in cudaStreamAddCallback, which must not make any CUDA API calls
-  // Use this to avoid global sync of cuMemFree before CUDA 11.2
-  virtual void DeallocateRawAsync(void* ptr) {
-    DeallocateRaw(ptr);
-  }
 
   // Returns true if this allocator tracks the sizes of allocations.
   // RequestedSize and AllocatedSize must be overridden if
@@ -221,10 +203,6 @@ class Allocator {
   virtual void ClearStats() {}
 
   virtual void SetSafeFrontier(uint64 count) {}
-
-  // For allocator that are stream aware, allow to specify the compute
-  // stream this allocator is used for.
-  virtual void SetStream(void* stream) {}
 };
 
 // An implementation of Allocator that delegates all calls to another Allocator.
@@ -348,14 +326,6 @@ Allocator* cpu_allocator_base();
 // compile time. Where ProcessState is visible, it's preferable to
 // call it directly.
 Allocator* cpu_allocator(int numa_node = port::kNUMANoAffinity);
-
-//If use PMEM mode of memkind as allocator, please call this function
-Allocator* pmem_allocator();
-
-Allocator* ev_allocator();
-
-// If use experimental libpmem based PMEM allocator, please call this function
-Allocator* experimental_pmem_allocator(const std::string& pmem_path, size_t allocator_size);
 
 // If 'enable' is true, the default CPU allocator implementation will collect
 // AllocatorStats. By default, it's disabled.

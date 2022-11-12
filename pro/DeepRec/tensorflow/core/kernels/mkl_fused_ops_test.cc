@@ -33,7 +33,7 @@ limitations under the License.
 
 namespace tensorflow {
 
-// Helper class for converting OneDNN tensors to TF tensors and comparing to
+// Helper class for converting MKL tensors to TF tensors and comparing to
 // expected values
 
 static const uint8 dummy_tensor[] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -53,10 +53,10 @@ class CommonTestUtilities : public OpsTestBase {
  public:
   void PerformConversion(DataType dtype, const Tensor& tensor,
                          const Tensor& mkl_meta_tensor, Tensor* output) {
-    // Create an OneDNN to TF conversion node and execute it
+    // Create an MKL to TF conversion node and execute it
     TF_EXPECT_OK(NodeDefBuilder("mkl_to_tf_op", "_MklToTf")
                      .Input(FakeInput(dtype))     // Input
-                     .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
+                     .Input(FakeInput(DT_UINT8))  // Mkl second tensor
                      .Attr("T", dtype)
                      .Attr("_kernel", "MklLayoutDependentOp")
                      .Finalize(node_def()));
@@ -193,7 +193,7 @@ class CommonTestUtilities : public OpsTestBase {
   using random_gen_ = Eigen::internal::NormalRandomGenerator<T>;
 };
 
-// Testing OneDNN's fused convolution ops
+// Testing MKL's fused convolution ops
 
 template <typename T>
 class MklFusedConv2DOpTest : public OpsTestBase {
@@ -486,7 +486,7 @@ using MklFusedBiasAddDataTypes = ::testing::Types<float>;
 INSTANTIATE_TYPED_TEST_CASE_P(Test, MklFusedConv2DWithBiasOpTest,
                               MklFusedBiasAddDataTypes);
 
-// Testing OneDNN's fused depthwise convolution ops
+// Testing MKL's fused depthwise convolution ops
 template <typename T>
 class MklFusedDepthwiseConv2DOpTest : public OpsTestBase {
  protected:
@@ -716,9 +716,9 @@ class FusedPadConvOpTest : public OpsTestBase {
                      .Input(FakeInput(dtype))     // Input
                      .Input(FakeInput(dtype))     // Filter
                      .Input(FakeInput(DT_INT32))  // Padding
-                     .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-                     .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-                     .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKl second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKl second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKl second tensor
                      .Attr("padding", "VALID")
                      .Attr("data_format", data_format)
                      .Attr("T", dtype)
@@ -810,8 +810,8 @@ class FilterCacheTest : public OpsTestBase {
     TF_EXPECT_OK(NodeDefBuilder("conv2d_filter_cache", "_MklConv2D")
                      .Input(FakeInput(dtype))     // Input
                      .Input(FakeInput(dtype))     // Filter
-                     .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-                     .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKl second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKl second tensor
                      .Attr("padding", "VALID")
                      .Attr("data_format", "NHWC")
                      .Attr("is_filter_const", is_filter_const)
@@ -900,7 +900,7 @@ class MklFusedMatMulOpTest : public OpsTestBase {
     AddInputFromArray<T>(weight.shape(), weight.flat<T>());
     for (const Tensor& arg : args)
       AddInputFromArray<T>(arg.shape(), arg.flat<T>());
-    // Add OneDNN meta input for input, filter and bias.
+    // Add MKL meta input for input, filter and bias.
     AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
     AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
     for (const Tensor& arg : args)
@@ -1115,7 +1115,7 @@ TEST_F(MklFusedMatMulCacheTest, WeightCached) {
                    .Finalize(node_def()));
 
   TF_EXPECT_OK(InitOp());
-  // The tensor shape of (1,3) is selected to allow the dnnl expected
+  // The tensor shape of (1,3) is selected to allow the mkldnn expected
   // weight format to be made as OI rather than IO for BS > 1
   // A matrix is:
   // |  1 |  2 |  3 |
@@ -1128,7 +1128,7 @@ TEST_F(MklFusedMatMulCacheTest, WeightCached) {
                            {7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18});
   // Bias vector.
   AddInputFromArray<float>(TensorShape({4}), {1, 2, 3, 4});
-  // Add OneDNN meta input for input, filter and bias.
+  // Add MKL meta input for input, filter and bias.
   AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
   AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
   AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
@@ -1188,15 +1188,15 @@ class BiasCacheTest : public OpsTestBase {
             .Input(FakeInput(DT_FLOAT))  // Max-filter
             .Input(FakeInput(DT_FLOAT))  // Min-output
             .Input(FakeInput(DT_FLOAT))  // Max-output
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
-            .Input(FakeInput(DT_UINT8))  // OneDNN second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
+            .Input(FakeInput(DT_UINT8))  // MKL second tensor
             .Attr("Tinput", DT_QUINT8)
             .Attr("Tfilter", DT_QINT8)
             .Attr("Tbias", DT_FLOAT)
@@ -1295,6 +1295,300 @@ TEST_F(BiasCacheTest, Conv2DBiasCacheTest) {
 
   Run<float>(DT_QUINT8, image, filter, bias, min_input, max_input, min_filter,
              max_filter, min_output, max_output, expected, true);
+}
+
+class MklQuantizedConv2DTest : public OpsTestBase {
+ public:
+  template <typename Tinput, typename Toutput>
+  void Verify(string node_name, string node_op, Tensor& image, Tensor& filter,
+              Tensor& bias, Tensor& min_input, Tensor& max_input,
+              Tensor& min_filter, Tensor& max_filter, Tensor& min_output,
+              Tensor& max_output, Tensor& expected, const bool is_filter_const,
+              float alpha) {
+    DataType in_dtype = DataTypeToEnum<Tinput>::v();
+    DataType out_dtype = DataTypeToEnum<Toutput>::v();
+    const int stride = 1;
+
+    TF_EXPECT_OK(NodeDefBuilder(node_name, node_op)
+                     .Input(FakeInput(in_dtype))  // Input
+                     .Input(FakeInput(DT_QINT8))  // Filter
+                     .Input(FakeInput(DT_FLOAT))  // Bias
+                     .Input(FakeInput(DT_FLOAT))  // Min-input
+                     .Input(FakeInput(DT_FLOAT))  // Max-input
+                     .Input(FakeInput(DT_FLOAT))  // Min-filter
+                     .Input(FakeInput(DT_FLOAT))  // Max-filter
+                     .Input(FakeInput(DT_FLOAT))  // Min-output
+                     .Input(FakeInput(DT_FLOAT))  // Max-output
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Attr("Tinput", in_dtype)
+                     .Attr("Tfilter", DT_QINT8)
+                     .Attr("Tbias", DT_FLOAT)
+                     .Attr("T", DT_QINT8)
+                     .Attr("out_type", out_dtype)
+                     .Attr("data_format", "NHWC")
+                     .Attr("strides", {1, stride, stride, 1})
+                     .Attr("is_filter_const", is_filter_const)
+                     .Attr("is_bias_const", true)
+                     .Attr("padding", "VALID")
+                     .Attr("_kernel", "QuantizedMklOp")
+                     .Attr("alpha", alpha)
+                     .Finalize(node_def()));
+    TF_EXPECT_OK(InitOp());
+
+    // Setting up inputs and execute
+    AddInputFromArray<Tinput>(image.shape(), image.flat<Tinput>());
+    AddInputFromArray<qint8>(filter.shape(), filter.flat<qint8>());
+    AddInputFromArray<float>(bias.shape(), bias.flat<float>());
+    AddInputFromArray<float>(min_input.shape(), min_input.flat<float>());
+    AddInputFromArray<float>(max_input.shape(), max_input.flat<float>());
+    AddInputFromArray<float>(min_filter.shape(), min_filter.flat<float>());
+    AddInputFromArray<float>(max_filter.shape(), max_filter.flat<float>());
+    AddInputFromArray<float>(min_output.shape(), min_output.flat<float>());
+    AddInputFromArray<float>(max_output.shape(), max_output.flat<float>());
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+
+    TF_ASSERT_OK(RunOpKernel());
+
+    // Compare output to expected results
+    const Tensor& output_new = *GetOutput(0);
+    const Tensor& output_layout_new = *GetOutput(3);
+    CommonTestUtilities<Toutput> conv_comp_new;
+    conv_comp_new.ConvertAndCompareIntegral(out_dtype, output_new,
+                                            output_layout_new, expected);
+  }
+
+  template <typename Tinput, typename Toutput>
+  void Verify(string node_name, string node_op, Tensor& image, Tensor& filter,
+              Tensor& bias, Tensor& min_input, Tensor& max_input,
+              Tensor& min_filter, Tensor& max_filter, Tensor& min_output,
+              Tensor& max_output, Tensor& summand, Tensor& min_summand,
+              Tensor& max_summand, Tensor& expected, const bool is_filter_const,
+              float alpha) {
+    DataType in_dtype = DataTypeToEnum<Tinput>::v();
+    DataType out_dtype = DataTypeToEnum<Toutput>::v();
+    const int stride = 1;
+
+    TF_EXPECT_OK(NodeDefBuilder(node_name, node_op)
+                     .Input(FakeInput(in_dtype))  // Input
+                     .Input(FakeInput(DT_QINT8))  // Filter
+                     .Input(FakeInput(DT_FLOAT))  // Bias
+                     .Input(FakeInput(DT_FLOAT))  // Min-input
+                     .Input(FakeInput(DT_FLOAT))  // Max-input
+                     .Input(FakeInput(DT_FLOAT))  // Min-filter
+                     .Input(FakeInput(DT_FLOAT))  // Max-filter
+                     .Input(FakeInput(DT_FLOAT))  // Min-output
+                     .Input(FakeInput(DT_FLOAT))  // Max-output
+                     .Input(FakeInput(out_dtype)) // Summand
+                     .Input(FakeInput(DT_FLOAT))  // Min-summand
+                     .Input(FakeInput(DT_FLOAT))  // Max-summand
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Input(FakeInput(DT_UINT8))  // MKL second tensor
+                     .Attr("Tinput", in_dtype)
+                     .Attr("Tfilter", DT_QINT8)
+                     .Attr("Tbias", DT_FLOAT)
+                     .Attr("T", DT_QINT8)
+                     .Attr("Tsummand", out_dtype)
+                     .Attr("out_type", out_dtype)
+                     .Attr("data_format", "NHWC")
+                     .Attr("strides", {1, stride, stride, 1})
+                     .Attr("is_filter_const", is_filter_const)
+                     .Attr("is_bias_const", true)
+                     .Attr("padding", "VALID")
+                     .Attr("_kernel", "QuantizedMklOp")
+                     .Attr("alpha", alpha)
+                     .Finalize(node_def()));
+    TF_EXPECT_OK(InitOp());
+
+    // Setting up inputs and execute
+    AddInputFromArray<Tinput>(image.shape(), image.flat<Tinput>());
+    AddInputFromArray<qint8>(filter.shape(), filter.flat<qint8>());
+    AddInputFromArray<float>(bias.shape(), bias.flat<float>());
+    AddInputFromArray<float>(min_input.shape(), min_input.flat<float>());
+    AddInputFromArray<float>(max_input.shape(), max_input.flat<float>());
+    AddInputFromArray<float>(min_filter.shape(), min_filter.flat<float>());
+    AddInputFromArray<float>(max_filter.shape(), max_filter.flat<float>());
+    AddInputFromArray<float>(min_output.shape(), min_output.flat<float>());
+    AddInputFromArray<float>(max_output.shape(), max_output.flat<float>());
+    AddInputFromArray<Toutput>(summand.shape(), summand.flat<Toutput>());
+    AddInputFromArray<float>(min_summand.shape(), min_summand.flat<float>());
+    AddInputFromArray<float>(max_summand.shape(), max_summand.flat<float>());
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+    AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
+
+    TF_ASSERT_OK(RunOpKernel());
+
+    // Compare output to expected results
+    const Tensor& output_new = *GetOutput(0);
+    const Tensor& output_layout_new = *GetOutput(3);
+    CommonTestUtilities<Toutput> conv_comp_new;
+    conv_comp_new.ConvertAndCompareIntegral(out_dtype, output_new,
+                                            output_layout_new, expected);
+  }
+
+  template <typename Tinput, typename Toutput>
+  void Run(string node_op, gtl::ArraySlice<Toutput> ground_truth, float alpha) {
+    DataType in_dtype = DataTypeToEnum<Tinput>::v();
+    DataType out_dtype = DataTypeToEnum<Toutput>::v();
+
+    Tensor image(in_dtype,
+                 {image_batch_count, image_height, image_width, depth});
+    test::FillValues<Tinput>(&image, {1, 2, 0, 4, 5, 6, 0, 8, 9, 10, 0, 120});
+
+    Tensor filter(DT_QINT8, {kFilterSize, kFilterSize, depth, kFilterCount});
+    test::FillValues<qint8>(&filter, {1, 0, -1, 1, 0, -1, 1, 0, -1});
+
+    Tensor bias(DT_FLOAT, {kFilterCount});
+    test::FillValues<float>(&bias, {1});
+
+    Tensor min_input(DT_FLOAT, {1});
+    Tensor max_input(DT_FLOAT, {1});
+
+    if (std::is_same<Tinput, quint8>::value) {
+      test::FillValues<float>(&min_input, {0});
+      test::FillValues<float>(&max_input, {255.0f});
+    } else {
+      test::FillValues<float>(&min_input, {-127.0f});
+      test::FillValues<float>(&max_input, {127.0f});
+    }
+
+    Tensor min_filter(DT_FLOAT, {1});
+    test::FillValues<float>(&min_filter, {-127.0f});
+
+    Tensor max_filter(DT_FLOAT, {1});
+    test::FillValues<float>(&max_filter, {127.0f});
+
+    Tensor min_output(DT_FLOAT, {1});
+    Tensor max_output(DT_FLOAT, {1});
+
+    if (std::is_same<Toutput, quint8>::value) {
+      test::FillValues<float>(&min_output, {0});
+      test::FillValues<float>(&max_output, {255.0f});
+    } else {
+      test::FillValues<float>(&min_output, {-127.0f});
+      test::FillValues<float>(&max_output, {127.0f});
+    }
+
+    Tensor summand(out_dtype, TensorShape({1, 1, 2, 1}));
+    test::FillValues<Toutput>(&summand, {2, 3});
+
+    Tensor min_summand(DT_FLOAT, {1});
+    Tensor max_summand(DT_FLOAT, {1});
+
+    if (std::is_same<Toutput, quint8>::value) {
+      test::FillValues<float>(&min_summand, {0});
+      test::FillValues<float>(&max_summand, {255.0f});
+    } else {
+      test::FillValues<float>(&min_summand, {-127.0f});
+      test::FillValues<float>(&max_summand, {127.0f});
+    }
+
+    Tensor expected(out_dtype, TensorShape({1, 1, 2, 1}));
+    test::FillValues<Toutput>(&expected, ground_truth);
+
+    string node_name = node_op.substr(1, node_op.length() - 1);
+
+    if (node_op == "_MklQuantizedConv2DWithBiasAndReluAndRequantize") {
+      Verify<Tinput, Toutput>(node_name, node_op, image, filter, bias,
+                              min_input, max_input, min_filter, max_filter,
+                              min_output, max_output, expected, true, alpha);
+      return;
+    }
+
+    if (node_op == "_MklQuantizedConv2DWithBiasReluAndSumAndRequantize") {
+      Verify<Tinput, Toutput>(node_name, node_op, image, filter, bias,
+                              min_input, max_input, min_filter, max_filter,
+                              min_output, max_output, summand, min_summand,
+                              max_summand, expected, true, alpha);
+      return;
+    }
+
+    TF_CHECK_OK(Status(error::Code::FAILED_PRECONDITION,
+                       "Current node op is not supported in this unit test"));
+  }
+
+ protected:
+  const int depth = 1;
+  const int image_width = 4;
+  const int image_height = 3;
+  const int image_batch_count = 1;
+  const int kFilterSize = 3;
+  const int kFilterCount = 1;
+};
+
+TEST_F(MklQuantizedConv2DTest, WithBiasAndReluAndRequantizeTest_U8in) {
+  string node_op = "_MklQuantizedConv2DWithBiasAndReluAndRequantize";
+  Run<quint8, quint8>(node_op, {16, 0}, 0);
+}
+
+TEST_F(MklQuantizedConv2DTest, WithBiasAndReluAndRequantizeTest_S8in) {
+  string node_op = "_MklQuantizedConv2DWithBiasAndReluAndRequantize";
+  Run<qint8, quint8>(node_op, {16, 0}, 0);
+}
+
+TEST_F(MklQuantizedConv2DTest, WithBiasAndLeakyReluAndRequantizeTest_U8in) {
+  string node_op = "_MklQuantizedConv2DWithBiasAndReluAndRequantize";
+  Run<quint8, qint8>(node_op, {16, -23}, 0.2);
+}
+
+TEST_F(MklQuantizedConv2DTest, WithBiasAndLeakyReluAndRequantizeTest_S8in) {
+  string node_op = "_MklQuantizedConv2DWithBiasAndReluAndRequantize";
+  Run<qint8, qint8>(node_op, {16, -23}, 0.2);
+}
+
+TEST_F(MklQuantizedConv2DTest, WithBiasReluAndSumAndRequantizeTest_U8in) {
+  string node_op = "_MklQuantizedConv2DWithBiasReluAndSumAndRequantize";
+  Run<quint8, quint8>(node_op, {18, 3}, 0);
+}
+
+TEST_F(MklQuantizedConv2DTest, WithBiasReluAndSumAndRequantizeTest_S8in) {
+  string node_op = "_MklQuantizedConv2DWithBiasReluAndSumAndRequantize";
+  Run<qint8, quint8>(node_op, {18, 3}, 0);
+}
+
+TEST_F(MklQuantizedConv2DTest, WithBiasLeakyReluAndSumAndRequantizeTest_U8in) {
+  string node_op = "_MklQuantizedConv2DWithBiasReluAndSumAndRequantize";
+  Run<quint8, qint8>(node_op, {18, -20}, 0.2);
+}
+
+TEST_F(MklQuantizedConv2DTest, WithBiasLeakyReluAndSumAndRequantizeTest_S8in) {
+  string node_op = "_MklQuantizedConv2DWithBiasReluAndSumAndRequantize";
+  Run<qint8, qint8>(node_op, {18, -20}, 0.2);
 }
 
 // Testing fusion of pad and fusedconv2d
@@ -1453,7 +1747,7 @@ class MklPadWithFusedConv2DOpTest : public OpsTestBase {
     for (const Tensor& arg : args)
       AddInputFromArray<T>(arg.shape(), arg.flat<T>());
     AddInputFromArray<int32>(padding.shape(), padding.flat<int32>());
-    // Add OneDNN meta input for input, filter, pad and agrs.
+    // Add MKL meta input for input, filter, pad and agrs.
     for (int i = 0; i < args.size() + 3; ++i)
       AddInputFromArray<uint8>(dummy_shape, dummy_tensor);
     TF_ASSERT_OK(RunOpKernel());

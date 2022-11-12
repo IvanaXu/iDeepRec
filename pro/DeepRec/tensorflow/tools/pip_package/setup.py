@@ -47,35 +47,25 @@ DOCLINES = __doc__.split('\n')
 # result for pip.
 # Also update tensorflow/tensorflow.bzl and
 # tensorflow/core/public/version.h
-_VERSION = '1.15.5+deeprec2206'
+_VERSION = '1.15.0-up3'
 
 REQUIRED_PACKAGES = [
-    'absl-py >= 0.9.0',
-    'astunparse == 1.6.3',
+    'absl-py >= 0.7.0',
+    'astor >= 0.6.0',
     'backports.weakref >= 1.0rc1;python_version<"3.4"',
     'enum34 >= 1.1.6;python_version<"3.4"',
-    # functools comes with python3, need to install the backport for python2
-    'functools32 >= 3.2.3;python_version<"3"',
-    'astor == 0.8.1',
-    'gast == 0.3.3',
+    'gast == 0.2.2',
     'google_pasta >= 0.1.6',
     'keras_applications >= 1.0.8',
     'keras_preprocessing >= 1.0.5',
-    # mock comes with unittest.mock for python3, need to install for python2
-    'mock >= 2.0.0;python_version<"3"',
-    'numpy >= 1.16.0, < 1.19.0',
+    'numpy >= 1.16.0, < 2.0',
     'opt_einsum >= 2.3.2',
     'six >= 1.10.0',
     'protobuf >= 3.6.1',
     'tensorboard >= 1.15.0, < 1.16.0',
-    'tensorflow-estimator >= 1.15.1, < 1.15.5',
+    'tensorflow-estimator == 1.15.1',
     'termcolor >= 1.1.0',
-    # python3 requires wheel 0.26
-    'wheel >= 0.26;python_version>="3"',
-    'wheel;python_version<"3"',
     'wrapt >= 1.11.1',
-    # Pin h5py to at most 2.10.0 as newer versions break old keras tests
-    'h5py <= 2.10.0',
 ]
 
 if sys.byteorder == 'little':
@@ -91,6 +81,16 @@ if '--project_name' in sys.argv:
   sys.argv.remove('--project_name')
   sys.argv.pop(project_name_idx)
 
+# python3 requires wheel 0.26
+if sys.version_info.major == 3:
+  REQUIRED_PACKAGES.append('wheel >= 0.26')
+else:
+  REQUIRED_PACKAGES.append('wheel')
+  # mock comes with unittest.mock for python3, need to install for python2
+  REQUIRED_PACKAGES.append('mock >= 2.0.0')
+  # functools comes with python3, need to install the backport for python2
+  REQUIRED_PACKAGES.append('functools32 >= 3.2.3')
+
 # tf-nightly should depend on tb-nightly
 if 'tf_nightly' in project_name:
   for i, pkg in enumerate(REQUIRED_PACKAGES):
@@ -103,6 +103,9 @@ if 'tf_nightly' in project_name:
 
 # pylint: disable=line-too-long
 CONSOLE_SCRIPTS = [
+    'toco_from_protos = tensorflow.lite.toco.python.toco_from_protos:main',
+    'tflite_convert = tensorflow.lite.python.tflite_convert:main',
+    'toco = tensorflow.lite.python.tflite_convert:main',
     'saved_model_cli = tensorflow.python.tools.saved_model_cli:main',
     # We need to keep the TensorBoard command, even though the console script
     # is now declared by the tensorboard pip package. If we remove the
@@ -288,12 +291,13 @@ setup(
         'Intended Audience :: Education',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3 :: Only',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',

@@ -209,7 +209,7 @@ class EigenGpuStreamDevice : public ::Eigen::StreamInterface {
       LogMemory::RecordRawDeallocation(data->operation_, data->step_id_,
                                        data->address_, data->allocator_, false);
     }
-    data->allocator_->DeallocateRawAsync(data->address_);
+    data->allocator_->DeallocateRaw(data->address_);
     delete data;
   }
 
@@ -248,23 +248,6 @@ class BaseGPUDevice::StreamGroupFactory {
       group->compute->Init();
       VLOG(2) << "Created stream[" << stream_group_within_gpu
               << "] = " << group->compute;
-
-#if TENSORFLOW_USE_ROCM
-      // ROCm streams are lightweight and will not necessarily trigger device
-      // queue init until they are first used. For optimal performance,
-      // compute and nccl streams must be immediate siblings.
-      group->nccl = new se::Stream(executor);
-      group->nccl->Init();
-      VLOG(2) << "Created nccl_stream[" << stream_group_within_gpu
-              << "] = " << group->nccl;
-
-      // ROCm streams are lightweight and will not necessarily trigger device
-      // queue init until they are first used. For optimal performance,
-      // compute and nccl streams must be immediate siblings.
-      // Force underlying resource creation now.
-      group->compute->ThenWaitFor(group->nccl);
-      group->nccl->ThenWaitFor(group->compute);
-#endif
 
       group->host_to_device = new se::Stream(executor);
       group->host_to_device->Init();
@@ -357,8 +340,13 @@ Status BaseGPUDevice::InitScratchBuffers() {
       se::DeviceMemory<char> mem(
           se::DeviceMemoryBase(scratch_buffer, scratch_buffer_size));
 
-      TF_RETURN_IF_ERROR(executor_->SynchronousMemZero(
-          &mem, Eigen::kGpuScratchSize + sizeof(unsigned int)));
+      bool ok = executor_->SynchronousMemZero(
+          &mem, Eigen::kGpuScratchSize + sizeof(unsigned int));
+      if (!ok) {
+        return errors::FailedPrecondition(
+            "Failed to memcopy into scratch buffer for device ",
+            tf_gpu_id_.value());
+      }
       scratch_.push_back(static_cast<char*>(scratch_buffer));
     }
   }
@@ -383,12 +371,8 @@ Status BaseGPUDevice::Init(const SessionOptions& options) {
     streams_.push_back(StreamGroupFactory::Global().GetOrCreate(
         tf_gpu_id_, i, executor_, options.config.gpu_options()));
     device_contexts_.push_back(new GPUDeviceContext(
-        i, streams_.back()->compute,
-#if TENSORFLOW_USE_ROCM
-        streams_.back()->nccl,
-#endif
-        streams_.back()->host_to_device, streams_.back()->device_to_host,
-        streams_.back()->device_to_device));
+        i, streams_.back()->compute, streams_.back()->host_to_device,
+        streams_.back()->device_to_host, streams_.back()->device_to_device));
   }
 
   em_ = EventMgrFactory::Singleton()->GetEventMgr(executor_,
@@ -490,6 +474,41 @@ bool BaseGPUDevice::RequiresRecordingAccessedTensors() const {
   return streams_.size() > 1;
 }
 
+Status BaseGPUDevice::FillContextMap(const Graph* graph,
+                                     DeviceContextMap* device_context_map) {
+  VLOG(2) << "FillContextMap";
+
+  const size_t num_streams = streams_.size();
+  // Special case for single stream.
+  if (num_streams == 1) {
+    return Status::OK();
+  }
+  const int64 before = Env::Default()->NowMicros();
+  gpu_stream_util::AssignStreamsOpts opts;
+  opts.max_streams = static_cast<int32>(num_streams);
+  std::unordered_map<int, int> node_to_stream_id;
+  TF_RETURN_IF_ERROR(
+      gpu_stream_util::AssignStreams(graph, opts, &node_to_stream_id));
+  int64 elapsed = Env::Default()->NowMicros() - before;
+  VLOG(3) << "AssignStreams took " << elapsed << "us";
+
+  // Fill in the context map.  It is OK for this map to contain
+  // duplicate DeviceContexts so long as we increment the refcount.
+  device_context_map->resize(graph->num_node_ids());
+  for (Node* n : graph->nodes()) {
+    auto mapped_stream = node_to_stream_id[n->id()];
+    CHECK_LE(mapped_stream, num_streams);
+    auto ctx = device_contexts_[mapped_stream];
+    VLOG(3) << "Assigned stream " << node_to_stream_id[n->id()]
+            << " ==> stream[" << ctx->stream_id() << "] for node id " << n->id()
+            << " " << n->type_string() << " " << n->name();
+    ctx->Ref();
+    (*device_context_map)[n->id()] = ctx;
+  }
+
+  return Status::OK();
+}
+
 string BaseGPUDevice::ComputeOpKernelDebugString(const OpKernel& op_kernel,
                                                  const int& stream_id) {
   return strings::StrCat(op_kernel.name(), " op ", op_kernel.type_string(),
@@ -520,6 +539,38 @@ void BaseGPUDevice::Compute(OpKernel* op_kernel, OpKernelContext* context) {
             << ComputeOpKernelDebugString(*op_kernel, stream_id);
   }
 
+  const auto num_streams = streams_.size();
+  if (num_streams > 1) {
+    // If this op's device context is different from the other contexts,
+    // we must wait on the stream.
+    for (int i = 0; i < context->num_inputs(); ++i) {
+      const GPUDeviceContext* idc =
+          static_cast<GPUDeviceContext*>(context->input_device_context(i));
+      OP_REQUIRES(context, idc != nullptr,
+                  errors::Internal("Input device context ", i,
+                                   " was not set properly."));
+      if (vlog_2) {
+        const void* base;
+        size_t len;
+        if (context->has_input(i)) {
+          if (IsRefType(context->input_dtype(i))) {
+            Tensor tensor = context->mutable_input(i, false);
+            base = DMAHelper::base(&tensor);
+            len = tensor.TotalBytes();
+          } else {
+            const Tensor& tensor = context->input(i);
+            base = DMAHelper::base(&tensor);
+            len = tensor.TotalBytes();
+          }
+          LOG(INFO) << "Input " << i << " " << base << "  " << len;
+          LOG(INFO) << "  stream[" << stream_id << "].ThenWaitFor(stream["
+                    << idc->stream_id() << "])"
+                    << ((idc->stream() == stream) ? " not needed" : "");
+        }
+      }
+      if (idc->stream() != stream) stream->ThenWaitFor(idc->stream());
+    }
+  }
   if (kernel_tracker_.get()) {
     context->set_record_memory_consumption(true);
     if (pending_cap_ > 0) {
@@ -823,27 +874,21 @@ Status VerifyVirtualDeviceSettings(
   return Status::OK();
 }
 
-int64 MinSystemMemory(int64 available_memory, int cc_major) {
+int64 MinSystemMemory(int64 available_memory) {
   // We use the following heuristic for now:
   //
   // If the available_memory is < 2GiB, we allocate 225MiB to system memory.
-  // Otherwise, depending on the capability version assign
-  //  575MiB (for cuda_compute_capability <= 6.x) or
-  // 1064MiB (for cuda_compute_capability <= 7.x) or
-  // 1600MiB (for cuda_compute_capability >= 8.x)
+  // Otherwise, allocate max(300MiB, 0.05 * available_memory) to system memory.
   //
   // In the future we could be more sophisticated by using a table of devices.
   int64 min_system_memory;
   if (available_memory < (1LL << 31)) {
+    // 225MiB
     min_system_memory = 225 * 1024 * 1024;
   } else {
-    if (cc_major <= 6) {
-      min_system_memory = 575 * 1024 * 1024;
-    } else if (cc_major <= 7) {
-      min_system_memory = 1064 * 1024 * 1024;
-    } else {
-      min_system_memory = 1600 * 1024 * 1024;
-    }
+    // max(300 MiB, 0.05 * available_memory)
+    min_system_memory =
+        std::max(int64{314572800}, static_cast<int64>(available_memory * 0.05));
   }
 #if defined(__GNUC__) && defined(__OPTIMIZE__)
 // Do nothing
@@ -882,13 +927,13 @@ Status SingleVirtualDeviceMemoryLimit(const GPUOptions& gpu_options,
   int64 allocated_memory = 0;
   const double per_process_gpu_memory_fraction =
       gpu_options.per_process_gpu_memory_fraction();
-  int cc_major = 0, cc_minor = 0;
-  if (!se->GetDeviceDescription().cuda_compute_capability(&cc_major,
-                                                          &cc_minor)) {
-    return errors::Internal("Failed to get compute capability for device.");
-  }
   if (per_process_gpu_memory_fraction > 1.0 ||
       gpu_options.experimental().use_unified_memory()) {
+    int cc_major = 0, cc_minor = 0;
+    if (!se->GetDeviceDescription().cuda_compute_capability(&cc_major,
+                                                            &cc_minor)) {
+      return errors::Internal("Failed to get compute capability for device.");
+    }
     if (cc_major < 6) {
       return errors::Internal(
           "Unified memory on GPUs with compute capability lower than 6.0 "
@@ -898,37 +943,12 @@ Status SingleVirtualDeviceMemoryLimit(const GPUOptions& gpu_options,
 
   if (per_process_gpu_memory_fraction == 0) {
     allocated_memory = available_memory;
-    const int64 min_system_memory = MinSystemMemory(available_memory,
-                                                    cc_major);
+    const int64 min_system_memory = MinSystemMemory(available_memory);
     if (min_system_memory < allocated_memory) {
       allocated_memory -= min_system_memory;
     }
   } else {
     allocated_memory = total_memory * per_process_gpu_memory_fraction;
-  }
-
-  // override the excluded memory when TF_DEVICE_MIN_SYS_MEMORY_IN_MB is set
-  const char* force_device_reserved_bytes =
-      std::getenv("TF_DEVICE_MIN_SYS_MEMORY_IN_MB");
-  if (force_device_reserved_bytes != nullptr &&
-      strcmp(force_device_reserved_bytes, "") != 0) {
-    size_t allowable_reserved_memory;
-    sscanf(force_device_reserved_bytes, "%zu", &allowable_reserved_memory);
-    //Convert MBytes to Bytes
-    allowable_reserved_memory = allowable_reserved_memory * 1024 * 1024; 
-    // TF_DEVICE_MIN_SYS_MEMORY_IN_MB overrides per_process_gpu_memory_fraction
-    if(allowable_reserved_memory <= available_memory) {
-      allocated_memory = available_memory - allowable_reserved_memory;
-      VLOG(1) << "Setting the GPU reserved bytes to "
-         << strings::HumanReadableNumBytes(allocated_memory) << " MBytes";
-    } else {
-      LOG(WARNING)
-            << "The requested reserved device memory " 
-            << strings::HumanReadableNumBytes(allowable_reserved_memory)
-            << " is larger than the available memory of "
-            << strings::HumanReadableNumBytes(available_memory)
-            << ". The request is ignored.";
-    }
   }
   *memory_limit = allocated_memory;
   return Status::OK();
@@ -1285,7 +1305,6 @@ Status BaseGPUDeviceFactory::CreateGPUDevice(
             << (bytes_limit >> 20) << " MB memory) -> physical GPU ("
             << GetShortDeviceDescription(platform_gpu_id, *desc) << ")";
   TF_RETURN_IF_ERROR(gpu_device->Init(options));
-  gpu_allocator->SetStream(gpu_device->GetStream());
   devices->push_back(std::move(gpu_device));
 
   return Status::OK();

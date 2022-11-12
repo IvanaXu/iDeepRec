@@ -25,7 +25,6 @@ limitations under the License.
 #include "absl/memory/memory.h"
 #include "absl/strings/str_join.h"
 #include "tensorflow/core/common_runtime/device.h"
-#include "tensorflow/core/common_runtime/graph_optimizer.h"
 #include "tensorflow/core/common_runtime/metrics.h"
 #include "tensorflow/core/common_runtime/optimization_registry.h"
 #include "tensorflow/core/common_runtime/placer.h"
@@ -52,7 +51,6 @@ limitations under the License.
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/types.h"
 #include "tensorflow/core/util/device_name_utils.h"
-#include "tensorflow/core/util/env_var.h"
 #include "tensorflow/core/util/util.h"
 
 #ifndef IS_MOBILE_PLATFORM
@@ -597,94 +595,6 @@ Status GraphExecutionState::PruneGraph(
   return Status::OK();
 }
 
-namespace {
-bool FindGradientOps(Graph* g, std::unordered_set<const Node*>& visited) {
-  bool found = false;
-  for (Node* n : g->nodes()) {
-    // Ftrl & Adagrad's input 3 is grad
-    if (n->IsApplyAdagradOps() ||
-        n->IsSparseApplyAdagradOps() ||
-        n->IsApplyFtrlOps() ||
-        n->IsSparseApplyFtrlOps()) {
-      Node* gradient = nullptr;
-      TF_CHECK_OK(n->input_node(3, &gradient));
-      visited.insert(gradient);
-      found = true;
-    }
-    // Adam's input 9 is grad
-    if (n->IsApplyAdamOps() ||
-        n->IsApplySparseAdamOps()) {
-      Node* gradient = nullptr;
-      TF_CHECK_OK(n->input_node(9, &gradient));
-      visited.insert(gradient);
-      found = true;
-    }
-  }
-  return found;
-}
-}
-
-Status GraphExecutionState::PipelineGraph(std::unique_ptr<Graph>* g,
-    int32 micro_batch_num) {
-  Graph* graph = g->get();
-  std::unique_ptr<Graph> g2duplicated(new Graph(OpRegistry::Global()));
-  CopyGraph(*graph, g2duplicated.get());
-
-  std::unordered_set<const Node*> visited;
-  if (!FindGradientOps(g2duplicated.get(), visited)) {
-    return Status::OK();
-  }
-  auto excluded = FindExcludeDuplicationNodes(g2duplicated.get(), visited);
-  // Duplicate Graph with micro_batch_num-1 duplications
-  ExtendGraph(g2duplicated.get(), excluded, micro_batch_num - 1);
-
-  std::unique_ptr<Graph> copy(new Graph(graph->flib_def()));
-  CopyGraph(*(g2duplicated.get()), copy.get());
-  g->swap(copy);
-
-  return Status::OK();
-}
-
-Status GraphExecutionState::SmartStageGraph(std::unique_ptr<Graph>* g,
-                                            const std::vector<std::string>& target_nodes,
-                                            const bool do_smart_stage_gpu) {
-    VLOG(2) << "GraphExecutionState::SmartStageGraph";
-    Graph* graph = g->get();
-    std::unique_ptr<Graph> staged_graph(new Graph(OpRegistry::Global()));
-    CopyGraph(*graph, staged_graph.get());
-    std::map<std::string, Node*> stage_node_map;
-    std::map<std::string, Node*> unstage_node_map;
-    for (Node* n : staged_graph.get()->op_nodes()) {
-      if (n->IsStage()) {
-        std::string name = n->def().attr().at("shared_name").s();
-        stage_node_map[name] = n;
-      } else if (n->IsUnstage()) {
-        std::string name = n->def().attr().at("shared_name").s();
-        unstage_node_map[name] = n;
-      }
-    }
-
-    // there should find only one cpu device
-    std::vector<Device *> devices = device_set_->devices();
-    std::string cpu_device_name = "";
-    for (auto iter = devices.begin(); iter != devices.end(); iter++) {
-      if ((*iter)->device_type() == "CPU") {
-        cpu_device_name = (*iter)->name();
-        break;
-      }
-    }
-
-    std::map<std::string, Node*>::iterator it;
-    for (it = stage_node_map.begin(); it != stage_node_map.end(); ++it) {
-      if (unstage_node_map.find(it->first) != unstage_node_map.end()) {
-        StageGraph(staged_graph.get(), it->second, unstage_node_map[it->first], 
-                   target_nodes, do_smart_stage_gpu, cpu_device_name);
-      }
-    }
-    g->swap(staged_graph);
-    return Status::OK();
-}
-
 Status GraphExecutionState::InitBaseGraph(std::unique_ptr<Graph>&& new_graph) {
   // Save stateful placements before placing.
   RestoreStatefulNodes(new_graph.get());
@@ -695,19 +605,6 @@ Status GraphExecutionState::InitBaseGraph(std::unique_ptr<Graph>&& new_graph) {
   optimization_options.graph = &new_graph;
   optimization_options.flib_def = flib_def_.get();
   optimization_options.device_set = device_set_;
-
-  const OptimizerOptions& session_optimizer_options =
-      session_options_->config.graph_options().optimizer_options();
-  if (session_optimizer_options.do_op_fusion()) {
-    OptimizerOptions opts;
-    opts.set_opt_level(OptimizerOptions::L0);
-    opts.set_do_op_fusion(
-      session_optimizer_options.do_op_fusion());
-    GraphOptimizer optimizer(opts);
-    VLOG(2) << "RUN Graph Optimization Passes before PRE_PLACEMENT";
-    optimizer.Optimize(nullptr, nullptr,
-                      /*device=*/nullptr, &new_graph, /*shape_map=*/nullptr);
-  }
 
   TF_RETURN_IF_ERROR(OptimizationPassRegistry::Global()->RunGrouping(
       OptimizationPassRegistry::PRE_PLACEMENT, optimization_options));
@@ -727,25 +624,6 @@ Status GraphExecutionState::InitBaseGraph(std::unique_ptr<Graph>&& new_graph) {
   for (const Node* n : new_graph->nodes()) {
     VLOG(2) << "Mapping " << n->name() << " to " << n->cost_id();
     node_name_to_cost_id_map_[n->name()] = n->cost_id();
-  }
-
-  int32 micro_batch_num = session_optimizer_options.micro_batch_num();
-  if (micro_batch_num > 1) {
-    VLOG(2) << "RUN Graph Optimization: Runtime Pipeline";
-    PipelineGraph(&new_graph, micro_batch_num);
-  }
-
-  if (session_optimizer_options.do_smart_stage() ||
-      session_optimizer_options.do_smart_stage_gpu()) {
-    VLOG(2) << "RUN Graph Optimization: SmartStage";
-    std::string tn;
-    ReadStringFromEnvVar("TARGET_NODES_NAME", "", &tn);
-    std::vector<std::string> target_nodes;
-    for (std::string s : str_util::Split(tn, ';')) {
-      target_nodes.push_back(s.substr(0, s.find_last_of(':')));
-    }
-    SmartStageGraph(&new_graph, target_nodes, 
-                    session_optimizer_options.do_smart_stage_gpu());
   }
 
   SaveStatefulNodes(new_graph.get());

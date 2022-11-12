@@ -71,6 +71,9 @@ class BaseGPUDevice : public LocalDevice {
       DeviceContext* device_context,
       const TensorReferenceVector& tensor_refs) override;
 
+  Status FillContextMap(const Graph* graph,
+                        DeviceContextMap* device_context_map) override;
+
   void Compute(OpKernel* op_kernel, OpKernelContext* context) override;
 
   Status Sync() override;
@@ -123,11 +126,6 @@ class BaseGPUDevice : public LocalDevice {
   // the compute stream and are not yet known to have completed.
   int PendingKernels();
 
-  void* GetStream() {
-    CHECK(streams_.size() == 1);
-    return streams_.front()->compute->implementation()->GpuStreamMemberHack();
-  }
-
  protected:
   Allocator* gpu_allocator_;  // not owned
   Allocator* cpu_allocator_;  // not owned
@@ -139,9 +137,6 @@ class BaseGPUDevice : public LocalDevice {
   friend class GPUDeviceTestHelper;
   struct StreamGroup {
     se::Stream* compute = nullptr;
-#if TENSORFLOW_USE_ROCM
-    se::Stream* nccl = nullptr;
-#endif
     se::Stream* host_to_device = nullptr;
     se::Stream* device_to_host = nullptr;
     gtl::InlinedVector<se::Stream*, 4> device_to_device;

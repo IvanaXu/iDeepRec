@@ -49,13 +49,6 @@ class XlaCompilationCache : public ResourceBase {
   enum class CompileMode {
     kLazy,
     kStrict,
-    kAsync,
-  };
-
-  enum class CompileState {
-    kUncompiled,
-    kCompiling,
-    kCompiled,
   };
 
   // Compiles a function into a XlaCompiler::CompilationResult that can be used
@@ -68,9 +61,7 @@ class XlaCompilationCache : public ResourceBase {
   // heuristics, the compilation cache may decide not to compile the cluster at
   // this time.  In this case it returns null into both `out_compilation_result`
   // and `out_executable`.  If `compile_mode` is `kStrict` then the compilation
-  // cache always attempts the compilation on a cache miss. if compilation mode
-  // is 'kAsync' compilation of the cluster happens in the background while the
-  // fall
+  // cache always attempts the compilation on a cache miss.
   //
   // The result of compilation is written to `*out_compilation_result`, which
   // must be non-null. If `out_executable` is non-null, also builds an
@@ -79,7 +70,7 @@ class XlaCompilationCache : public ResourceBase {
   // non-constant outputs.
   Status Compile(const XlaCompiler::Options& options,
                  const NameAttrList& function,
-                 std::vector<XlaCompiler::Argument>& args,
+                 absl::Span<const XlaCompiler::Argument> args,
                  const XlaCompiler::CompileOptions& compile_options,
                  CompileMode compile_mode,
                  const XlaCompiler::CompilationResult** out_compilation_result,
@@ -89,7 +80,7 @@ class XlaCompilationCache : public ResourceBase {
   // XlaCompiler::CompileFunction.
   Status CompileSingleOp(
       const XlaCompiler::Options& options,
-      std::vector<XlaCompiler::Argument>& args, OpKernelContext* ctx,
+      absl::Span<const XlaCompiler::Argument> args, OpKernelContext* ctx,
       const XlaCompiler::CompileOptions& compile_options,
       const XlaCompiler::CompilationResult** out_compilation_result,
       xla::LocalExecutable** out_executable);
@@ -131,11 +122,10 @@ class XlaCompilationCache : public ResourceBase {
   // Common implementation of Compile and CompileSingleOp.
   Status CompileImpl(
       const XlaCompiler::Options& options, const NameAttrList& function,
-      std::vector<XlaCompiler::Argument>& args,
+      absl::Span<const XlaCompiler::Argument> args,
       const std::function<Status(XlaCompiler* compiler,
-                                 const std::vector<XlaCompiler::Argument>& args,
                                  XlaCompiler::CompilationResult*)>& compile_fn,
-      CompileMode compile_mode,
+      absl::optional<int64> compile_threshold,
       const XlaCompiler::CompilationResult** out_compilation_result,
       xla::LocalExecutable** out_executable);
 
@@ -153,7 +143,7 @@ class XlaCompilationCache : public ResourceBase {
     mutex mu;
 
     // Have we tried compiling this entry?
-    CompileState compile_state = CompileState::kUncompiled;
+    bool compiled = false;
 
     // The number of times a compilation with this signature has been requested.
     int64 request_count = 0;
@@ -169,21 +159,6 @@ class XlaCompilationCache : public ResourceBase {
     std::unique_ptr<xla::LocalExecutable> executable GUARDED_BY(mu);
   };
 
-  Status CompileStrict(
-    Entry* entry, const XlaCompiler::Options& options,
-    const std::vector<XlaCompiler::Argument>& args,
-    const string &function_name,
-    const std::function<Status(XlaCompiler* compiler,
-                               const std::vector<XlaCompiler::Argument>& args,
-                               XlaCompiler::CompilationResult*)>& compile_fn);
-  Status CompileAsynchronous(
-    Entry* entry, const XlaCompiler::Options& options,
-    const std::vector<XlaCompiler::Argument>& args,
-    const string &function_name,
-    const std::function<Status(XlaCompiler* compiler,
-                               const std::vector<XlaCompiler::Argument>& args,
-                               XlaCompiler::CompilationResult*)>& compile_fn);
-
   mutex compile_cache_mu_;
   absl::flat_hash_map<Signature, std::unique_ptr<Entry>, Signature::Hash> cache_
       GUARDED_BY(compile_cache_mu_);
@@ -198,13 +173,9 @@ class XlaCompilationCache : public ResourceBase {
     // Cumulative time spent compiling the cluster.
     int64 cumulative_compile_time_us = 0;
 
-    // Maximum time spent compiling the cluster.
-    uint64 max_compile_time_s = 0;
-
     // True if we have decided that this cluster is too dynamic (i.e. its shapes
-    // change too frequently) to profitably JIT compile, or when it takes too long
-    // to compile the cluster.  Once a cluster is tagged megamorphic, it stays
-    // megamorphic forever.
+    // change too frequently) to profitably JIT compile.  Once a cluster is
+    // tagged megamorphic, it stays megamorphic forever.
     bool is_megamorphic = false;
   };
 
@@ -214,31 +185,9 @@ class XlaCompilationCache : public ResourceBase {
   absl::flat_hash_map<string, ClusterCompileStats> cluster_compile_stats_
       GUARDED_BY(cluster_compile_stats_mu_);
 
-  struct AsyncCompilation {
-    mutex async_compilation_mu_;
-
-    // number of threads for asynchronous compilations;
-    static constexpr int64 kNrofCompilerThreads = 10;
-
-    // maximum number of ongoing compilations;
-    static constexpr int64 kMaxNrofOngoingCompilations = kNrofCompilerThreads;
-
-    // pool of threads for asynchronous compilations;
-    thread::ThreadPool compiler_threads;
-
-    // number of ongoing compilations.
-    int64 nrof_ongoing_compilations GUARDED_BY(async_compilation_mu_) = 0;
-
-    AsyncCompilation()
-      : compiler_threads(tensorflow::Env::Default(), "aync_compiler_threads",
-                         kNrofCompilerThreads) {}
-    ~AsyncCompilation() {}
-
-  } async_compilation_;
-
   // The number of times a lazy compilation must be requested for a specific
   // signature before  we attempt to compile it.
-  static constexpr int64 kDefaultCompilationThreshold = 3;
+  static constexpr int64 kDefaultCompilationThreshold = 2;
 
   TF_DISALLOW_COPY_AND_ASSIGN(XlaCompilationCache);
 };

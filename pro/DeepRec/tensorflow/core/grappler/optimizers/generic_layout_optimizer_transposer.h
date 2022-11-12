@@ -148,12 +148,10 @@ class Transposer {
                               utils::MutationNewNode* added_node);
 
  protected:
-  int GetFanoutPortRank(const utils::MutableNodeView& node, int port) const;
   bool IsFanoutPortRankN(const utils::MutableNodeView& node, int port,
                          int n) const;
   bool IsFanoutPortsRankN(const utils::MutableNodeView& node,
                           absl::Span<const int> ports, int n) const;
-  int GetFaninPortRank(const utils::MutableNodeView& node, int port) const;
   bool IsFaninPortRankN(const utils::MutableNodeView& node, int port,
                         int n) const;
 
@@ -209,14 +207,6 @@ class DefaultLayoutSensitiveOpTransposer : public LayoutSensitiveOpTransposer {
                        utils::MutableNodeView* node) override;
 };
 
-class BiasAddTransposer : public LayoutSensitiveOpTransposer {
- public:
-  explicit BiasAddTransposer () : LayoutSensitiveOpTransposer() {}
-
-  Status TransposeNode(TransposeContext* context,
-                       utils::MutableNodeView* node) override;
-};
-
 class AvgPoolGradTransposer : public LayoutSensitiveOpTransposer {
  public:
   explicit AvgPoolGradTransposer() : LayoutSensitiveOpTransposer() {}
@@ -244,30 +234,6 @@ class Conv2DBackpropFilterTransposer : public LayoutSensitiveOpTransposer {
 class Conv2DBackpropInputTransposer : public LayoutSensitiveOpTransposer {
  public:
   explicit Conv2DBackpropInputTransposer() : LayoutSensitiveOpTransposer() {}
-
-  Status TransposeNode(TransposeContext* context,
-                       utils::MutableNodeView* node) override;
-};
-
-class Conv3DTransposer : public LayoutSensitiveOpTransposer {
- public:
-  explicit Conv3DTransposer() : LayoutSensitiveOpTransposer() {}
-
-  Status TransposeNode(TransposeContext* context,
-                       utils::MutableNodeView* node) override;
-};
-
-class Conv3DBackpropFilterTransposer: public LayoutSensitiveOpTransposer {
- public:
-  explicit Conv3DBackpropFilterTransposer() : LayoutSensitiveOpTransposer() {}
-
-  Status TransposeNode(TransposeContext* context,
-                       utils::MutableNodeView* node) override;
-};
-
-class Conv3DBackpropInputTransposer: public LayoutSensitiveOpTransposer {
- public:
-  explicit Conv3DBackpropInputTransposer() : LayoutSensitiveOpTransposer() {}
 
   Status TransposeNode(TransposeContext* context,
                        utils::MutableNodeView* node) override;
@@ -326,9 +292,9 @@ class LayoutAgnosticOpTransposer : public Transposer {
   bool IsAfterDstToSrcTransform(const TransposeContext& context,
                                 const utils::MutableNodeView& node) const;
 
-  std::vector<int> GetVariadicNDFaninPorts(
-      const TransposeContext& context, const utils::MutableNodeView& node,
-      int rank) const;
+  std::vector<int> GetVariadic4DFaninPorts(
+      const TransposeContext& context,
+      const utils::MutableNodeView& node) const;
 };
 
 class DefaultLayoutAgnosticOpTransposer : public LayoutAgnosticOpTransposer {
@@ -356,21 +322,19 @@ class BinaryOpTransposer : public LayoutAgnosticOpTransposer {
 
  private:
   bool IsNDOperateWithMD(const utils::MutableNodeView& node, int n, int m);
-  bool IsFaninShapeSupported(const utils::MutableNodeView& node, int rank);
-  std::vector<int> GetNDDataFaninPorts(const utils::MutableNodeView& node,
-                                       int rank);
+  bool IsFaninShapeSupported(const utils::MutableNodeView& node);
+  std::vector<int> Get4DDataFaninPorts(const utils::MutableNodeView& node);
   Status AddNodeShapeConst(utils::Mutation* mutation,
                            absl::string_view node_name,
                            absl::string_view node_device, bool node_in_frame,
-                           int num_channels, absl::string_view depended_node,
-                           int rank);
+                           int num_channels, absl::string_view depended_node);
   Status AddNodeReshape(utils::Mutation* mutation, absl::string_view node_name,
                         absl::string_view node_device,
                         absl::string_view input_name,
                         absl::string_view shape_const_node_name,
                         const DataType& data_type);
   Status MaybeReshapeVectorFanin(TransposeContext* context,
-                                 utils::MutableNodeView* node, int rank);
+                                 utils::MutableNodeView* node);
 };
 
 class ConcatOpTransposer : public LayoutAgnosticOpTransposer {
@@ -429,7 +393,7 @@ class ReduceTransposer : public LayoutAgnosticOpTransposer {
   bool KeepDims(const utils::MutableNodeView& node);
   bool IsAlongAxis(const Tensor& tensor, absl::Span<const int> axis, int rank);
   bool IsReduceAxisSupported(const TransposeContext& context,
-                             const utils::MutableNodeView& node, int rank);
+                             const utils::MutableNodeView& node);
 };
 
 class ReverseV2Transposer : public LayoutAgnosticOpTransposer {

@@ -16,60 +16,49 @@ limitations under the License.
 #ifndef TENSORFLOW_COMPILER_XLA_SERVICE_MLIR_GPU_HLO_DIALECT_EMITTER_H_
 #define TENSORFLOW_COMPILER_XLA_SERVICE_MLIR_GPU_HLO_DIALECT_EMITTER_H_
 
-#include <memory>
-
-#include "absl/types/span.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "mlir/IR/Builders.h"  // TF:llvm-project
-#include "mlir/IR/Function.h"  // TF:llvm-project
-#include "mlir/IR/MLIRContext.h"  // TF:llvm-project
-#include "mlir/IR/Module.h"  // TF:llvm-project
-#include "tensorflow/compiler/xla/service/dfs_hlo_visitor_with_default.h"
-#include "tensorflow/compiler/xla/service/hlo_computation.h"
+#include "absl/container/flat_hash_map.h"
+#include "mlir/IR/Builders.h"  // TF:local_config_mlir
+#include "mlir/IR/Function.h"  // TF:local_config_mlir
+#include "mlir/IR/MLIRContext.h"  // TF:local_config_mlir
+#include "mlir/IR/Module.h"  // TF:local_config_mlir
+#include "tensorflow/compiler/xla/service/buffer_assignment.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
-#include "tensorflow/compiler/xla/service/mlir_gpu/emission_context.h"
 #include "tensorflow/compiler/xla/status.h"
 
 namespace xla {
-namespace mlir_gpu {
+namespace gpu {
 
+// This class is the top-level API for the HLO --> HLO dialect compiler. It
+// implements the DfsHloVisitor interface and emits HLO computations as MLIR IR
+// functions.
 class HloDialectEmitter : public DfsHloVisitorWithDefault {
  public:
-  HloDialectEmitter(xla::mlir_gpu::EmissionContext* emission_context,
-                    ::mlir::Region* region,
-                    llvm::ArrayRef<::mlir::Value> arguments)
-      : emission_context_(emission_context),
-        builder_(region),
-        arguments_(arguments) {}
+  HloDialectEmitter(const HloModule& hlo_module,
+                    const BufferAssignment& assignment,
+                    ::mlir::ModuleOp mlir_module);
+  ~HloDialectEmitter() override = default;
 
-  HloDialectEmitter(xla::mlir_gpu::EmissionContext* emission_context,
-                    ::mlir::OpBuilder builder,
-                    llvm::ArrayRef<::mlir::Value> arguments)
-      : emission_context_(emission_context),
-        builder_(builder),
-        arguments_(arguments) {}
+  // The following methods implement the DfsHloVisitor interface.
+  //
+  // Default action which emits code for most operations. Operations which are
+  // special in some way are handled explicitly in HandleFoo methods.
+  Status DefaultAction(HloInstruction* hlo) override;
 
-  StatusOr<mlir::Value> EmitComputation(const HloComputation& computation);
+  Status HandleFusion(HloInstruction* fusion) override;
+  Status HandleCustomCall(HloInstruction* custom_call) override;
 
-  Status DefaultAction(HloInstruction* instr) override;
-  Status HandleBroadcast(HloInstruction* broadcast) override;
-  Status HandleCompare(HloInstruction* compare) override;
-  Status HandleConstant(HloInstruction* constant) override;
-  Status HandleIota(HloInstruction* iota) override;
-  Status HandleParameter(HloInstruction* param) override;
-  Status HandleReduce(HloInstruction* reduce) override;
+  Status FinishVisit(HloInstruction* root) override;
 
  private:
-  mlir::Location getLocation(const HloInstruction* instr) const;
+  ::mlir::ModuleOp mlir_module_;
+  ::mlir::Builder builder_;
+  absl::flat_hash_map<const xla::HloComputation*, ::mlir::FuncOp>
+      computation_to_mlir_function_;
 
-  xla::mlir_gpu::EmissionContext* emission_context_;
-  ::mlir::OpBuilder builder_;
-  llvm::ArrayRef<::mlir::Value> arguments_;
-  absl::flat_hash_map<const xla::HloInstruction*, ::mlir::Value>
-      instruction_to_values_;
+  TF_DISALLOW_COPY_AND_ASSIGN(HloDialectEmitter);
 };
 
-}  // namespace mlir_gpu
+}  // namespace gpu
 }  // namespace xla
 
 #endif  // TENSORFLOW_COMPILER_XLA_SERVICE_MLIR_GPU_HLO_DIALECT_EMITTER_H_

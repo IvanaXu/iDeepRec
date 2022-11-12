@@ -206,16 +206,6 @@ class MIOpenSupport : public dnn::DnnSupport {
       bool with_winograd_nonfused, int cc_major, int cc_minor,
       std::vector<dnn::AlgorithmDesc>* out_algorithms) override;
 
-  bool DoSoftmax(
-      Stream* stream, const DeviceMemory<float>& x,
-      const dnn::BatchDescriptor& x_desc, bool log,
-      DeviceMemory<float>* y);
-
-  bool DoSoftmax(
-      Stream* stream, const DeviceMemory<Eigen::half>& x,
-      const dnn::BatchDescriptor& x_desc, bool log,
-      DeviceMemory<Eigen::half>* y);
-
   bool DoBatchNormalizationForward(
       Stream* stream, const DeviceMemory<float>& x,
       const DeviceMemory<float>& scale, const DeviceMemory<float>& offset,
@@ -223,12 +213,13 @@ class MIOpenSupport : public dnn::DnnSupport {
       const DeviceMemory<float>& estimated_variance,
       const DeviceMemory<float>& side_input, const dnn::BatchDescriptor& x_desc,
       const dnn::BatchDescriptor& scale_offset_desc, const double epsilon,
-      const double exponential_average_factor,
       dnn::ActivationMode activation_mode, DeviceMemory<float>* y,
       DeviceMemory<float>* batch_mean, DeviceMemory<float>* batch_var,
       DeviceMemory<float>* saved_mean, DeviceMemory<float>* saved_inv_var,
       bool is_training, ScratchAllocator* reserve_space_allocator,
-      ScratchAllocator* workspace_allocator) override;
+      ScratchAllocator* workspace_allocator,
+      std::function<const DeviceMemory<float>&()> var_to_inv_var,
+      std::function<void()> inv_var_to_var) override;
 
   bool DoBatchNormalizationForward(
       Stream* stream, const DeviceMemory<Eigen::half>& x,
@@ -237,12 +228,13 @@ class MIOpenSupport : public dnn::DnnSupport {
       const DeviceMemory<float>& estimated_variance,
       const DeviceMemory<float>& side_input, const dnn::BatchDescriptor& x_desc,
       const dnn::BatchDescriptor& scale_offset_desc, const double epsilon,
-      const double exponential_average_factor,
       dnn::ActivationMode activation_mode, DeviceMemory<Eigen::half>* y,
       DeviceMemory<float>* batch_mean, DeviceMemory<float>* batch_var,
       DeviceMemory<float>* saved_mean, DeviceMemory<float>* saved_inv_var,
       bool is_training, ScratchAllocator* reserve_space_allocator,
-      ScratchAllocator* workspace_allocator) override;
+      ScratchAllocator* workspace_allocator,
+      std::function<const DeviceMemory<float>&()> var_to_inv_var,
+      std::function<void()> inv_var_to_var) override;
 
   bool DoBatchNormalizationBackward(
       Stream* stream, const DeviceMemory<float>& y_backprop,
@@ -651,11 +643,11 @@ class MIOpenSupport : public dnn::DnnSupport {
       const DeviceMemory<U>& estimated_variance,
       const DeviceMemory<U>& side_input, const dnn::BatchDescriptor& x_desc,
       const dnn::BatchDescriptor& scale_offset_desc, const double epsilon,
-      const double exponential_average_factor,
       dnn::ActivationMode activation_mode, DeviceMemory<T>* y,
       DeviceMemory<U>* batch_mean, DeviceMemory<U>* batch_var,
       DeviceMemory<U>* saved_mean, DeviceMemory<U>* saved_inv_var,
-      bool is_training);
+      bool is_training, std::function<const DeviceMemory<U>&()> var_to_inv_var,
+      std::function<void()> inv_var_to_var);
 
   template <class T, class U>
   bool DoBatchNormalizationBackwardImpl(
@@ -692,9 +684,7 @@ class MIOpenSupport : public dnn::DnnSupport {
                         const MIOpenRnnStateTensorDescriptor& output_c_desc,
                         DeviceMemory<T>* output_c_data, bool is_training,
                         ScratchAllocator* reserve_space_allocator,
-                        ScratchAllocator* workspace_allocator,
-                        dnn::ProfileResult* output_profile_result);
-
+                        ScratchAllocator* workspace_allocator);
   template <class T>
   bool DoRnnBackwardImpl(Stream* stream, const MIOpenRnnDescriptor& rnn_desc,
                          const MIOpenRnnSequenceTensorDescriptor& input_desc,
@@ -718,8 +708,7 @@ class MIOpenSupport : public dnn::DnnSupport {
                          DeviceMemory<T>* input_c_backprop_data,
                          DeviceMemory<T>* params_backprop_data,
                          DeviceMemory<uint8>* reserve_space_data,
-                         ScratchAllocator* workspace_allocator,
-                         dnn::ProfileResult* output_profile_result);
+                         ScratchAllocator* workspace_allocator);
 
   template <typename T>
   bool DoFusedConvolutionBiasActivationImpl(

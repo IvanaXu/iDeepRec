@@ -344,42 +344,6 @@ port::Status GpuExecutor::Launch(Stream* stream, const ThreadDim& thread_dims,
       args.number_of_shared_bytes(), hipstream, nullptr, (void**)&config);
 }
 
-port::Status GpuExecutor::LaunchExecutableGraph(Stream* main_stream,
-                                                void* graph_exec) {
-  return port::InternalError(
-      "Feature not supported on ROCm platform (LaunchExecutableGraph)");
-}
-
-port::Status GpuExecutor::BeginGraphCapture(Stream* stream) {
-  return port::InternalError(
-      "Feature not supported on ROCm platform (BeginGraphCapture)");
-}
-
-port::Status<void*> GpuExecutor::EndGraphCapture(Stream* capture_stream,
-                                                 void* graph) {
-  return port::InternalError(
-      "Feature not supported on ROCm platform (EndGraphCapture)");
-}
-
-port::StatusOr<void*> GpuExecutor::InstantiateGraph(void* graph,
-                                                    void* graph_exec) {
-  return port::InternalError(
-      "Feature not supported on ROCm platform (InstantiateGraph)");
-}
-
-port::Status GpuExecutor::UpdateExecutableGraph(void* graph, void* graph_exec) {
-  return port::InternalError(
-      "Feature not supported on ROCm platform (UpdateExecutableGraph)");
-}
-
-void GpuExecutor::DestroyExecutableGraph(void* context, void* exec_graph) {
-  LOG(ERROR) << "Feature not supported on ROCm platform (DestroyExecutableGraph)");
-}
-
-void GpuExecutor::DestroyGraph(void* context, void* graph) {
-  LOG(ERROR) << "Feature not supported on ROCm platform (DestroyGraph)");
-}
-
 int GpuExecutor::CalculateOccupancy(const DeviceDescription& device_description,
                                     uint64 registers_per_thread,
                                     uint64 shared_memory_per_block,
@@ -461,9 +425,8 @@ void GpuExecutor::VlogOccupancyInfo(const KernelBase& kernel,
   // TODO(ROCm) implement this feature in HIP
 }
 
-DeviceMemoryBase GpuExecutor::Allocate(uint64 size, int64 memory_space) {
-  CHECK_EQ(memory_space, 0);
-  return DeviceMemoryBase(GpuDriver::DeviceAllocate(context_, size), size);
+void* GpuExecutor::Allocate(uint64 size) {
+  return GpuDriver::DeviceAllocate(context_, size);
 }
 
 void* GpuExecutor::GetSubBuffer(DeviceMemoryBase* mem, uint64 offset_bytes,
@@ -494,8 +457,7 @@ bool GpuExecutor::SynchronizeAllActivity() {
   return GpuDriver::SynchronizeContext(context_);
 }
 
-port::Status GpuExecutor::SynchronousMemZero(DeviceMemoryBase* location,
-                                             uint64 size) {
+bool GpuExecutor::SynchronousMemZero(DeviceMemoryBase* location, uint64 size) {
   if (reinterpret_cast<uintptr_t>(location->opaque()) % 4 == 0 &&
       size % 4 == 0) {
     return GpuDriver::SynchronousMemsetUint32(
@@ -505,8 +467,8 @@ port::Status GpuExecutor::SynchronousMemZero(DeviceMemoryBase* location,
                                            0x0, size);
 }
 
-port::Status GpuExecutor::SynchronousMemSet(DeviceMemoryBase* location,
-                                            int value, uint64 size) {
+bool GpuExecutor::SynchronousMemSet(DeviceMemoryBase* location, int value,
+                                    uint64 size) {
   if (reinterpret_cast<uintptr_t>(location->opaque()) % 4 == 0 &&
       size % 4 == 0) {
     // hipMemset reinterprets "value" as a uint8.
@@ -539,8 +501,8 @@ port::Status GpuExecutor::SynchronousMemcpyDeviceToDevice(
                                          AsROCmDevicePtr(gpu_src), size);
 }
 
-port::Status GpuExecutor::MemZero(Stream* stream, DeviceMemoryBase* location,
-                                  uint64 size) {
+bool GpuExecutor::MemZero(Stream* stream, DeviceMemoryBase* location,
+                          uint64 size) {
   if (reinterpret_cast<uintptr_t>(location->opaque()) % 4 == 0 &&
       size % 4 == 0) {
     return Memset32(stream, location, 0x0, size);
@@ -549,8 +511,8 @@ port::Status GpuExecutor::MemZero(Stream* stream, DeviceMemoryBase* location,
   }
 }
 
-port::Status GpuExecutor::Memset(Stream* stream, DeviceMemoryBase* location,
-                                 uint8 pattern, uint64 size) {
+bool GpuExecutor::Memset(Stream* stream, DeviceMemoryBase* location,
+                         uint8 pattern, uint64 size) {
   VLOG(2) << "enqueueing memset8 operation onto stream " << stream
           << " at location " << location << " with size " << size
           << " and pattern " << std::hex << pattern;
@@ -559,8 +521,8 @@ port::Status GpuExecutor::Memset(Stream* stream, DeviceMemoryBase* location,
                                             AsGpuStreamValue(stream));
 }
 
-port::Status GpuExecutor::Memset32(Stream* stream, DeviceMemoryBase* location,
-                                   uint32 pattern, uint64 size) {
+bool GpuExecutor::Memset32(Stream* stream, DeviceMemoryBase* location,
+                           uint32 pattern, uint64 size) {
   VLOG(2) << "enqueueing memset32 operation onto stream " << stream
           << " at location " << location << " with size " << size
           << " and pattern " << std::hex << pattern;

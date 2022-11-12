@@ -34,11 +34,8 @@ namespace gpu {
 
 std::ostream& operator<<(std::ostream& out,
                          const LaunchDimensions& launch_dims) {
-  auto block_counts = launch_dims.block_counts();
-  auto thread_counts = launch_dims.thread_counts_per_block();
-  out << absl::StrFormat("[block: {%d, %d, %d}, thread: {%d, %d, %d}]",
-                         block_counts.x, block_counts.y, block_counts.z,
-                         thread_counts.x, thread_counts.y, thread_counts.z);
+  out << absl::StrFormat("[block: %d, thread: %d]", launch_dims.block_count(),
+                         launch_dims.threads_per_block());
   return out;
 }
 
@@ -64,7 +61,7 @@ int64 ThreadsPerBlockLimit(const se::DeviceDescription& device_desc) {
 // Calculates the launch dimensions used to invoke `hlo`.
 LaunchDimensions CalculateLaunchDimensions(
     const Shape& shape, const se::DeviceDescription& device_desc,
-    int unroll_factor, bool few_waves) {
+    int unroll_factor) {
   int64 num_elements = ShapeUtil::ElementsIn(shape);
   if (num_elements <= 1) {
     return LaunchDimensions();
@@ -89,8 +86,7 @@ LaunchDimensions CalculateLaunchDimensions(
   // need more registers to hold intermediate values. Reduce the number of
   // blocks per thread to increase the number of registers available to ptxas.
   // Make sure we still have a multiple of 32.
-  threads_per_block =
-      RoundUpToNearest(threads_per_block / unroll_factor, int64{32});
+  threads_per_block = RoundUpToNearest(threads_per_block / unroll_factor, 32LL);
   if (num_elements < threads_per_block) {
     threads_per_block = num_elements;
     VLOG(2) << "Update # of threads per block to the element count ("
@@ -98,15 +94,6 @@ LaunchDimensions CalculateLaunchDimensions(
   }
 
   int64 block_count = CeilOfRatio(num_elements, threads_per_block);
-  if (few_waves) {
-    int64 new_block_count =
-        device_desc.core_count() *
-        (device_desc.threads_per_core_limit() / threads_per_block);
-    if (new_block_count < block_count) {
-      threads_per_block = std::min(threads_per_block, 128LL);
-      block_count = std::min(new_block_count, block_count);
-    }
-  }
   VLOG(2) << absl::StrFormat(
       "Initialized the block count to ceil(# of elements / threads per "
       "block) = ceil(%d/%d) = %d",

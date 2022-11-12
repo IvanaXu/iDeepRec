@@ -18,7 +18,7 @@ tf_class {
   }
   member_method {
     name: "__init__"
-    argspec: "args=[\'self\', \'opt\', \'replicas_to_aggregate\', \'total_num_replicas\', \'variable_averages\', \'variables_to_average\', \'use_locking\', \'name\', \'sparse_reduction_type\', \'sparse_accumulator_type\'], varargs=None, keywords=None, defaults=[\'None\', \'None\', \'None\', \'False\', \'sync_replicas\', \'MEAN\', \'multi_map\'], "
+    argspec: "args=[\'self\', \'opt\', \'replicas_to_aggregate\', \'total_num_replicas\', \'variable_averages\', \'variables_to_average\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'None\', \'None\', \'None\', \'False\', \'sync_replicas\'], "
   }
   member_method {
     name: "apply_gradients"
@@ -27,10 +27,6 @@ tf_class {
   member_method {
     name: "compute_gradients"
     argspec: "args=[\'self\'], varargs=args, keywords=kwargs, defaults=None"
-  }
-  member_method {
-    name: "doing_loss_scaling"
-    argspec: "args=[\'self\'], varargs=None, keywords=None, defaults=None"
   }
   member_method {
     name: "get_chief_queue_runner"

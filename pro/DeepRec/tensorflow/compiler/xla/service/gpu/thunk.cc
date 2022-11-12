@@ -20,8 +20,6 @@ namespace gpu {
 
 absl::string_view ThunkKindToString(Thunk::Kind kind) {
   switch (kind) {
-    case Thunk::kAsyncOutSend:
-      return "kAsyncOutSend";
     case Thunk::kCholesky:
       return "kCholesky";
     case Thunk::kCollectivePermute:
@@ -32,8 +30,6 @@ absl::string_view ThunkKindToString(Thunk::Kind kind) {
       return "kConvolution";
     case Thunk::kCopy:
       return "kCopy";
-    case Thunk::kCudnnSoftmax:
-      return "kCudnnSoftmax";
     case Thunk::kCudnnBatchNormBackward:
       return "kCudnnBatchNormBackward";
     case Thunk::kCudnnBatchNormForwardInference:

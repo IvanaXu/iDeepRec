@@ -120,7 +120,7 @@ class StreamExecutor {
   // Synchronously allocates an array on the device of type T with element_count
   // elements.
   template <typename T>
-  DeviceMemory<T> AllocateArray(uint64 element_count, int64 memory_space = 0);
+  DeviceMemory<T> AllocateArray(uint64 element_count);
 
   // As AllocateArray(), but returns a ScopedDeviceMemory<T>.
   template <typename T>
@@ -233,13 +233,13 @@ class StreamExecutor {
 
   // Blocks the caller while "size" bytes are zeroed out (in POD fashion) at the
   // given location in device memory.
-  port::Status SynchronousMemZero(DeviceMemoryBase *location,
-                                  uint64 size) SE_MUST_USE_RESULT;
+  bool SynchronousMemZero(DeviceMemoryBase *location,
+                          uint64 size) SE_MUST_USE_RESULT;
 
   // Blocks the caller while "size" bytes are initialized to "value" (in POD
   // fashion) at the given location in device memory.
-  port::Status SynchronousMemSet(DeviceMemoryBase *location, int value,
-                                 uint64 size) SE_MUST_USE_RESULT;
+  bool SynchronousMemSet(DeviceMemoryBase *location, int value,
+                         uint64 size) SE_MUST_USE_RESULT;
 
   // [deprecated] Blocks the caller while a data segment of the given size is
   // copied from the host source to the device destination.
@@ -294,15 +294,15 @@ class StreamExecutor {
   // Enqueues an operation onto stream to zero out size bytes at the given
   // device memory location. Neither stream nor location may be null. Returns
   // whether the operation was successfully enqueued onto the stream.
-  port::Status MemZero(Stream *stream, DeviceMemoryBase *location,
-                       uint64 size) SE_MUST_USE_RESULT;
+  bool MemZero(Stream *stream, DeviceMemoryBase *location,
+               uint64 size) SE_MUST_USE_RESULT;
 
   // Enqueues an operation onto stream to set 32-bit patterns starting at
   // location, for byte count given by size. size must be 32-bit quantified
   // (i.e. evently divisible by 4). Returns whether the operation was
   // successfully enqueued onto the stream.
-  port::Status Memset32(Stream *stream, DeviceMemoryBase *location,
-                        uint32 pattern, uint64 size);
+  bool Memset32(Stream *stream, DeviceMemoryBase *location, uint32 pattern,
+                uint64 size) SE_MUST_USE_RESULT;
 
   // Enables peer access from this StreamExecutor to memory
   // allocated by other, such that launched device code, memcpies, etc may
@@ -372,24 +372,6 @@ class StreamExecutor {
   bool GetConvolveAlgorithms(bool with_winograd_nonfused,
                              std::vector<dnn::AlgorithmDesc> *out_algorithms);
 
-  // Returns the supported execution plans for the convolution operation.
-  bool GetConvolveExecutionPlans(
-      dnn::ConvolutionKind kind, dnn::DataType element_type, Stream *stream,
-      const dnn::BatchDescriptor &input_descriptor,
-      const dnn::FilterDescriptor &filter_descriptor,
-      const dnn::BatchDescriptor &output_descriptor,
-      const dnn::ConvolutionDescriptor &convolution_descriptor,
-      std::vector<cudnn_frontend::ExecutionPlan> *out_exec_plans);
-
-  bool GetFusedConvolveExecutionPlans(
-      dnn::ConvolutionKind kind, dnn::DataType element_type, Stream *stream,
-      const dnn::BatchDescriptor &input_descriptor,
-      const dnn::FilterDescriptor &filter_descriptor,
-      const dnn::BatchDescriptor &bias_descriptor,
-      const dnn::BatchDescriptor &output_descriptor,
-      const dnn::ConvolutionDescriptor &convolution_descriptor,
-      std::vector<cudnn_frontend::ExecutionPlan> *out_exec_plans);
-
   // Returns the list of supported algorithms for rnn operation.
   bool GetRnnAlgorithms(std::vector<dnn::AlgorithmDesc> *out_algorithms);
 
@@ -416,11 +398,6 @@ class StreamExecutor {
       dnn::DataType data_type, const dnn::AlgorithmConfig &algorithm_config,
       float dropout, uint64 seed, ScratchAllocator *state_allocator,
       bool use_padded_io);
-
-  // Create an CTC loss descriptor. The caller retains the ownership of the
-  // descriptor.
-  port::StatusOr<std::unique_ptr<dnn::CtcLossDescriptor>>
-  createCtcLossDescriptor(dnn::DataType data_type);
 
   // Create a RNN sequence descriptor that specifies either the input or output
   // sequence. The caller retains the ownership of the returned descriptor.
@@ -476,20 +453,6 @@ class StreamExecutor {
   port::Status Launch(Stream *stream, const ThreadDim &thread_dims,
                       const BlockDim &block_dims, const KernelBase &kernel,
                       const KernelArgsArrayBase &args);
-
-  port::Status LaunchExecutableGraph(Stream *stream, void *exec_graph);
-
-  port::Status BeginGraphCapture(Stream *stream);
-
-  port::StatusOr<void *> EndGraphCapture(Stream *stream, void *graph);
-
-  port::StatusOr<void *> InstantiateGraph(void *graph, void *graph_exec);
-
-  port::Status UpdateExecutableGraph(void *graph, void *graph_exec);
-
-  void DestroyExecutableGraph(void *context, void *exec_graph);
-
-  void DestroyGraph(void *context, void *graph);
 
   // Gets-or-creates (creates with memoization) a FftSupport datatype that can
   // be used to execute FFT routines on the current platform.
@@ -557,9 +520,9 @@ class StreamExecutor {
   friend struct ThenBlasImpl;
 
   // Synchronously allocates size bytes on the underlying platform and returns
-  // a DeviceMemoryBase representing that allocation. In the case of failure,
+  // an opaque void* representing that allocation. In the case of failure,
   // nullptr is returned.
-  DeviceMemoryBase Allocate(uint64 size, int64 memory_space);
+  void *Allocate(uint64 size);
 
   // Gets-or-creates (creates with memoization) an RngSupport datatype that can
   // be used for random-number-generation routines on the current platform.
@@ -823,10 +786,10 @@ StreamExecutor::CreateTypedKernel(absl::string_view kernel_name,
 }
 
 template <typename T>
-inline DeviceMemory<T> StreamExecutor::AllocateArray(uint64 element_count,
-                                                     int64 memory_space) {
+inline DeviceMemory<T> StreamExecutor::AllocateArray(uint64 element_count) {
   uint64 bytes = sizeof(T) * element_count;
-  return DeviceMemory<T>(Allocate(bytes, memory_space));
+  void *opaque = Allocate(bytes);
+  return DeviceMemory<T>::MakeFromByteSize(opaque, bytes);
 }
 
 template <typename T>
@@ -862,13 +825,13 @@ ScopedDeviceMemory<ElemT>::ScopedDeviceMemory(
 
 template <typename T>
 DeviceMemory<T> StreamExecutor::AllocateZeroed() {
-  DeviceMemoryBase buf = Allocate(sizeof(T), /*memory_space=*/0);
-  if (buf.is_null()) {
+  void *opaque = Allocate(sizeof(T));
+  if (opaque == nullptr) {
     return DeviceMemory<T>{};
   }
 
-  DeviceMemory<T> result(buf);
-  bool ok = SynchronousMemZero(&result, sizeof(T)).ok();
+  DeviceMemory<T> result = DeviceMemory<T>::MakeFromByteSize(opaque, sizeof(T));
+  bool ok = SynchronousMemZero(&result, sizeof(T));
   if (!ok) {
     Deallocate(&result);
     return DeviceMemory<T>{};

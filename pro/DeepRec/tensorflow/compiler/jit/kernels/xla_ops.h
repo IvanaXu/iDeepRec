@@ -40,7 +40,7 @@ class XlaPlatformInfo {
   explicit XlaPlatformInfo(const DeviceType device_type,
                            se::Platform::Id platform_id,
                            const XlaDevice::Metadata* xla_device_metadata,
-                           std::shared_ptr<se::DeviceMemoryAllocator> device_allocator)
+                           se::DeviceMemoryAllocator* device_allocator)
       : device_type_(device_type),
         platform_id_(platform_id),
         xla_device_metadata_(xla_device_metadata),
@@ -53,7 +53,7 @@ class XlaPlatformInfo {
   }
 
   // Non-null only when run on an XLA device.
-  std::shared_ptr<se::DeviceMemoryAllocator> custom_allocator() const {
+  se::DeviceMemoryAllocator* custom_allocator() const {
     return device_allocator_;
   }
 
@@ -82,9 +82,7 @@ class XlaPlatformInfo {
   // If the op associated with this XlaPlatformInfo is placed on an XLA device
   // then device_allocator_ is the xla::Backend's memory allocator.  If the op
   // is placed on a regular CPU or GPU device then device_allocator_ is null.
-  // The allocator is of unknowm provenance; keep it in a shared pointer to
-  // set an artificial refcount of one
-  std::shared_ptr<se::DeviceMemoryAllocator> device_allocator_;
+  se::DeviceMemoryAllocator* device_allocator_;
 
   TF_DISALLOW_COPY_AND_ASSIGN(XlaPlatformInfo);
 };
@@ -172,13 +170,6 @@ class XlaRunOp : public OpKernel {
 
  private:
   const XlaPlatformInfo platform_info_;
-};
-
-class XlaMergeOp : public OpKernel {
- public:
-  explicit XlaMergeOp(OpKernelConstruction* ctx);
-
-  void Compute(OpKernelContext* ctx) override;
 };
 
 }  // namespace tensorflow

@@ -349,7 +349,7 @@ class ReturnStatementsTransformer(converter.Base):
     docstring = None
     if converted_body:
       if (isinstance(converted_body[0], gast.Expr) and
-          isinstance(converted_body[0].value, gast.Constant)):
+          isinstance(converted_body[0].value, gast.Str)):
         docstring = converted_body[0]
         converted_body = converted_body[1:]
 

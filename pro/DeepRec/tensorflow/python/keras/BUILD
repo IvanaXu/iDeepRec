@@ -819,6 +819,7 @@ cuda_py_test(
     ],
     shard_count = 4,
     tags = [
+        "no_rocm",
         "no_windows_gpu",
     ],
     xla_enable_strict_auto_jit = True,
@@ -943,7 +944,7 @@ tf_py_test(
 
 tf_py_test(
     name = "normalization_test",
-    size = "large",
+    size = "medium",
     srcs = ["layers/normalization_test.py"],
     additional_deps = [
         ":keras",
@@ -951,7 +952,7 @@ tf_py_test(
         "//third_party/py/numpy",
         "//tensorflow/python:client_testlib",
     ],
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "no_rocm",
         "notsan",

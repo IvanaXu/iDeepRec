@@ -57,11 +57,11 @@ TOOLCHAIN_INSTALL_PATH=/tmp/toolchain_install/
 sudo rm -rf ${TOOLCHAIN_INSTALL_PATH}
 mkdir ${TOOLCHAIN_INSTALL_PATH}
 cd ${TOOLCHAIN_INSTALL_PATH}
-curl -L https://github.com/rvagg/rpi-newer-crosstools/archive/eb68350c5c8ec1663b7fe52c742ac4271e3217c5.tar.gz -o toolchain.tar.gz
+curl -L https://github.com/raspberrypi/tools/archive/0e906ebc527eab1cdbf7adabff5b474da9562e9f.tar.gz -o toolchain.tar.gz
 tar xzf toolchain.tar.gz
-mv rpi-newer-crosstools-eb68350c5c8ec1663b7fe52c742ac4271e3217c5 tools
+mv tools-0e906ebc527eab1cdbf7adabff5b474da9562e9f/ tools
 
-CROSSTOOL_CC=${TOOLCHAIN_INSTALL_PATH}/tools/x64-gcc-6.5.0/arm-rpi-linux-gnueabihf/bin/arm-rpi-linux-gnueabihf-gcc
+CROSSTOOL_CC=${TOOLCHAIN_INSTALL_PATH}/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc
 
 OPENBLAS_SRC_PATH=/tmp/openblas_src/
 sudo rm -rf ${OPENBLAS_SRC_PATH}
@@ -108,7 +108,7 @@ bazel build -c opt ${PI_COPTS} \
   --copt=-funsafe-math-optimizations --copt=-ftree-vectorize \
   --copt=-fomit-frame-pointer --cpu=armeabi \
   --crosstool_top=@local_config_arm_compiler//:toolchain \
-  --define tensorflow_dnnl_contraction_kernel=0 \
+  --define tensorflow_mkldnn_contraction_kernel=0 \
   --verbose_failures \
   //tensorflow:libtensorflow.so \
   //tensorflow:libtensorflow_framework.so \

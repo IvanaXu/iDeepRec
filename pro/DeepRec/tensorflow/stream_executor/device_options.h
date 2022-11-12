@@ -64,8 +64,7 @@ struct DeviceOptions {
   unsigned flags() const { return flags_; }
 
   bool operator==(const DeviceOptions& other) const {
-    return flags_ == other.flags_ &&
-           non_portable_tags == other.non_portable_tags;
+    return flags_ == other.flags_;
   }
 
   bool operator!=(const DeviceOptions& other) const {

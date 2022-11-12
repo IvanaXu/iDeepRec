@@ -24,6 +24,7 @@ limitations under the License.
 #include "grpcpp/impl/codegen/status.h"
 #include "grpcpp/impl/codegen/stub_options.h"
 #include "grpcpp/impl/codegen/sync_stream.h"
+#include "tensorflow/core/distributed_runtime/rpc/grpc_util.h"
 
 #include "tensorflow/contrib/verbs/verbs_service.pb.h"
 

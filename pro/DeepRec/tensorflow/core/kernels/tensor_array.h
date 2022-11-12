@@ -347,8 +347,7 @@ class TensorArray : public ResourceBase {
   Tensor* handle() { return &handle_; }
 
   ResourceHandle resource_handle(OpKernelContext* ctx) {
-    return ctx->step_container()->MakeResourceHandle<TensorArray>(
-        key_, *ctx->device());
+    return MakePerStepResourceHandle<TensorArray>(ctx, key_);
   }
 
  private:

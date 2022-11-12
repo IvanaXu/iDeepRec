@@ -104,8 +104,6 @@ bool IsBiasAdd(const NodeDef& node) {
   return node.op() == "BiasAdd" || node.op() == "BiasAddV1";
 }
 
-bool IsBiasAddV2(const NodeDef& node) { return node.op() == "BiasAdd"; }
-
 bool IsBiasAddGrad(const NodeDef& node) { return node.op() == "BiasAddGrad"; }
 
 bool IsBitcast(const NodeDef& node) { return node.op() == "Bitcast"; }
@@ -158,7 +156,6 @@ bool IsControlFlow(const NodeDef& node) {
          node.op() == "Exit" ||
          node.op() == "LoopCond" ||
          node.op() == "Merge" ||
-         node.op() == "_XlaMerge" ||
          node.op() == "NextIteration" ||
          node.op() == "Switch" ||
          node.op() == "_SwitchN";
@@ -176,14 +173,6 @@ bool IsConv2DBackpropInput(const NodeDef& node) {
 }
 
 bool IsConv3D(const NodeDef& node) { return node.op() == "Conv3D"; }
-
-bool IsConv3DBackpropFilterV2(const NodeDef& node) {
-  return node.op() == "Conv3DBackpropFilterV2";
-}
-
-bool IsConv3DBackpropInputV2(const NodeDef& node) {
-  return node.op() == "Conv3DBackpropInputV2";
-}
 
 bool IsDepthwiseConv2dNative(const NodeDef& node) {
   return node.op() == "DepthwiseConv2dNative";
@@ -324,10 +313,6 @@ bool IsInvGrad(const NodeDef& node) { return node.op() == "InvGrad"; }
 
 bool IsLeakyRelu(const NodeDef& node) { return node.op() == "LeakyRelu"; }
 
-bool IsLeakyReluGrad(const NodeDef& node) {
-  return node.op() == "LeakyReluGrad";
-}
-
 bool IsLess(const NodeDef& node) { return node.op() == "Less"; }
 
 bool IsLessEqual(const NodeDef& node) { return node.op() == "LessEqual"; }
@@ -354,7 +339,7 @@ bool IsMean(const NodeDef& node) { return node.op() == "Mean"; }
 
 bool IsMerge(const NodeDef& node) {
   const auto& op = node.op();
-  return op == "Merge" || op == "RefMerge" || op == "_XlaMerge";
+  return op == "Merge" || op == "RefMerge";
 }
 
 bool IsMin(const NodeDef& node) { return node.op() == "Min"; }
@@ -443,11 +428,6 @@ bool IsRecv(const NodeDef& node) {
   return node.op() == "_Recv" || node.op() == "_HostRecv";
 }
 
-bool IsFuseRecv(const NodeDef& node) {
-  const auto op = node.op();
-  return op == "_FuseRecv";
-}
-
 bool IsReduction(const NodeDef& node) {
   const auto& op = node.op();
   return op == "Sum" || op == "Prod" || op == "Min" || op == "Max" ||
@@ -496,6 +476,8 @@ bool IsShape(const NodeDef& node) { return node.op() == "Shape"; }
 bool IsShapeN(const NodeDef& node) { return node.op() == "ShapeN"; }
 
 bool IsShuffle(const NodeDef& node) { return node.op() == "Shuffle"; }
+
+bool IsSigmoid(const NodeDef& node) { return node.op() == "Sigmoid"; }
 
 bool IsSigmoidGrad(const NodeDef& node) { return node.op() == "SigmoidGrad"; }
 

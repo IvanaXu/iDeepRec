@@ -1,8 +1,8 @@
-load("//tensorflow:tensorflow.bzl", "cc_header_only_library", "tf_cc_test")
+load("//tensorflow:tensorflow.bzl", "tf_cc_test", "cc_header_only_library")
 load("@local_config_cuda//cuda:build_defs.bzl", "if_cuda")
 load("//tensorflow:tensorflow.bzl", "tf_custom_op_py_library", "tf_jit_compilation_passes_extra_deps")
 load("//tensorflow/core/platform:default/build_config.bzl", "tf_additional_all_protos", "tf_proto_library")
-load("//tensorflow/core/platform:default/build_config_root.bzl", "tf_cuda_tests_tags")
+
 package(
     default_visibility = [
         ":internal",
@@ -501,7 +501,6 @@ cc_library(
     srcs = [
         "build_xla_ops_pass.cc",
         "clone_constants_for_better_clustering.cc",
-        "cluster_scoping_pass.cc",
         "deadness_analysis.cc",
         "deadness_analysis_internal.h",
         "encapsulate_subgraphs_pass.cc",
@@ -513,12 +512,10 @@ cc_library(
         "mark_for_compilation_pass_test_helper.cc",
         "partially_decluster_pass.cc",
         "report_clustering_info_pass.cc",
-        "async_io_conversion_pass.cc",
     ],
     hdrs = [
         "build_xla_ops_pass.h",
         "clone_constants_for_better_clustering.h",
-        "cluster_scoping_pass.h",
         "deadness_analysis.h",
         "encapsulate_subgraphs_pass.h",
         "encapsulate_xla_computations_pass.h",
@@ -529,7 +526,6 @@ cc_library(
         "mark_for_compilation_pass_test_helper.h",
         "partially_decluster_pass.h",
         "report_clustering_info_pass.h",
-        "async_io_conversion_pass.h",
     ],
     deps = [
         "compilability_check_util",
@@ -539,6 +535,7 @@ cc_library(
         ":flags",
         ":resource_operation_safety_analysis",
         ":shape_inference_helpers",
+        ":union_find",
         ":xla_activity_listener",
         ":xla_cluster_util",
         "//tensorflow/cc:cc_ops",
@@ -548,7 +545,6 @@ cc_library(
         "//tensorflow/cc:scope_internal",
         "//tensorflow/compiler/jit/graphcycles",
         "//tensorflow/compiler/jit/ops:xla_ops",
-        "//tensorflow/compiler/jit/ops:async_io_ops",
         "//tensorflow/compiler/tf2xla:resource_operation_table",
         "//tensorflow/compiler/tf2xla:side_effect_util",
         "//tensorflow/compiler/tf2xla:tf2xla_util",
@@ -557,7 +553,6 @@ cc_library(
         "//tensorflow/compiler/tf2xla/cc:xla_ops",
         "//tensorflow/compiler/xla:status_macros",
         "//tensorflow/compiler/xla:statusor",
-        "//tensorflow/compiler/xla:union_find",
         "//tensorflow/compiler/xla:util",
         "//tensorflow/core:core_cpu",
         "//tensorflow/core:core_cpu_internal",
@@ -631,6 +626,11 @@ tf_cc_test(
     ],
 )
 
+cc_library(
+    name = "union_find",
+    hdrs = ["union_find.h"],
+)
+
 tf_cc_test(
     name = "deadness_analysis_test",
     size = "small",
@@ -678,10 +678,8 @@ tf_cc_test(
     name = "compilation_passes_test",
     size = "small",
     srcs = [
-        "async_io_conversion_pass_test.cc",
         "build_xla_ops_pass_test.cc",
         "clone_constants_for_better_clustering_test.cc",
-        "cluster_scoping_pass_test.cc",
         "encapsulate_subgraphs_pass_test.cc",
         "encapsulate_xla_computations_pass_test.cc",
         "extract_outside_compilation_pass_test.cc",
@@ -692,9 +690,6 @@ tf_cc_test(
         "partially_decluster_pass_test.cc",
         "rearrange_function_argument_pass_test.cc",
     ],
-    # TODO(b/141643254) Re-enable msan after fixing use-of-uninitialized-value
-    # error.
-    tags = ["nomsan"] + tf_cuda_tests_tags(),
     deps = [
         ":common",
         ":compilation_passes",
@@ -807,6 +802,7 @@ cc_library(
         ":device_util",
         ":flags",
         ":resource_operation_safety_analysis",
+        ":union_find",
         ":xla_activity_listener",
         ":xla_activity_proto_cc",
         ":xla_cluster_util",
@@ -814,7 +810,6 @@ cc_library(
         "//tensorflow/compiler/tf2xla:resource_operation_table",
         "//tensorflow/compiler/tf2xla:xla_compiler",
         "//tensorflow/compiler/xla:statusor",
-        "//tensorflow/compiler/xla:union_find",
         "//tensorflow/compiler/xla:util",
         "//tensorflow/core:core_cpu",
         "//tensorflow/core:framework",

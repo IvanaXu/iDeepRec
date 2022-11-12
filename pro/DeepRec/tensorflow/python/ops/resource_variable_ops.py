@@ -418,7 +418,6 @@ class BaseResourceVariable(variables.VariableV1):
             handle=self._handle, handle_device=self._handle.device)
     self._handle_deleter = handle_deleter
     self._cached_shape_as_list = None
-    self._is_sparse=False
 
   def __repr__(self):
     if context.executing_eagerly() and not self._in_graph_mode:
@@ -633,7 +632,7 @@ class BaseResourceVariable(variables.VariableV1):
     # specifies instead of the device where the variable is.
     return array_ops.identity(value)
 
-  def sparse_read(self, indices, name=None, ev_init_value=None):
+  def sparse_read(self, indices, name=None):
     """Reads the value of this variable sparsely, using `gather`."""
     with ops.name_scope("Gather" if name is None else name) as name:
       variable_accessed(self)
@@ -1694,7 +1693,6 @@ class ResourceVariable(BaseResourceVariable):
     self._caching_device = None
     self._dtype = dtypes.as_dtype(self._handle.op.get_attr("dtype"))
     self._constraint = None
-    self._is_sparse=False
 
 
 class UninitializedVariable(BaseResourceVariable):
@@ -1893,9 +1891,6 @@ def _to_proto_fn(v, export_scope=None):
 
 def _from_proto_fn(v, import_scope=None):
   """Creates Variable or ResourceVariable from VariableDef as needed."""
-  if v.is_embedding_var:
-    from tensorflow.python.ops import kv_variable_ops
-    return kv_variable_ops.EmbeddingVariable.from_proto(v, import_scope=import_scope)
   if v.is_resource:
     return ResourceVariable.from_proto(v, import_scope=import_scope)
   return variables.Variable.from_proto(v, import_scope=import_scope)

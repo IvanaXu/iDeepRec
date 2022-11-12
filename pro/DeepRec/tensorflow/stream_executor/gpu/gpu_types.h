@@ -59,10 +59,6 @@ using GpuSharedMemConfig = hipSharedMemConfig;
 using GpuComplexType = hipComplex;
 using GpuDoubleComplexType = hipDoubleComplex;
 using GpuRngHandle = hiprandGenerator_t;
-// Dummy types for unsupported features.
-using GpuGraphHandle = void*;
-using GpuGraphExecHandle = void*;
-using GpuStreamCaptureMode = int;
 
 #else  // CUDA
 
@@ -81,16 +77,6 @@ using GpuSharedMemConfig = CUsharedconfig;
 using GpuComplexType = cuComplex;
 using GpuDoubleComplexType = cuDoubleComplex;
 using GpuRngHandle = curandGenerator_t;
-#if CUDA_VERSION >= 10100
-using GpuGraphHandle = CUgraph;
-using GpuGraphExecHandle = CUgraphExec;
-using GpuStreamCaptureMode = CUstreamCaptureMode;
-#else
-// Dummy types for unsupported features.
-using GpuGraphHandle = void*;
-using GpuGraphExecHandle = void*;
-using GpuStreamCaptureMode = int;
-#endif
 
 #endif
 

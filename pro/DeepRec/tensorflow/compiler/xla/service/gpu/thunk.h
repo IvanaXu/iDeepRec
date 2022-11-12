@@ -21,7 +21,6 @@ limitations under the License.
 
 #include "tensorflow/compiler/xla/executable_run_options.h"
 #include "tensorflow/compiler/xla/service/gpu/buffer_allocations.h"
-#include "tensorflow/compiler/xla/service/gpu/gpu_executable_run_options.h"
 #include "tensorflow/compiler/xla/service/gpu/hlo_execution_profiler.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/core/lib/core/status.h"
@@ -44,14 +43,12 @@ class GpuExecutable;
 class Thunk {
  public:
   enum Kind {
-    kAsyncOutSend,
     kCholesky,
     kCollectivePermute,
     kConditional,
     kConvolution,
     kCopy,
     kCudnnBatchNormBackward,
-    kCudnnSoftmax,
     kCudnnBatchNormForwardInference,
     kCudnnBatchNormForwardTraining,
     kCustomCall,
@@ -98,11 +95,8 @@ class Thunk {
     const BufferAllocations* buffer_allocations;  // never null
     se::Stream* stream;
     RunId run_id;
-    HloExecutionProfiler* profiler;                               // never null
-    const DeviceAssignment* device_assn;                          // never null
-    std::vector<std::function<void()>>* deferred_host_callbacks;  // never null
-    const std::vector<GlobalDeviceId>* gpu_global_device_ids;     // may be null
-    const NcclUniqueIdCallback* nccl_unique_id_callback;          // may be null
+    HloExecutionProfiler* profiler;       // never null
+    const DeviceAssignment* device_assn;  // never null
   };
 
   // Execute the kernel for the thunk on the given stream. This method must be
@@ -120,13 +114,11 @@ class Thunk {
   // Safely copies the given buffer to the GPU, deleting it on the host only
   // after the copy has completed.
   template <typename T>
-  void SafeH2DMemcpy(
-      se::DeviceMemory<T> dest, std::unique_ptr<T[]> buf, int64 count,
-      se::Stream* stream,
-      std::vector<std::function<void()>>* deferred_host_callbacks) {
+  void SafeH2DMemcpy(se::DeviceMemory<T> dest, std::unique_ptr<T[]> buf,
+                     int64 count, se::Stream* stream) {
     stream->ThenMemcpy(&dest, buf.get(), count * sizeof(T));
     auto* buf_raw = buf.release();
-    deferred_host_callbacks->push_back([buf_raw] { delete[] buf_raw; });
+    stream->ThenRunAfterNextBlockHostUntilDone([buf_raw] { delete[] buf_raw; });
   }
 
  private:

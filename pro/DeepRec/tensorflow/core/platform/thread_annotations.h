@@ -44,12 +44,6 @@ limitations under the License.
 #define THREAD_ANNOTATION_ATTRIBUTE__(x)  // no-op
 #endif
 
-#if defined(__clang__) && (!defined(SWIG))
-#define TF_INTERNAL_THREAD_ANNOTATION_ATTRIBUTE(x) __attribute__((x))
-#else
-#define TF_INTERNAL_THREAD_ANNOTATION_ATTRIBUTE(x)  // no-op
-#endif
-
 // Document if a shared variable/field needs to be protected by a mutex.
 // GUARDED_BY allows the user to specify a particular mutex that should be
 // held when accessing the annotated variable.  GUARDED_VAR indicates that
@@ -57,9 +51,6 @@ limitations under the License.
 // cases where a valid mutex expression cannot be specified.
 #define GUARDED_BY(x) THREAD_ANNOTATION_ATTRIBUTE__(guarded_by(x))
 #define GUARDED_VAR  // no-op
-
-// FOR XLA that use the upstream name
-#define TF_GUARDED_BY(x) THREAD_ANNOTATION_ATTRIBUTE__(guarded_by(x))
 
 // Document if the memory location pointed to by a pointer should be guarded
 // by a mutex when dereferencing the pointer.  PT_GUARDED_VAR is analogous to
@@ -69,8 +60,6 @@ limitations under the License.
 // guarded by mu2, q should be annotated as follows:
 //     int *q GUARDED_BY(mu1) PT_GUARDED_BY(mu2);
 #define PT_GUARDED_BY(x) THREAD_ANNOTATION_ATTRIBUTE__(pt_guarded_by(x))
-// For XLA that use the upstrem syntax
-#define TF_PT_GUARDED_BY PT_GUARDED_BY
 #define PT_GUARDED_VAR  // no-op
 
 // Document the acquisition order between locks that can be held
@@ -99,12 +88,6 @@ limitations under the License.
 #define EXCLUSIVE_LOCKS_REQUIRED(...) \
   THREAD_ANNOTATION_ATTRIBUTE__(exclusive_locks_required(__VA_ARGS__))
 
-// For XLA that use the upstream name.
-#define TF_EXCLUSIVE_LOCKS_REQUIRED EXCLUSIVE_LOCKS_REQUIRED
-
-#define TF_SHARED_LOCKS_REQUIRED(...) \
-  TF_INTERNAL_THREAD_ANNOTATION_ATTRIBUTE(shared_locks_required(__VA_ARGS__))
-
 #define SHARED_LOCKS_REQUIRED(...) \
   THREAD_ANNOTATION_ATTRIBUTE__(shared_locks_required(__VA_ARGS__))
 
@@ -113,8 +96,6 @@ limitations under the License.
 // mutex implementation is non-reentrant).
 #define LOCKS_EXCLUDED(...) \
   THREAD_ANNOTATION_ATTRIBUTE__(locks_excluded(__VA_ARGS__))
-//For XLA that use the new upstream name.
-#define TF_LOCKS_EXCLUDED LOCKS_EXCLUDED
 
 // Document a function that returns a mutex without acquiring it.  For example,
 // a public getter method that returns a pointer to a private mutex should
@@ -170,13 +151,6 @@ limitations under the License.
 // or (b) the function contains race conditions that are known to be benign.
 #define NO_THREAD_SAFETY_ANALYSIS \
   THREAD_ANNOTATION_ATTRIBUTE__(no_thread_safety_analysis)
-
-// Turns off thread safety checking within the body of a particular function.
-// This is used as an escape hatch for cases where either (a) the function
-// is correct, but the locking is more complicated than the analyzer can handle,
-// or (b) the function contains race conditions that are known to be benign.
-#define TF_NO_THREAD_SAFETY_ANALYSIS \
-  TF_INTERNAL_THREAD_ANNOTATION_ATTRIBUTE(no_thread_safety_analysis)
 
 // TS_UNCHECKED should be placed around lock expressions that are not valid
 // C++ syntax, but which are present for documentation purposes.  These

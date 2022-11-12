@@ -414,20 +414,9 @@ class Thread {
   /// Blocks until the thread of control stops running.
   virtual ~Thread();
 
-  virtual void SetThreadPoolAffinity(const cpu_set_t& cpuset) {}
-
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(Thread);
 };
-
-/// \brief Cross-platform setenv.
-///
-/// Since setenv() is not available on windows, we provide an
-/// alternative with platform specific implementations here.
-int setenv(const char* name, const char* value, int overwrite);
-
-/// Cross-platform unsetenv.
-int unsetenv(const char* name);
 
 /// \brief Options to configure a Thread.
 ///

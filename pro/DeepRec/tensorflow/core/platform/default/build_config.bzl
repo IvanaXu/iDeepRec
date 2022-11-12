@@ -683,15 +683,6 @@ def tf_additional_core_deps():
         "//conditions:default": [
             "//tensorflow/core/platform/hadoop:hadoop_file_system",
         ],
-    }) + select({
-        "//tensorflow:android": [],
-        "//tensorflow:ios": [],
-        "//tensorflow:linux_s390x": [],
-        "//tensorflow:windows": [],
-        "//tensorflow:no_aws_support": [],
-        "//conditions:default": [
-            "//tensorflow/core/platform/s3:s3_file_system",
-        ],
     })
 
 # TODO(jart, jhseu): Delete when GCP is default on.
@@ -759,24 +750,6 @@ def tf_additional_gdr_lib_defines():
 def tf_additional_numa_lib_defines():
     return select({
         "//tensorflow:with_numa_support": ["TENSORFLOW_USE_NUMA"],
-        "//conditions:default": [],
-    })
-
-def tf_additional_star_lib_defines():
-    return select({
-        "//tensorflow:with_star_support": ["TENSORFLOW_USE_STAR"],
-        "//conditions:default": [],
-    })
-
-def tf_additional_pmem_lib_defines():
-    return select({
-        "//tensorflow:with_pmem_support": ["TENSORFLOW_USE_PMEM"],
-        "//conditions:default": [],
-    })
-
-def tf_additional_gpu_ev_lib_defines():
-    return select({
-        "//tensorflow:with_gpu_ev_support": ["TENSORFLOW_USE_GPU_EV"],
         "//conditions:default": [],
     })
 

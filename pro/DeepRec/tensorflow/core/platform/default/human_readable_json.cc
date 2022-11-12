@@ -28,11 +28,7 @@ Status ProtoToHumanReadableJson(const protobuf::Message& proto, string* result,
 #else
   result->clear();
 
-  tensorflow::protobuf::util::JsonPrintOptions json_options;
-  json_options.preserve_proto_field_names = true;
-  json_options.always_print_primitive_fields = true;
-  auto status = protobuf::util::MessageToJsonString(
-                    proto, result, json_options);
+  auto status = protobuf::util::MessageToJsonString(proto, result);
   if (!status.ok()) {
     // Convert error_msg google::protobuf::StringPiece to
     // tensorflow::StringPiece.

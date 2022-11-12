@@ -24,7 +24,8 @@ StatusScopedDiagnosticHandler::StatusScopedDiagnosticHandler(
     : SourceMgrDiagnosticHandler(source_mgr_, context, diag_stream_),
       diag_stream_(diag_str_),
       propagate_(propagate) {
-  setHandler([this](Diagnostic& diag) { return this->handler(&diag); });
+  context->getDiagEngine().setHandler(
+      [this](Diagnostic diag) { this->handler(std::move(diag)); });
 }
 
 StatusScopedDiagnosticHandler::~StatusScopedDiagnosticHandler() {
@@ -62,25 +63,27 @@ Status StatusScopedDiagnosticHandler::Combine(Status status) {
   return status;
 }
 
-LogicalResult StatusScopedDiagnosticHandler::handler(Diagnostic* diag) {
-  // Non-error diagnostic are ignored when VLOG isn't enabled.
-  if (diag->getSeverity() != DiagnosticSeverity::Error && VLOG_IS_ON(1))
-    return success();
-
+void StatusScopedDiagnosticHandler::handler(Diagnostic diag) {
+#ifndef NDEBUG
   size_t current_diag_str_size_ = diag_str_.size();
+#endif
 
   // Emit the diagnostic and flush the stream.
-  emitDiagnostic(*diag);
+  emitDiagnostic(diag);
   diag_stream_.flush();
 
+#ifndef NDEBUG
   // Emit non-errors to VLOG instead of the internal status.
-  if (diag->getSeverity() != DiagnosticSeverity::Error) {
+  if (diag.getSeverity() != DiagnosticSeverity::Error) {
     VLOG(1) << diag_str_.substr(current_diag_str_size_);
     diag_str_.resize(current_diag_str_size_);
   }
+#endif
 
-  // Return failure to signal propagation if necessary.
-  return failure(propagate_);
+  // Propagate diagnostic if needed.
+  if (propagate_) {
+    propagateDiagnostic(std::move(diag));
+  }
 }
 
 }  // namespace mlir

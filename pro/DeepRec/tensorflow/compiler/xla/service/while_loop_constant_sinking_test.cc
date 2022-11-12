@@ -16,8 +16,8 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/while_loop_constant_sinking.h"
 
 #include "tensorflow/compiler/xla/service/hlo_matchers.h"
+#include "tensorflow/compiler/xla/service/hlo_parser.h"
 #include "tensorflow/compiler/xla/test.h"
-#include "tensorflow/compiler/xla/tests/hlo_test_base.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
 
 namespace xla {
@@ -25,7 +25,8 @@ namespace {
 
 namespace op = xla::testing::opcode_matchers;
 using ::testing::_;
-using WhileLoopConstantSinkingTest = HloTestBase;
+
+class WhileLoopConstantSinkingTest : public ::testing::Test {};
 
 TEST_F(WhileLoopConstantSinkingTest, SinkOneConstant) {
   const char* const hlo_string = R"(
@@ -53,8 +54,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
@@ -93,8 +94,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
@@ -134,8 +135,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
@@ -182,8 +183,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
@@ -224,8 +225,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
@@ -270,8 +271,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
@@ -310,8 +311,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
@@ -353,8 +354,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
@@ -404,8 +405,8 @@ ENTRY entry {
 }
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module,
-                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_string));
   TF_ASSERT_OK_AND_ASSIGN(bool changed,
                           WhileLoopConstantSinking{}.Run(module.get()));
   ASSERT_TRUE(changed);

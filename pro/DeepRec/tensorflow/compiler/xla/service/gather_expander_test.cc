@@ -14,17 +14,13 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/compiler/xla/service/gather_expander.h"
-
+#include "tensorflow/compiler/xla/service/hlo_parser.h"
 #include "tensorflow/compiler/xla/test.h"
-#include "tensorflow/compiler/xla/tests/hlo_test_base.h"
 #include "tensorflow/compiler/xla/tests/test_macros.h"
 
 namespace xla {
 namespace {
-
-using GatherExpanderTest = HloTestBase;
-
-TEST_F(GatherExpanderTest, ErrorStatusOnTooManyIndices) {
+TEST(GatherExpanderTest, ErrorStatusOnTooManyIndices) {
   const string hlo_text = R"(
 HloModule TensorFlowGatherMultipleBatchDims
 
@@ -40,7 +36,7 @@ ENTRY main {
 }
 )";
   TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
-                          ParseAndReturnVerifiedModule(hlo_text));
+                          ParseAndReturnUnverifiedModule(hlo_text));
 
   Status status = GatherExpander{}.Run(module.get()).status();
   EXPECT_EQ(status.code(), tensorflow::error::UNIMPLEMENTED);
@@ -51,7 +47,7 @@ ENTRY main {
                            "indices are not supported."));
 }
 
-TEST_F(GatherExpanderTest, AvoidDegenerateDims) {
+TEST(GatherExpanderTest, AvoidDegenerateDims) {
   const string hlo_text = R"(
 HloModule TensorFlowGatherV2
 
@@ -67,7 +63,7 @@ ENTRY main {
 }
 )";
   TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
-                          ParseAndReturnVerifiedModule(hlo_text));
+                          ParseAndReturnUnverifiedModule(hlo_text));
   TF_ASSERT_OK_AND_ASSIGN(bool changed, GatherExpander{}.Run(module.get()));
   ASSERT_TRUE(changed);
 
@@ -109,7 +105,7 @@ ENTRY main {
       ShapeUtil::GetTupleElementShape(while_shape, 3)));
 }
 
-TEST_F(GatherExpanderTest, CheckOpMetadata) {
+TEST(GatherExpanderTest, CheckOpMetadata) {
   const string hlo_text = R"(
 HloModule TensorFlowGatherV2
 
@@ -125,7 +121,7 @@ ENTRY main {
 }
 )";
   TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
-                          ParseAndReturnVerifiedModule(hlo_text));
+                          ParseAndReturnUnverifiedModule(hlo_text));
   OpMetadata metadata;
   metadata.set_op_name("Gather");
   module->entry_computation()->root_instruction()->set_metadata(metadata);

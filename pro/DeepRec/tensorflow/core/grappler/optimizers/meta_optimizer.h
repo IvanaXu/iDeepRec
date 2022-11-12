@@ -53,8 +53,6 @@ class MetaOptimizer : public GraphOptimizer {
   std::unique_ptr<GraphOptimizer> MakeNewOptimizer(
       const string& optimizer) const;
 
-  bool IsSingleThreadedExecutor() const;
-
   // Initialize active optimizers from RewriterConfig toggles.
   Status InitializeOptimizers(
       std::vector<std::unique_ptr<GraphOptimizer>>* optimizers) const;
@@ -83,7 +81,6 @@ class MetaOptimizer : public GraphOptimizer {
   DeviceBase* const cpu_device_;  // may be NULL
   ConfigProto config_proto_;
   RewriterConfig& cfg_;
-  bool xla_on_;
 
   struct OptimizerResult {
     string optimizer_name;

@@ -8,5 +8,4 @@ exports_files(["LICENSE.txt"])
 cc_library(
     name = "hdfs",
     hdrs = ["hdfs.h"],
-    includes = ["."],
 )

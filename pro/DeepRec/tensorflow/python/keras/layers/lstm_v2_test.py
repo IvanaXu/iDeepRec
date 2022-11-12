@@ -570,8 +570,6 @@ class LSTMV2Test(keras_parameterized.TestCase):
         input_shape=(num_samples, timesteps, embedding_dim))
 
   def test_float64_LSTM(self):
-    if test.is_built_with_rocm:
-      self.skipTest("Double type is yet not supported in ROCm")
     num_samples = 2
     timesteps = 3
     embedding_dim = 4
@@ -607,7 +605,6 @@ class LSTMV2Test(keras_parameterized.TestCase):
     else:
       self.assertEqual(len(layer.get_losses_for(x)), 1)
 
-  '''
   def test_statefulness_LSTM(self):
     num_samples = 2
     timesteps = 3
@@ -681,7 +678,6 @@ class LSTMV2Test(keras_parameterized.TestCase):
 
     self.assertAllClose(out7, out6, atol=1e-5)
     self.assertAllClose(out8, out7, atol=1e-5)
-  '''
 
   def test_stateful_LSTM_training(self):
     # See b/123587692 for more context.

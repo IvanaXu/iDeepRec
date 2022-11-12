@@ -29,10 +29,6 @@ tf_module {
     argspec: "args=[\'image\', \'saturation_factor\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "batched_non_max_suppression"
-    argspec: "args=[\'boxes\', \'scores\', \'box_counts\', \'max_output_size\', \'iou_threshold\', \'score_threshold\', \'pad_to_max_output_size\', \'algorithm\', \'name\'], varargs=None, keywords=None, defaults=[\'0.5\', \'-inf\', \'False\', \'auto\', \'None\'], "
-  }
-  member_method {
     name: "central_crop"
     argspec: "args=[\'image\', \'central_fraction\'], varargs=None, keywords=None, defaults=None"
   }
@@ -111,10 +107,6 @@ tf_module {
   member_method {
     name: "flip_up_down"
     argspec: "args=[\'image\'], varargs=None, keywords=None, defaults=None"
-  }
-  member_method {
-    name: "generate_bounding_box_proposals"
-    argspec: "args=[\'scores\', \'bbox_deltas\', \'image_info\', \'anchors\', \'nms_threshold\', \'pre_nms_topn\', \'min_size\', \'post_nms_topn\', \'name\'], varargs=None, keywords=None, defaults=[\'0.7\', \'6000\', \'16\', \'300\', \'None\'], "
   }
   member_method {
     name: "grayscale_to_rgb"

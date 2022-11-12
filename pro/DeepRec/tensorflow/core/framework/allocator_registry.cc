@@ -16,9 +16,6 @@ limitations under the License.
 #include <string>
 
 #include "tensorflow/core/framework/allocator_registry.h"
-#ifdef TENSORFLOW_USE_PMEM
-#include "tensorflow/core/framework/experimental_pmem_allocator.h"
-#endif
 #include "tensorflow/core/platform/logging.h"
 
 namespace tensorflow {
@@ -86,78 +83,6 @@ Allocator* AllocatorFactoryRegistry::GetAllocator() {
     return best_entry->allocator.get();
   } else {
     LOG(FATAL) << "No registered CPU AllocatorFactory";
-    return nullptr;
-  }
-}
-
-#ifdef TENSORFLOW_USE_PMEM
-Allocator* AllocatorFactoryRegistry::GetExperimentalPMEMAllocator(
-    const std::string& pmem_path, size_t pmem_size) {
-  mutex_lock l(mu_);
-  first_alloc_made_ = true;
-  FactoryEntry* best_entry = nullptr;
-  for (auto& entry : factories_) {
-    if (entry.name == "ExperimentalPMEMAllocator") {
-      best_entry = &entry;
-      break;
-    }
-  }
-
-  if (best_entry) {
-    if (!best_entry->allocator) {
-      static_cast<ExperimentalPMEMAllocatorFactory*>(
-          best_entry->factory.get())->Init(pmem_path, pmem_size);
-      best_entry->allocator.reset(best_entry->factory->CreateAllocator());
-    }
-    return best_entry->allocator.get();
-  } else {
-    LOG(FATAL) << "No registered Experimental PMEM AllocatorFactory";
-    return nullptr;
-  }
-}
-#endif
-
-Allocator* AllocatorFactoryRegistry::GetPMEMAllocator() {
-  mutex_lock l(mu_);
-  first_alloc_made_ = true;
-  FactoryEntry* best_entry = nullptr;
-  for (auto& entry : factories_) {
-    if (entry.name == "PMEMAllocator") {
-      best_entry = &entry;
-      break;
-    }
-  }
-
-  if (best_entry) {
-    if (!best_entry->allocator) {
-      best_entry->allocator.reset(best_entry->factory->CreatePMEMAllocator());
-    }
-    return best_entry->allocator.get();
-  } else {
-    return nullptr;
-  }
-}
-
-Allocator* AllocatorFactoryRegistry::GetEVAllocator() {
-  mutex_lock l(mu_);
-  first_alloc_made_ = true;
-  FactoryEntry* best_entry = nullptr;
-  for (auto& entry : factories_) {
-    if (best_entry == nullptr) {
-      best_entry = &entry;
-    } else if (entry.name == "EVAllocator") {
-      best_entry = &entry;
-      break;
-    }
-  }
-
-  if (best_entry) {
-    if (!best_entry->allocator) {
-      best_entry->allocator.reset(best_entry->factory->CreateEVAllocator());
-    }
-    return best_entry->allocator.get();
-  } else {
-    LOG(FATAL) << "No registered EV AllocatorFactory";
     return nullptr;
   }
 }

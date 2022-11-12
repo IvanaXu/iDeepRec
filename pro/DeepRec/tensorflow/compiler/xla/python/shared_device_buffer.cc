@@ -17,7 +17,6 @@ limitations under the License.
 
 #include <memory>
 
-#include "tensorflow/stream_executor/device_memory.h"
 #include "tensorflow/stream_executor/device_memory_allocator.h"
 
 namespace xla {
@@ -56,74 +55,68 @@ void BufferDefinitionEvent::WaitForEventOnStream(se::Stream* stream) {
 }
 
 static std::shared_ptr<SharedDeviceBuffer> BufferFromScopedShapedBufferIterator(
-    const Shape& on_host_shape, const Shape& on_device_shape,
-    int device_ordinal, se::DeviceMemoryAllocator* allocator,
+    const Shape& on_device_shape, int device_ordinal,
+    se::DeviceMemoryAllocator* allocator,
     ShapeTree<se::DeviceMemoryBase>::iterator* iterator,
     const ShapeTree<se::DeviceMemoryBase>::iterator& end,
     const std::shared_ptr<BufferDefinitionEvent>& definition_event) {
-  std::vector<se::OwningDeviceMemory> buffers;
-  buffers.reserve(1);
-  std::vector<std::shared_ptr<SharedDeviceBuffer>> children;
+  CHECK(*iterator != end);
 
-  auto consume_buffer = [&]() {
-    CHECK(*iterator != end);
-    buffers.emplace_back((*iterator)->second, device_ordinal, allocator);
-    (*iterator)->second = se::DeviceMemoryBase();
-    ++*iterator;
-  };
-  if (on_host_shape.IsTuple()) {
-    consume_buffer();
+  se::OwningDeviceMemory device_memory((*iterator)->second, device_ordinal,
+                                       allocator);
+  (*iterator)->second = se::DeviceMemoryBase();
+  ++*iterator;
+
+  std::vector<std::shared_ptr<SharedDeviceBuffer>> children;
+  if (on_device_shape.IsTuple()) {
     int num_children = ShapeUtil::TupleElementCount(on_device_shape);
     children.reserve(num_children);
     for (int i = 0; i < num_children; ++i) {
       children.push_back(BufferFromScopedShapedBufferIterator(
-          on_host_shape.tuple_shapes(i), on_device_shape.tuple_shapes(i),
-          device_ordinal, allocator, iterator, end, definition_event));
+          on_device_shape.tuple_shapes(i), device_ordinal, allocator, iterator,
+          end, definition_event));
     }
-  } else {
-    // An on-host array may be an on-device tuple. For example, a complex tensor
-    // may be represented as a (real, imag) pair.
-    ShapeUtil::ForEachSubshape(
-        on_device_shape,
-        [&](const Shape&, const ShapeIndex&) { consume_buffer(); });
   }
   return std::make_shared<SharedDeviceBuffer>(
-      absl::Span<se::OwningDeviceMemory>(buffers), children, definition_event);
+      on_device_shape, std::move(device_memory), children, definition_event);
 }
 
 /* static */ std::shared_ptr<SharedDeviceBuffer>
 SharedDeviceBuffer::FromScopedShapedBuffer(
-    ScopedShapedBuffer* shaped_buffer,
+    ScopedShapedBuffer shaped_buffer,
     const std::shared_ptr<BufferDefinitionEvent>& definition_event) {
   ShapeTree<se::DeviceMemoryBase>::iterator iterator =
-      shaped_buffer->buffers().begin();
+      shaped_buffer.buffers().begin();
   std::shared_ptr<SharedDeviceBuffer> output =
       BufferFromScopedShapedBufferIterator(
-          shaped_buffer->on_host_shape(), shaped_buffer->on_device_shape(),
-          shaped_buffer->device_ordinal(), shaped_buffer->memory_allocator(),
-          &iterator, shaped_buffer->buffers().end(), definition_event);
-  CHECK(iterator == shaped_buffer->buffers().end());
+          shaped_buffer.on_device_shape(), shaped_buffer.device_ordinal(),
+          shaped_buffer.memory_allocator(), &iterator,
+          shaped_buffer.buffers().end(), definition_event);
+  CHECK(iterator == shaped_buffer.buffers().end());
   return output;
 }
 
 /* static */ StatusOr<std::shared_ptr<SharedDeviceBuffer>>
 SharedDeviceBuffer::MakeTuple(
     std::vector<std::shared_ptr<SharedDeviceBuffer>> children,
-    const Shape& on_host_shape, TransferManager* transfer_manager,
-    se::DeviceMemoryAllocator* allocator, int device_ordinal,
+    TransferManager* transfer_manager, se::DeviceMemoryAllocator* allocator,
+    int device_ordinal,
     std::shared_ptr<BufferDefinitionEvent> definition_event) {
-  CHECK(on_host_shape.IsTuple() &&
-        on_host_shape.tuple_shapes_size() == children.size());
+  std::vector<Shape> child_shapes;
+  child_shapes.reserve(children.size());
+  for (const auto& child : children) {
+    TF_RET_CHECK(child->device_memory().device_ordinal() == device_ordinal);
+    child_shapes.push_back(child->on_device_shape());
+  }
+
+  Shape shape = ShapeUtil::MakeTupleShape(child_shapes);
   TF_ASSIGN_OR_RETURN(
       se::OwningDeviceMemory device_memory,
-      allocator->Allocate(
-          device_ordinal,
-          transfer_manager->GetByteSizeRequirement(on_host_shape)));
+      allocator->Allocate(device_ordinal,
+                          transfer_manager->GetByteSizeRequirement(shape)));
   return std::make_shared<SharedDeviceBuffer>(
-      allocator, device_ordinal,
-      std::initializer_list<se::DeviceMemoryBase>{device_memory.Release()},
-      std::move(children), std::move(definition_event),
-      /*on_delete_callback=*/nullptr);
+      std::move(shape), std::move(device_memory), std::move(children),
+      std::move(definition_event));
 }
 
 /* static */ StatusOr<std::shared_ptr<SharedDeviceBuffer>>
@@ -131,19 +124,13 @@ SharedDeviceBuffer::MakeArray(
     Shape on_device_shape, TransferManager* transfer_manager,
     se::DeviceMemoryAllocator* allocator, int device_ordinal,
     std::shared_ptr<BufferDefinitionEvent> definition_event) {
-  std::vector<se::OwningDeviceMemory> device_buffers;
-  TF_RETURN_IF_ERROR(ShapeUtil::ForEachSubshapeWithStatus(
-      on_device_shape, [&](const Shape& subshape, const ShapeIndex&) -> Status {
-        TF_ASSIGN_OR_RETURN(
-            se::OwningDeviceMemory device_memory,
-            allocator->Allocate(
-                device_ordinal,
-                transfer_manager->GetByteSizeRequirement(subshape)));
-        device_buffers.push_back(std::move(device_memory));
-        return Status::OK();
-      }));
+  TF_ASSIGN_OR_RETURN(
+      se::OwningDeviceMemory device_memory,
+      allocator->Allocate(
+          device_ordinal,
+          transfer_manager->GetByteSizeRequirement(on_device_shape)));
   return std::make_shared<SharedDeviceBuffer>(
-      absl::Span<se::OwningDeviceMemory>(device_buffers),
+      std::move(on_device_shape), std::move(device_memory),
       /*children=*/std::vector<std::shared_ptr<SharedDeviceBuffer>>{},
       std::move(definition_event));
 }
@@ -153,21 +140,19 @@ static void PopulateShapedBufferFromBuffer(
     const SharedDeviceBuffer& buffer,
     ShapeTree<se::DeviceMemoryBase>::iterator* iterator,
     const ShapeTree<se::DeviceMemoryBase>::iterator& end) {
-  for (const se::DeviceMemoryBase& buf : buffer.device_memory()) {
-    CHECK(*iterator != end);
-    (*iterator)->second = buf;
-    ++*iterator;
-  }
+  CHECK(*iterator != end);
+  (*iterator)->second = *buffer.device_memory();
+  ++*iterator;
   for (const auto& child : buffer.children()) {
     PopulateShapedBufferFromBuffer(*child, iterator, end);
   }
 }
 
-ShapedBuffer SharedDeviceBuffer::AsShapedBuffer(const Shape& on_host_shape,
-                                                const Shape& on_device_shape,
-                                                se::Platform* platform) const {
-  ShapedBuffer shaped_buffer(on_host_shape, on_device_shape, platform,
-                             device_ordinal_);
+ShapedBuffer SharedDeviceBuffer::AsShapedBuffer(
+    const Shape& on_host_shape) const {
+  ShapedBuffer shaped_buffer(on_host_shape, on_device_shape_,
+                             device_memory_.allocator()->platform(),
+                             device_memory_.device_ordinal());
   ShapeTree<se::DeviceMemoryBase>::iterator iterator =
       shaped_buffer.buffers().begin();
   PopulateShapedBufferFromBuffer(*this, &iterator,
@@ -177,47 +162,13 @@ ShapedBuffer SharedDeviceBuffer::AsShapedBuffer(const Shape& on_host_shape,
 }
 
 SharedDeviceBuffer::SharedDeviceBuffer(
-    se::DeviceMemoryAllocator* allocator, int device_ordinal,
-    absl::Span<se::DeviceMemoryBase const> device_memory,
-    std::vector<std::shared_ptr<SharedDeviceBuffer>> children,
-    std::shared_ptr<BufferDefinitionEvent> definition_event,
-    std::function<void()> on_delete_callback)
-    : allocator_(allocator),
-      device_ordinal_(device_ordinal),
-      device_memory_(device_memory.begin(), device_memory.end()),
-      children_(std::move(children)),
-      definition_event_(std::move(definition_event)),
-      on_delete_callback_(std::move(on_delete_callback)) {}
-
-SharedDeviceBuffer::SharedDeviceBuffer(
-    absl::Span<se::OwningDeviceMemory> device_memory,
+    Shape on_device_shape, se::OwningDeviceMemory device_memory,
     std::vector<std::shared_ptr<SharedDeviceBuffer>> children,
     std::shared_ptr<BufferDefinitionEvent> definition_event)
-    : children_(std::move(children)),
-      definition_event_(std::move(definition_event)) {
-  CHECK(!device_memory.empty());
-  allocator_ = device_memory.front().allocator();
-  device_ordinal_ = device_memory.front().device_ordinal();
-  for (se::OwningDeviceMemory& buffer : device_memory) {
-    CHECK(buffer.allocator() == allocator_) << "Mismatched allocators";
-    CHECK_EQ(buffer.device_ordinal(), device_ordinal_);
-    device_memory_.push_back(buffer.Release());
-  }
-}
-
-SharedDeviceBuffer::~SharedDeviceBuffer() {
-  if (allocator_) {
-    for (const se::DeviceMemoryBase& buffer : device_memory_) {
-      Status status = allocator_->Deallocate(device_ordinal_, buffer);
-      if (!status.ok()) {
-        LOG(ERROR) << "Buffer deallocation failed: " << status;
-      }
-    }
-  }
-  if (on_delete_callback_) {
-    on_delete_callback_();
-  }
-}
+    : on_device_shape_(std::move(on_device_shape)),
+      device_memory_(std::move(device_memory)),
+      children_(std::move(children)),
+      definition_event_(std::move(definition_event)) {}
 
 void GetDeviceBufferDefinitionEvents(
     const SharedDeviceBuffer& buffer,

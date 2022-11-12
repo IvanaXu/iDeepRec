@@ -1,4 +1,3 @@
-# cython: language_level=2
 # distutils: language = c++
 
 # Test case for defining a XLA custom call target in Cython, and registering

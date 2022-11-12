@@ -52,7 +52,7 @@ class HloDataflowAnalysis {
       const HloInstruction* instr, const HloInstruction* operand,
       const ShapeIndex& user_index)>;
 
-  // Runs dataflow analysis on the given module. Parameters:
+  // Run dataflow analysis on the given module. Parameters:
   //
   //   ssa_form : If true then new values are defined at the merge points of
   //     kWhile instructions. Abusing nomenclature somewhat, we call these "phi
@@ -81,7 +81,7 @@ class HloDataflowAnalysis {
   bool ValueIsDefinedAt(const HloInstruction* instruction,
                         const ShapeIndex& index = {}) const;
 
-  // Returns the HloValue defined by 'instruction' at the given shape index of
+  // Return the HloValue defined by 'instruction' at the given shape index of
   // its output.
   //
   // Precondition: ValueIsDefinedAt is true for this instruction and index.
@@ -90,7 +90,7 @@ class HloDataflowAnalysis {
   HloValue& GetValueDefinedAt(const HloInstruction* instruction,
                               const ShapeIndex& index = {});
 
-  // Returns the InstructionValueSet for the given instruction.
+  // Return the InstructionValueSet for the given instruction.
   const InstructionValueSet& GetInstructionValueSet(
       const HloInstruction* instruction) const;
   InstructionValueSet& GetInstructionValueSet(
@@ -100,7 +100,7 @@ class HloDataflowAnalysis {
   // a flattened set.
   HloValueSet GetFlattenedValueSet(const HloInstruction* instruction) const;
 
-  // Returns the HloValueSet for the given instruction at the given index or the
+  // Return the HloValueSet for the given instruction at the given index or the
   // given position.
   const HloValueSet& GetValueSet(const HloInstruction* instruction,
                                  const ShapeIndex& index = {}) const;
@@ -109,7 +109,7 @@ class HloDataflowAnalysis {
   HloValueSet& GetValueSet(const HloInstruction* instruction,
                            const ShapeIndex& index = {});
 
-  // Returns the unique value in the HloValueSet at the given instruction and
+  // Return the unique value in the HloValueSet at the given instruction and
   // shape index. CHECKs if the value set does not contain a exactly one value.
   const HloValue& GetUniqueValueAt(const HloInstruction* instruction,
                                    const ShapeIndex& index = {}) const {
@@ -120,17 +120,17 @@ class HloDataflowAnalysis {
     return GetValue(GetValueSet(instruction, index).GetUniqueValue().id());
   }
 
-  // Returns the HloValue with the given Id.
+  // Return the HloValue with the given Id.
   const HloValue& GetValue(HloValue::Id value_id) const;
   HloValue& GetValue(HloValue::Id value_id);
 
-  // Returns the total number of HloValues.
+  // Return the total number of HloValues.
   int64 value_count() const { return values_.size(); }
 
-  // Returns a vector of all HloValues stabily sorted by HloValue::Id.
+  // Return a vector of all HloValues stabily sorted by HloValue::Id.
   const std::vector<HloValue*>& values() const { return values_vector_; }
 
-  // Returns the call graph used for computing the dataflow.
+  // Return the call graph used for computing the dataflow.
   const CallGraph& call_graph() const { return *call_graph_; }
 
   string ToString() const;
@@ -164,10 +164,10 @@ class HloDataflowAnalysis {
   HloValue* NewHloValue(HloInstruction* instruction, const ShapeIndex& index,
                         bool is_phi = false);
 
-  // Marks the HloValue with the given ID for deletion.
+  // Mark the HloValue with the given ID for deletion.
   void MarkValueForDeletion(HloValue::Id value_id);
 
-  // Deletes all HloValues marked for deletion. Should be called after
+  // Delete all HloValues marked for deletion. Should be called after
   // propagation is complete.
   void DeleteMarkedValues();
 
@@ -189,23 +189,20 @@ class HloDataflowAnalysis {
   bool UpdateDomainValueSet(HloInstruction* domain);
   bool UpdateGetTupleElementValueSet(HloInstruction* gte);
   bool UpdateParameterValueSet(HloInstruction* parameter);
-  bool UpdateCopyStartValueSet(HloInstruction* copy_start);
   bool UpdateCopyDoneValueSet(HloInstruction* copy_done);
   bool UpdateRecvDoneValueSet(HloInstruction* recv_done);
   bool UpdateTupleSelectValueSet(HloInstruction* select);
   bool UpdateSendValueSet(HloInstruction* send);
-  bool UpdateSetDimensionSizeValueSet(HloInstruction* set_dimension_size);
   bool UpdateTupleValueSet(HloInstruction* tuple);
   bool UpdateWhileValueSet(HloInstruction* xla_while);
   bool UpdateAddDependencyValueSet(HloInstruction* add_dependency);
 
-  // Propagates the dataflow through the module. In particular, it propagates
-  // the HloValueSet from its defining instruction to the users of the
-  // instructions.
+  // Propagate the dataflow through the module.
   void Propagate();
 
-  // Returns the result of the SSA Phi function applied to the given inputs at
-  // the given instruction.
+  // Return the result of the SSA Phi function applied to the given inputs at
+  // the given instruction. If skip_top_level is true, then the top level of the
+  // value set of 'instruction' is not modified.
   bool Phi(HloInstruction* instruction,
            absl::Span<const InstructionValueSet* const> inputs);
 
@@ -220,7 +217,7 @@ class HloDataflowAnalysis {
       HloInstruction* instruction, const InstructionValueSet& new_value_set,
       const InstructionValueSet* prev_value_set = nullptr);
 
-  // Verifies various invariants of the dataflow analysis.
+  // Verify various invariants of the dataflow analysis.
   Status Verify() const;
 
   const HloModule& module_;

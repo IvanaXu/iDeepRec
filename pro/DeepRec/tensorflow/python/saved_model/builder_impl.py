@@ -35,7 +35,6 @@ from tensorflow.python.platform import tf_logging
 from tensorflow.python.saved_model import constants
 from tensorflow.python.saved_model import signature_def_utils
 from tensorflow.python.saved_model import utils_impl as saved_model_utils
-from tensorflow.python.training import incremental_saver as tf_incr_saver
 from tensorflow.python.training import saver as tf_saver
 from tensorflow.python.util import compat
 from tensorflow.python.util.deprecation import deprecated_args
@@ -90,8 +89,7 @@ class _SavedModelBuilder(object):
   object-based method of creating SavedModels.
   """
 
-  def __init__(self, export_dir, save_incr_model=False):
-    self.save_incr_model=save_incr_model
+  def __init__(self, export_dir):
     self._saved_model = saved_model_pb2.SavedModel()
     self._saved_model.saved_model_schema_version = (
         constants.SAVED_MODEL_SCHEMA_VERSION)
@@ -227,13 +225,7 @@ class _SavedModelBuilder(object):
           sharded=True,
           write_version=saver_pb2.SaverDef.V2,
           allow_empty=True)
-
-    # Do not save increment model
-    if not self.save_incr_model:
-      return saver
-
-    incr_saver = tf_incr_saver._get_incremental_saver(True, saver)
-    return incr_saver
+    return saver
 
   def add_meta_graph(self,
                      tags,
@@ -440,8 +432,8 @@ class SavedModelBuilder(_SavedModelBuilder):
   __doc__ = _SavedModelBuilder.__doc__.replace("assets_list",
                                                "assets_collection")
 
-  def __init__(self, export_dir, save_incr_model=False):
-    super(SavedModelBuilder, self).__init__(export_dir=export_dir, save_incr_model=save_incr_model)
+  def __init__(self, export_dir):
+    super(SavedModelBuilder, self).__init__(export_dir=export_dir)
 
   def _add_collections(self, assets_collection, main_op, train_op):
     """Add asset and op collections to be saved."""

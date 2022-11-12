@@ -58,8 +58,6 @@ class Device : public DeviceBase {
   typedef std::function<void(const Status&)> DoneCallback;
 
   Device(Env* env, const DeviceAttributes& device_attributes);
-  Device(Env* env, const DeviceAttributes& device_attributes,
-         const DeviceResourceMgrMap* dev_rmgr_map);
   ~Device() override;
 
   // Full name of this device (see top comment).
@@ -151,14 +149,13 @@ class Device : public DeviceBase {
     return Status::OK();
   }
 
-  // Sets `out_context` a new DeviceContext* for executing a graph, or nullptr
-  // if the device does not support contexts. Returns an error status if any
-  // error occurred while trying to create a context, otherwise OK.
+  // Fill in the context map for the graph. Default behavior is to do
+  // nothing.
   //
-  // The caller takes ownership of one reference on the output DeviceContext*,
-  // and should call Unref().
-  virtual Status TryGetDeviceContext(DeviceContext** out_context) {
-    *out_context = nullptr;
+  // The caller takes ownership over the DeviceContext objects given
+  // by the device.
+  virtual Status FillContextMap(const Graph* graph,
+                                DeviceContextMap* device_context_map) {
     return Status::OK();
   }
 
@@ -191,9 +188,7 @@ class Device : public DeviceBase {
 
  protected:
   void DeleteResourceMgr() {
-    if (owned_rmgr_) {
-      delete rmgr_;
-    }
+    delete rmgr_;
     rmgr_ = nullptr;
   }
 
@@ -206,7 +201,6 @@ class Device : public DeviceBase {
 
   // Resources associated w/ this device. E.g., shared variables, etc.
   ResourceMgr* rmgr_ = nullptr;
-  bool owned_rmgr_ = true;
 
   TF_DISALLOW_COPY_AND_ASSIGN(Device);
 };

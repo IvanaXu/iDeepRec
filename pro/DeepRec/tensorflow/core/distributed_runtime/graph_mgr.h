@@ -91,23 +91,10 @@ class GraphMgr {
                     StepStatsCollector* collector,
                     MutableRunGraphResponseWrapper* response,
                     CancellationManager* cancellation_manager,
-                    const NamedTensors& in,
-                    std::map<std::string, bool>& is_send_dead,
-                    StatusCallback done);
-  void ExecuteAsync(const string& handle, const int64 step_id,
-                    Rendezvous* rendezvous,
-                    WorkerSession* session, const ExecutorOpts& opts,
-                    StepStatsCollector* collector,
-                    MutableRunGraphResponseWrapper* response,
-                    CancellationManager* cancellation_manager,
-                    const NamedTensors& in, 
-                    std::map<std::string, bool>& is_send_dead,
-                    StatusCallback done);
+                    const NamedTensors& in, StatusCallback done);
 
   Status SendInputs(const int64 step_id, const NamedTensors& in);
   Status RecvOutputs(const int64 step_id, NamedTensors* out);
-  Status RecvOutputs(const int64 step_id, NamedTensors* out,
-                     std::map<std::string, bool>* is_out_dead);
   void RecvOutputsAsync(const int64 step_id, NamedTensors* out,
                         StatusCallback done);
 
@@ -177,13 +164,11 @@ class GraphMgr {
 
   void StartParallelExecutors(const string& handle, int64 step_id, Item* item,
                               Rendezvous* rendezvous,
-                              Rendezvous* global_rendezvous,
                               CollectiveExecutor::Handle* ce_handle,
                               StepStatsCollector* collector,
                               CostGraphDef* cost_graph,
                               CancellationManager* cancellation_manager,
-                              WorkerSession* session, const ExecutorOpts& opts,
-                              StatusCallback done);
+                              WorkerSession* session, StatusCallback done);
 
   // Don't attempt to process cost models unless explicitly requested for at
   // least one of the items.

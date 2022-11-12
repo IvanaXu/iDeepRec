@@ -15,7 +15,7 @@ limitations under the License.
 
 #ifdef INTEL_MKL
 
-#include "dnnl.hpp"
+#include "mkldnn.hpp"
 #include "absl/strings/match.h"
 #include "tensorflow/cc/ops/const_op.h"
 #include "tensorflow/cc/ops/nn_ops.h"
@@ -44,90 +44,93 @@ limitations under the License.
 
 namespace tensorflow {
 
-template <typename T>
 static Graph* Activation(const string& op_name, const string& kind,
                          const TensorShape& shape) {
   auto* graph = new Graph(OpRegistry::Global());
-  DataType type = DataTypeToEnum<T>::v();
-
   const string node_name = kind + "_" + op_name;
   const bool isForwardOp = !tensorflow::str_util::EndsWith(op_name, "Grad");
   const bool isDefault = (kind == "Default");
 
-  Tensor input_t(type, shape);
-  input_t.flat<T>().setRandom();
+  Tensor input_t(DT_FLOAT, shape);
+  input_t.flat<float>().setRandom();
   Node* input = test::graph::Constant(graph, input_t, "input");
   Node* not_mkl_shape =
       test::graph::Constant(graph, GetMklMetaTensor(), "not_mkl");
 
   if (isForwardOp) {
-    auto nodeBuilder = NodeBuilder(graph->NewName(node_name), isDefault ? op_name : "_Mkl" + op_name)
-                           .Input(input)
-                           .Attr("T", type);
-    isDefault ? nodeBuilder : nodeBuilder.Input(not_mkl_shape)
-                                         .Attr("_kernel", "MklLayoutDependentOp");
-    TF_CHECK_OK(nodeBuilder.Finalize(graph, nullptr));
+    // Default forward op.
+    if (isDefault) {
+      TF_CHECK_OK(NodeBuilder(graph->NewName(node_name), op_name)
+                      .Input(input)
+                      .Attr("T", DT_FLOAT)
+                      .Finalize(graph, nullptr));
+      return graph;
+    }
+    // MKL forward op.
+    TF_CHECK_OK(NodeBuilder(graph->NewName(node_name), "_Mkl" + op_name)
+                    .Input(input)
+                    .Input(not_mkl_shape)
+                    .Attr("T", DT_FLOAT)
+                    .Attr("_kernel", "MklLayoutDependentOp")
+                    .Finalize(graph, nullptr));
     return graph;
   }
 
-  Tensor grad_t(type, shape);
-  grad_t.flat<T>().setRandom();
+  // Default backward op.
+  Tensor grad_t(DT_FLOAT, shape);
+  grad_t.flat<float>().setRandom();
   Node* grad = test::graph::Constant(graph, grad_t, "grad");
+  if (isDefault) {
+    TF_CHECK_OK(NodeBuilder(graph->NewName(node_name), op_name)
+                    .Input(grad)
+                    .Input(input)
+                    .Attr("T", DT_FLOAT)
+                    .Finalize(graph, nullptr));
+    return graph;
+  }
 
-  auto nodeBuilder = NodeBuilder(graph->NewName(node_name), isDefault ? op_name : "_Mkl" + op_name)
-                         .Input(grad)
-                         .Input(input)
-                         .Attr("T", type);
-  isDefault ? nodeBuilder : nodeBuilder.Input(not_mkl_shape)
-                                       .Input(not_mkl_shape)
-                                       .Attr("_kernel", "MklLayoutDependentOp");
-
-  TF_CHECK_OK(nodeBuilder.Finalize(graph, nullptr));
+  // MKL backward op.
+  TF_CHECK_OK(NodeBuilder(graph->NewName(node_name), "_Mkl" + op_name)
+                  .Input(grad)
+                  .Input(input)
+                  .Input(not_mkl_shape)
+                  .Input(not_mkl_shape)
+                  .Attr("T", DT_FLOAT)
+                  .Attr("_kernel", "MklLayoutDependentOp")
+                  .Finalize(graph, nullptr));
   return graph;
 }
 
-#define BM_Activation_Base(op, kind, name, in_shape, T, device, NTH)                 \
-  static void BM_##op##_##kind##_##T##name##_##device##_##NTH(int iters) {           \
-    int64 num_elements = in_shape.num_elements();                                    \
-    testing::UseRealTime();                                                          \
-    testing::ItemsProcessed(static_cast<int64>(iters) * num_elements);               \
-    SessionOptions opts;                                                             \
-    opts.config.set_intra_op_parallelism_threads(NTH);                               \
-    test::Benchmark(#device, Activation<T>(#op, #kind, in_shape), &opts).Run(iters); \
-  }                                                                                  \
-  BENCHMARK(BM_##op##_##kind##_##T##name##_##device##_##NTH)                         \
+#define BM_Activation(op, kind, A, B, C, D, type)                            \
+  static void BM_##op##_##kind##_##type##_##A##_##B##_##C##_##D(int iters) { \
+    int64 num_computed_elements = (A) * (B) * (C) * (D);                     \
+    int64 flops_per_iter = num_computed_elements;                            \
+    testing::ItemsProcessed(static_cast<int64>(iters) * flops_per_iter);     \
+                                                                             \
+    test::Benchmark(#type, Activation(#op, #kind, {A, B, C, D})).Run(iters); \
+  }                                                                          \
+  BENCHMARK(BM_##op##_##kind##_##type##_##A##_##B##_##C##_##D)
 
-#define BM_Activation_Kind(op, name, in_shape, T, device, NTH)     \
-  BM_Activation_Base(op, Default, name, in_shape, T, device, NTH); \
-  BM_Activation_Base(op, Mkl, name, in_shape, T, device, NTH);     \
+#define BM(op, A, B, C, D, type)                \
+  BM_Activation(op, Default, A, B, C, D, type); \
+  BM_Activation(op, Mkl, A, B, C, D, type);
 
-#define BM_Activation_NTH(op, name, in_shape, T, device) \
-  BM_Activation_Kind(op, name, in_shape, T, device, 1);  \
-  BM_Activation_Kind(op, name, in_shape, T, device, 4);  \
-  BM_Activation_Kind(op, name, in_shape, T, device, 8);  \
+#define TEST_ALL_SIZES(OP)       \
+  BM(OP, 2, 4, 8, 16, cpu);      \
+  BM(OP, 3, 5, 9, 17, cpu);      \
+  BM(OP, 32, 64, 128, 256, cpu); \
+  BM(OP, 33, 65, 129, 257, cpu);
 
-#define BM_Activation_ND(op, name, ...)                                   \
-  BM_Activation_NTH(op, name, TensorShape({__VA_ARGS__}), float, cpu);    \
-  BM_Activation_NTH(op, name, TensorShape({__VA_ARGS__}), bfloat16, cpu); \
-
-#define TEST_Activation_ALL(OP)                              \
-  BM_Activation_ND(OP, _2D_1x512, 1, 512);                   \
-  BM_Activation_ND(OP, _2D_512x1, 512, 1);                   \
-  BM_Activation_ND(OP, _2D_32x32, 32, 32);                   \
-  BM_Activation_ND(OP, _2D_512x512, 512, 512);               \
-  BM_Activation_ND(OP, _3D_32x128x128, 32, 128, 128);        \
-  BM_Activation_ND(OP, _4D_32x32x128x128, 32, 32, 128, 128); \
-
-TEST_Activation_ALL(Tanh)
-TEST_Activation_ALL(TanhGrad)
-TEST_Activation_ALL(Elu)
-TEST_Activation_ALL(EluGrad)
-TEST_Activation_ALL(Relu)
-TEST_Activation_ALL(ReluGrad)
-TEST_Activation_ALL(Relu6)
-TEST_Activation_ALL(Relu6Grad)
-TEST_Activation_ALL(LeakyRelu)
-TEST_Activation_ALL(LeakyReluGrad)
+TEST_ALL_SIZES(Tanh)
+TEST_ALL_SIZES(TanhGrad)
+TEST_ALL_SIZES(Relu)
+TEST_ALL_SIZES(ReluGrad)
+TEST_ALL_SIZES(Elu)
+TEST_ALL_SIZES(EluGrad)
+TEST_ALL_SIZES(Relu6)
+TEST_ALL_SIZES(Relu6Grad)
+TEST_ALL_SIZES(LeakyRelu)
+TEST_ALL_SIZES(LeakyReluGrad)
 
 }  // namespace tensorflow
 

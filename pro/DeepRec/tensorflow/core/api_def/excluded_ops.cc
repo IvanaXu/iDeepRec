@@ -34,6 +34,8 @@ const std::unordered_set<std::string>* GetExcludedOps() {
           "QuantizedConv2DAndReluAndRequantize",
           "QuantizedConv2DWithBiasAndRelu",
           "QuantizedConv2DWithBiasAndReluAndRequantize",
+          "QuantizedConv2DWithBiasReluAndSum",
+          "QuantizedConv2DWithBiasReluAndSumAndRequantize",
           "QuantizedConv2DWithBiasSumAndRelu",
           "QuantizedConv2DWithBiasSumAndReluAndRequantize",
           "QuantizedConv2DWithBiasSignedSumAndReluAndRequantize",

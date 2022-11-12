@@ -19,7 +19,6 @@ limitations under the License.
 #include <list>
 #include <memory>
 #include <numeric>
-#include <utility>
 #include <vector>
 
 #include "absl/algorithm/container.h"
@@ -138,7 +137,6 @@ bool IsAlwaysDuplicable(const HloInstruction& instruction) {
     case HloOpcode::kAddDependency:
     case HloOpcode::kAfterAll:
     case HloOpcode::kAtan2:
-    case HloOpcode::kSoftmax:
     case HloOpcode::kBatchNormGrad:
     case HloOpcode::kBatchNormInference:
     case HloOpcode::kBatchNormTraining:
@@ -168,7 +166,6 @@ bool IsAlwaysDuplicable(const HloInstruction& instruction) {
     case HloOpcode::kReduceWindow:
     case HloOpcode::kRng:
     case HloOpcode::kRngGetAndUpdateState:
-    case HloOpcode::kRngBitGenerator:
     case HloOpcode::kRsqrt:
     case HloOpcode::kScatter:
     case HloOpcode::kSelectAndScatter:
@@ -181,7 +178,6 @@ bool IsAlwaysDuplicable(const HloInstruction& instruction) {
     case HloOpcode::kTriangularSolve:
     case HloOpcode::kWhile:
     case HloOpcode::kGetDimensionSize:
-    case HloOpcode::kSetDimensionSize:
       return true;
   }
 
@@ -472,10 +468,8 @@ StatusOr<bool> InstructionFusion::Run(HloModule* module) {
   module_ = module;
   int64 fuse_count = 0;
   std::vector<std::vector<bool>>* fusion_config = nullptr;
-  HloModuleConfig module_config;
   if (config_collection_mode_ != FusionConfigCollection::kOff) {
-    module_config = module->config();
-    fusion_config = module_config.mutable_fusion_config();
+    fusion_config = module->mutable_fusion_config();
     fusion_config->clear();
   }
 
@@ -574,7 +568,7 @@ StatusOr<bool> InstructionFusion::Run(HloModule* module) {
     if (config_collection_mode_ != FusionConfigCollection::kOff) {
       const std::vector<bool>* comp_fusion_config =
           fusion_queue->FusionConfiguration();
-      if (comp_fusion_config && !comp_fusion_config->empty()) {
+      if (comp_fusion_config && comp_fusion_config->size() > 0) {
         fusion_config->push_back(*comp_fusion_config);
       }
     }
@@ -592,7 +586,6 @@ StatusOr<bool> InstructionFusion::Run(HloModule* module) {
     VLOG(1) << "There are " << fused_count << " fused bits that cause "
             << fuse_count << " fusion actions.";
     VLOG(1) << FusionConfigToString(*fusion_config);
-    module->set_config(module_config);
   }
   VLOG(1) << "Fusion count: " << fuse_count;
 
@@ -616,20 +609,12 @@ HloInstruction* InstructionFusion::AddFusionInstruction(
   return fusion_instruction;
 }
 
-HloInstruction* InstructionFusion::FuseInstruction(
-    HloInstruction* fusion_instruction, HloInstruction* producer) {
-  return fusion_instruction->FuseInstruction(producer);
-}
-
 HloInstruction* InstructionFusion::Fuse(HloInstruction* producer,
                                         HloInstruction* consumer) {
   VLOG(2) << "Fusing " << producer->ToString() << " into "
           << consumer->ToString();
   HloInstruction* fusion_instruction = AddFusionInstruction(producer, consumer);
-  FuseInstruction(fusion_instruction, producer);
-  if (fusion_instruction != producer && fusion_instruction != consumer) {
-    VLOG(2) << "       created new fusion: " << fusion_instruction->ToString();
-  }
+  fusion_instruction->FuseInstruction(producer);
   return fusion_instruction;
 }
 

@@ -249,6 +249,9 @@ Status Conv2DShapeWithExplicitPadding(shape_inference::InferenceContext* c);
 // padding.
 Status Conv2DShape(shape_inference::InferenceContext* c);
 
+// Shape function for QuantizedConv2D-like operations
+Status QuantizedConv2DShape(shape_inference::InferenceContext* c);
+
 // Shape function for Conv3D-like operations.
 Status Conv3DShape(shape_inference::InferenceContext* c);
 

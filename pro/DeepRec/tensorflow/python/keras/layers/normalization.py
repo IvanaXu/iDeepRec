@@ -42,11 +42,26 @@ from tensorflow.python.util.tf_export import keras_export
 
 
 class BatchNormalizationBase(Layer):
-  """Base class of Batch normalization layer (Ioffe and Szegedy, 2014).
+  r"""Normalize and scale inputs or activations. (Ioffe and Szegedy, 2014).
 
   Normalize the activations of the previous layer at each batch,
   i.e. applies a transformation that maintains the mean activation
   close to 0 and the activation standard deviation close to 1.
+
+  Batch normalization differs from other layers in several key aspects:
+
+  1) Adding BatchNormalization with `training=True` to a model causes the
+  result of one example to depend on the contents of all other examples in a
+  minibatch. Be careful when padding batches or masking examples, as these can
+  change the minibatch statistics and affect other examples.
+
+  2) Updates to the weights (moving statistics) are based on the forward pass
+  of a model rather than the result of gradient computations.
+
+  3) When performing inference using a model containing batch normalization, it
+  is generally (though not always) desirable to use accumulated statistics
+  rather than mini-batch statistics. This is accomplished by passing
+  `training=False` when calling the model, or using `model.predict`.
 
   Arguments:
     axis: Integer, the axis that should be normalized
@@ -125,11 +140,31 @@ class BatchNormalizationBase(Layer):
   Output shape:
     Same shape as input.
 
-  References:
-    - [Batch Normalization: Accelerating Deep Network Training by Reducing
-      Internal Covariate Shift](https://arxiv.org/abs/1502.03167)
-
   {{TRAINABLE_ATTRIBUTE_NOTE}}
+
+  Normalization equations:
+    Consider the intermediate activations \(x\) of a mini-batch of size
+    \\(m\\):
+
+    We can compute the mean and variance of the batch
+
+    \\({\mu_B} = \frac{1}{m} \sum_{i=1}^{m} {x_i}\\)
+
+    \\({\sigma_B^2} = \frac{1}{m} \sum_{i=1}^{m} ({x_i} - {\mu_B})^2\\)
+
+    and then compute a normalized \\(x\\), including a small factor
+    \\({\epsilon}\\) for numerical stability.
+
+    \\(\hat{x_i} = \frac{x_i - \mu_B}{\sqrt{\sigma_B^2 + \epsilon}}\\)
+
+    And finally \\(\hat{x}\) is linearly transformed by \({\gamma}\\)
+    and \\({\beta}\\), which are learned parameters:
+
+    \\({y_i} = {\gamma * \hat{x_i} + \beta}\\)
+
+  References:
+  - [Batch Normalization: Accelerating Deep Network Training by Reducing
+    Internal Covariate Shift](https://arxiv.org/abs/1502.03167)
   """
 
   # By default, the base class uses V2 behavior. The BatchNormalization V1
@@ -161,13 +196,13 @@ class BatchNormalizationBase(Layer):
                **kwargs):
     super(BatchNormalizationBase, self).__init__(
         name=name, **kwargs)
-    if isinstance(axis, list):
+    if isinstance(axis, (list, tuple)):
       self.axis = axis[:]
     elif isinstance(axis, int):
       self.axis = axis
     else:
-      raise TypeError('axis must be int or list, type given: %s'
-                      % type(axis))
+      raise TypeError('Expected an int or a list/tuple of ints for the '
+                      'argument \'axis\', but received: %r' % axis)
     self.momentum = momentum
     self.epsilon = epsilon
     self.center = center
@@ -187,8 +222,10 @@ class BatchNormalizationBase(Layer):
     if self._USE_V2_BEHAVIOR:
       if fused:
         self._raise_if_fused_cannot_be_used()
-      elif fused is None:
-        fused = self._fused_can_be_used()
+      # We leave fused as None if self._fused_can_be_used()==True, since we
+      # still may set it to False in self.build() if the input rank is not 4.
+      elif fused is None and not self._fused_can_be_used():
+        fused = False
     elif fused is None:
       fused = True
     self.supports_masking = True
@@ -209,16 +246,22 @@ class BatchNormalizationBase(Layer):
 
   def _raise_if_fused_cannot_be_used(self):
     """Raises a ValueError if fused implementation cannot be used.
+
+    In addition to the checks done in this function, the input tensors rank must
+    be 4. The input rank check can only be done once the input shape is known.
     """
     # Currently fused batch norm doesn't support renorm. It also only supports a
-    # single axis, when no virtual batch size or adjustment is used.
+    # channel dimension on axis 1 or 3, when no virtual batch size or adjustment
+    # is used.
     if self.renorm:
       raise ValueError('Passing both fused=True and renorm=True is '
                        'unsupported')
     axis = [self.axis] if isinstance(self.axis, int) else self.axis
-    if len(axis) > 1:
-      raise ValueError('Passing fused=True is only supported when operating '
-                       'over a single axis.')
+    # Axis -3 is equivalent to 1, and axis -1 is equivalent to 3, because the
+    # input rank is required to be 4 (which is checked later).
+    if len(axis) > 1 or axis[0] not in (-3, -1, 1, 3):
+      raise ValueError('Passing fused=True is only supported when axis is 1 '
+                       'or 3')
     if self.virtual_batch_size is not None:
       raise ValueError('Passing fused=True is unsupported when '
                        'virtual_batch_size is specified.')
@@ -262,62 +305,6 @@ class BatchNormalizationBase(Layer):
         distribution_strategy_context.get_strategy().extended,
         'experimental_enable_get_next_as_optional', False)
 
-  def _get_shape_and_axis_for_fused(self, nd_shape, nd_axis):
-    """Compute an equivalent shape and axis that are compatible with the fused
-    implementation.
-
-    The input/output of the layer can be reshaped to/from the shape returned by
-    this function without affecting the correctness of the computation.
-
-    Arguments:
-      nd_shape: Tensor. The original shape of the operation.
-      nd_axis: Integer. The original axis of the operation.
-
-    Returns:
-      shape: Tensor. A 4D shape.
-      axis: Integer. An axis (always 1 or 3).
-    """
-    assert(isinstance(nd_axis, int))
-    ndims = nd_shape.shape[0]
-    shape = nd_shape[:]
-    axis = nd_shape + nd_axis if nd_axis < 0 else nd_axis
-    # First check if the axis needs to be moved.
-    if axis not in (1, ndims - 1):
-      # Move axis to dim 1.
-      if axis == 0:
-        # Transform [C, ...] to [1, C, ...].
-        shape = array_ops.concat([constant_op.constant([1]), shape], axis=0)
-        ndims += 1
-      else:
-        # Merge excess pre-axis dims into first dim.
-        # Transform [N, ..., C, ...] to [product(N, ...), C, ...].
-        product = math_ops.reduce_prod(shape[:axis], keepdims=True)
-        shape = array_ops.concat([product, shape[axis:]], axis=0)
-        ndims -= (axis - 1)
-      axis = 1
-    # Now change shape to 4D.
-    is_channels_last = axis == ndims - 1
-    if ndims < 4:
-      # Insert new dims after existing spatial dim or before channel dim.
-      new_dims = constant_op.constant([1] * (4 - ndims))
-      if is_channels_last:
-        # Transform [..., C] to [..., 1..., C] (ndims=4).
-        shape = array_ops.concat([shape[:-1], new_dims, shape[-1:]], axis=0)
-      else:
-        # Transform [N, C, ...] to [N, C, ..., 1...] (ndims=4).
-        shape = array_ops.concat([shape, new_dims], axis=0)
-    elif ndims > 4:
-      # Merge excess spatial dims into the second spatial dim.
-      # Transform [N, C, H, W, ...] to [N, C, H, product(W, ...)].
-      # Or        [N, H, W, ..., C] to [N, H, product(W, ...), C].
-      merge_dim = 2 if is_channels_last else 3
-      product = math_ops.reduce_prod(
-          shape[merge_dim:merge_dim + 1 + (ndims - 4)], keepdims=True)
-      shape = array_ops.concat([shape[:merge_dim], product,
-                                shape[merge_dim + 1 + (ndims - 4):]], axis=0)
-    axis = 3 if is_channels_last else 1
-    return shape, axis
-
   def build(self, input_shape):
     input_shape = tensor_shape.TensorShape(input_shape)
     if not input_shape.ndims:
@@ -352,8 +339,33 @@ class BatchNormalizationBase(Layer):
         raise ValueError('When using virtual_batch_size, adjustment cannot '
                          'be specified')
 
-    if self.fused and not self._USE_V2_BEHAVIOR:
-      self.fused = self._fused_can_be_used()
+    if self.fused in (None, True):
+      # TODO(yaozhang): if input is not 4D, reshape it to 4D and reshape the
+      # output back to its original shape accordingly.
+      if self._USE_V2_BEHAVIOR:
+        if self.fused is None:
+          self.fused = (ndims == 4)
+        elif self.fused and ndims != 4:
+          raise ValueError('Batch normalization layers with fused=True only '
+                           'support 4D input tensors.')
+      else:
+        assert self.fused is not None
+        self.fused = (ndims == 4 and self._fused_can_be_used())
+      # TODO(chrisying): fused batch norm is currently not supported for
+      # multi-axis batch norm and by extension virtual batches. In some cases,
+      # it might be possible to use fused batch norm but would require reshaping
+      # the Tensor to 4D with the axis in 1 or 3 (preferred 1) which is
+      # particularly tricky. A compromise might be to just support the most
+      # common use case (turning 5D w/ virtual batch to NCHW)
+
+    if self.fused:
+      if self.axis == [1]:
+        self._data_format = 'NCHW'
+      elif self.axis == [3]:
+        self._data_format = 'NHWC'
+      else:
+        raise ValueError('Unsupported axis, fused batch norm only supports '
+                         'axis == [1] or axis == [3]')
 
     axis_to_dim = {x: input_shape.dims[x].value for x in self.axis}
     for x in axis_to_dim:
@@ -491,7 +503,7 @@ class BatchNormalizationBase(Layer):
   def _assign_moving_average(self, variable, value, momentum, inputs_size):
     with K.name_scope('AssignMovingAvg') as scope:
       with ops.colocate_with(variable):
-        decay = ops.convert_to_tensor(1.0 - momentum, name='decay')
+        decay = ops.convert_to_tensor_v2(1.0 - momentum, name='decay')
         if decay.dtype != variable.dtype.base_dtype:
           decay = math_ops.cast(decay, variable.dtype.base_dtype)
         update_delta = (
@@ -511,30 +523,6 @@ class BatchNormalizationBase(Layer):
     beta = self.beta if self.center else self._beta_const
     gamma = self.gamma if self.scale else self._gamma_const
 
-    original_shape = None
-    fused_axis = self.axis[0]
-    input_shape = array_ops.shape(inputs)
-    ndims = len(inputs.shape)
-    if self.axis[0] not in (1, ndims - 1) or ndims not in (4, 5):
-      # The fused implementation supports NCHW or NHWC, so we reshape the
-      # input/output tensor to/from an equivalent 4D shape.
-      fused_shape, fused_axis = self._get_shape_and_axis_for_fused(input_shape,
-                                                                   self.axis[0])
-      original_shape = input_shape
-      inputs = array_ops.reshape(inputs, fused_shape)
-
-      # TODO(chrisying): fused batch norm is currently not supported for
-      # multi-axis batch norm and by extension virtual batches. In some cases,
-      # it might be possible to use fused batch norm but would require reshaping
-      # the Tensor to 4D with the axis in 1 or 3 (preferred 1) which is
-      # particularly tricky. A compromise might be to just support the most
-      # common use case (turning 5D w/ virtual batch to NCHW)
-
-    if ndims == 5:
-      data_format = 'NCDHW' if fused_axis == 1 else 'NDHWC'
-    else:
-      data_format = 'NCHW' if fused_axis == 1 else 'NHWC'
-
     # TODO(b/129279393): Support zero batch input in non DistributionStrategy
     # code as well.
     if self._support_zero_size_input():
@@ -548,7 +536,7 @@ class BatchNormalizationBase(Layer):
           gamma,
           beta,
           epsilon=self.epsilon,
-          data_format=data_format)
+          data_format=self._data_format)
 
     def _fused_batch_norm_inference():
       return nn.fused_batch_norm(
@@ -559,7 +547,7 @@ class BatchNormalizationBase(Layer):
           variance=self.moving_variance,
           epsilon=self.epsilon,
           is_training=False,
-          data_format=data_format)
+          data_format=self._data_format)
 
     output, mean, variance = tf_utils.smart_cond(
         training, _fused_batch_norm_training, _fused_batch_norm_inference)
@@ -572,16 +560,13 @@ class BatchNormalizationBase(Layer):
       factor = (sample_size - math_ops.cast(1.0, variance.dtype)) / sample_size
       variance *= factor
 
-    if original_shape is not None:
-      output = array_ops.reshape(output, original_shape)
-
     training_value = tf_utils.constant_value(training)
     if training_value is None:
       momentum = tf_utils.smart_cond(training,
                                      lambda: self.momentum,
                                      lambda: 1.0)
     else:
-      momentum = ops.convert_to_tensor(self.momentum)
+      momentum = ops.convert_to_tensor_v2(self.momentum)
     if training_value or training_value is None:
       def mean_update():
         return self._assign_moving_average(self.moving_mean, mean, momentum,
@@ -667,8 +652,12 @@ class BatchNormalizationBase(Layer):
 
     return (r, d, out_mean, out_variance)
 
+  def _calculate_mean_and_var(self, inputs, reduction_axes, keep_dims):
+    return nn.moments(inputs, reduction_axes, keep_dims=keep_dims)
+
   def _moments(self, inputs, reduction_axes, keep_dims):
-    mean, variance = nn.moments(inputs, reduction_axes, keep_dims=keep_dims)
+    mean, variance = self._calculate_mean_and_var(inputs, reduction_axes,
+                                                  keep_dims)
     # TODO(b/129279393): Support zero batch input in non DistributionStrategy
     # code as well.
     if self._support_zero_size_input():
@@ -686,8 +675,10 @@ class BatchNormalizationBase(Layer):
         training = bool(training)
       if base_layer_utils.is_in_keras_graph():
         training = math_ops.logical_and(training, self._get_trainable_var())
-      else:
-        training = math_ops.logical_and(training, self.trainable)
+      elif not self.trainable:
+        # When the layer is not trainable, it overrides the value passed from
+        # model.
+        training = self.trainable
     return training
 
   def call(self, inputs, training=None):
@@ -768,13 +759,11 @@ class BatchNormalizationBase(Layer):
       moving_mean = self.moving_mean
       moving_variance = self.moving_variance
 
-      mean = tf_utils.smart_cond(training,
-                                 lambda: mean,
-                                 lambda: ops.convert_to_tensor(moving_mean))
+      mean = tf_utils.smart_cond(training, lambda: mean,
+                                 lambda: ops.convert_to_tensor_v2(moving_mean))
       variance = tf_utils.smart_cond(
-          training,
-          lambda: variance,
-          lambda: ops.convert_to_tensor(moving_variance))
+          training, lambda: variance,
+          lambda: ops.convert_to_tensor_v2(moving_variance))
 
       if self.virtual_batch_size is not None:
         # This isn't strictly correct since in ghost batch norm, you are
@@ -900,7 +889,7 @@ def replace_in_base_docstring(replacements):
   string = BatchNormalizationBase.__doc__
   for old, new in replacements:
     assert old in string
-    string.replace(old, new)
+    string = string.replace(old, new)
   return string
 
 
@@ -982,8 +971,8 @@ class LayerNormalization(Layer):
     elif isinstance(axis, int):
       self.axis = axis
     else:
-      raise ValueError('Expected an int or a list/tuple of ints for the '
-                       'argument \'axis\', but received instead: %s' % axis)
+      raise TypeError('Expected an int or a list/tuple of ints for the '
+                      'argument \'axis\', but received: %r' % axis)
 
     self.epsilon = epsilon
     self.center = center
@@ -997,6 +986,31 @@ class LayerNormalization(Layer):
 
     self.supports_masking = True
 
+    # Indicates whether a faster fused implementation can be used. This will be
+    # set to True or False in build()"
+    self._fused = None
+
+  def _fused_can_be_used(self, ndims):
+    """Return false if fused implementation cannot be used.
+
+    Check if the axis is contiguous and can be collapsed into the last axis.
+    The self.axis is assumed to have no duplicates.
+    """
+    axis = sorted(self.axis)
+    can_use_fused = False
+
+    if axis[-1] == ndims - 1 and axis[-1] - axis[0] == len(axis) - 1:
+      can_use_fused = True
+
+    # fused_batch_norm will silently raise epsilon to be at least 1.001e-5, so
+    # we cannot used the fused version if epsilon is below that value. Also, the
+    # variable dtype must be float32, as fused_batch_norm only supports float32
+    # variables.
+    if self.epsilon < 1.001e-5 or self.dtype != 'float32':
+      can_use_fused = False
+
+    return can_use_fused
+
   def build(self, input_shape):
     ndims = len(input_shape)
     if ndims is None:
@@ -1005,6 +1019,8 @@ class LayerNormalization(Layer):
     # Convert axis to list and resolve negatives
     if isinstance(self.axis, int):
       self.axis = [self.axis]
+    elif isinstance(self.axis, tuple):
+      self.axis = list(self.axis)
     for idx, x in enumerate(self.axis):
       if x < 0:
         self.axis[idx] = ndims + x
@@ -1041,15 +1057,14 @@ class LayerNormalization(Layer):
     else:
       self.beta = None
 
+    self._fused = self._fused_can_be_used(ndims)
+
     self.built = True
 
   def call(self, inputs):
     # Compute the axes along which to reduce the mean / variance
     input_shape = inputs.shape
     ndims = len(input_shape)
-
-    # Calculate the moments on the last axis (layer activations).
-    mean, variance = nn.moments(inputs, self.axis, keep_dims=True)
 
     # Broadcasting only necessary for norm where the axis is not just
     # the last dimension
@@ -1061,16 +1076,73 @@ class LayerNormalization(Layer):
           self.axis != [ndims - 1]):
         return array_ops.reshape(v, broadcast_shape)
       return v
-    scale, offset = _broadcast(self.gamma), _broadcast(self.beta)
 
-    # Compute layer normalization using the batch_normalization function.
-    outputs = nn.batch_normalization(
-        inputs,
-        mean,
-        variance,
-        offset=offset,
-        scale=scale,
-        variance_epsilon=self.epsilon)
+    if not self._fused:
+      input_dtype = inputs.dtype
+      if input_dtype in ('float16', 'bfloat16') and self.dtype == 'float32':
+        # If mixed precision is used, cast inputs to float32 so that this is at
+        # least as numerically stable as the fused version.
+        inputs = math_ops.cast(inputs, 'float32')
+
+      # Calculate the moments on the last axis (layer activations).
+      mean, variance = nn.moments(inputs, self.axis, keep_dims=True)
+
+      scale, offset = _broadcast(self.gamma), _broadcast(self.beta)
+
+      # Compute layer normalization using the batch_normalization function.
+      outputs = nn.batch_normalization(
+          inputs,
+          mean,
+          variance,
+          offset=offset,
+          scale=scale,
+          variance_epsilon=self.epsilon)
+      outputs = math_ops.cast(outputs, input_dtype)
+    else:
+      # Collapse dims before self.axis, and dims in self.axis
+      pre_dim, in_dim = (1, 1)
+      axis = sorted(self.axis)
+      tensor_shape = array_ops.shape(inputs)
+      for dim in range(0, ndims):
+        dim_tensor = tensor_shape[dim]
+        if dim < axis[0]:
+          pre_dim = pre_dim * dim_tensor
+        else:
+          assert dim in axis
+          in_dim = in_dim * dim_tensor
+
+      squeezed_shape = [1, pre_dim, in_dim, 1]
+      # This fused operation requires reshaped inputs to be NCHW.
+      data_format = 'NCHW'
+
+      inputs = array_ops.reshape(inputs, squeezed_shape)
+
+      def _set_const_tensor(val, dtype, shape):
+        return array_ops.fill(shape, constant_op.constant(val, dtype=dtype))
+
+      # self.gamma and self.beta have the wrong shape for fused_batch_norm, so
+      # we cannot pass them as the scale and offset parameters. Therefore, we
+      # create two constant tensors in correct shapes for fused_batch_norm and
+      # later construct a separate calculation on the scale and offset.
+      scale = _set_const_tensor(1.0, self.dtype, [pre_dim])
+      offset = _set_const_tensor(0.0, self.dtype, [pre_dim])
+
+      # Compute layer normalization using the fused_batch_norm function.
+      outputs, _, _ = nn.fused_batch_norm(
+          inputs,
+          scale=scale,
+          offset=offset,
+          epsilon=self.epsilon,
+          data_format=data_format)
+
+      outputs = array_ops.reshape(outputs, tensor_shape)
+
+      scale, offset = _broadcast(self.gamma), _broadcast(self.beta)
+
+      if scale is not None:
+        outputs = outputs * math_ops.cast(scale, outputs.dtype)
+      if offset is not None:
+        outputs = outputs + math_ops.cast(offset, outputs.dtype)
 
     # If some components of the shape got lost due to adjustments, fix that.
     outputs.set_shape(input_shape)

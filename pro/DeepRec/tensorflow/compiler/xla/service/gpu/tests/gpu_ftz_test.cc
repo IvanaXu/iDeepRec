@@ -13,10 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include <memory>
-
 #include "tensorflow/compiler/xla/service/gpu/tests/gpu_codegen_test.h"
-#include "tensorflow/compiler/xla/tests/verified_hlo_module.h"
 
 // Check that the ftz (flush denormals to zero) flag is reflected in PTX as
 // expected.
@@ -31,7 +28,7 @@ class GpuFtzTest : public GpuCodegenTest {
 
   // Creates an HLO module that performs the given binary operation on some
   // data.
-  std::unique_ptr<VerifiedHloModule> CreateBinaryOpModule(HloOpcode op) {
+  std::unique_ptr<HloModule> CreateBinaryOpModule(HloOpcode op) {
     HloComputation::Builder builder(TestName());
 
     Shape param_shape = ShapeUtil::MakeShapeWithLayout(
@@ -42,13 +39,13 @@ class GpuFtzTest : public GpuCodegenTest {
         /* parameter_number=*/1, param_shape, "y"));
     builder.AddInstruction(HloInstruction::CreateBinary(param_shape, op, x, y));
 
-    auto hlo_module = CreateNewVerifiedModuleWithFTZ(ftz_);
+    auto hlo_module = CreateNewUnverifiedModuleWithFTZ(ftz_);
     hlo_module->AddEntryComputation(builder.Build());
     return hlo_module;
   }
 
   // Creates an HLO module that performs the given unary operation on some data.
-  std::unique_ptr<VerifiedHloModule> CreateUnaryOpModule(HloOpcode op) {
+  std::unique_ptr<HloModule> CreateUnaryOpModule(HloOpcode op) {
     HloComputation::Builder builder(TestName());
 
     Shape param_shape = ShapeUtil::MakeShapeWithLayout(
@@ -57,7 +54,7 @@ class GpuFtzTest : public GpuCodegenTest {
         /* parameter_number=*/0, param_shape, "x"));
     builder.AddInstruction(HloInstruction::CreateUnary(param_shape, op, x));
 
-    auto hlo_module = CreateNewVerifiedModuleWithFTZ(ftz_);
+    auto hlo_module = CreateNewUnverifiedModuleWithFTZ(ftz_);
     hlo_module->AddEntryComputation(builder.Build());
     return hlo_module;
   }
@@ -77,14 +74,14 @@ class GpuFtzDisabledTest : public GpuFtzTest {
 
 // Check that we emit mul.ftz.f32 when in ftz mode, and plain mul.f32 otherwise.
 TEST_F(GpuFtzEnabledTest, MultiplyFtz) {
-  CompileAndOptionallyVerifyPtx(CreateBinaryOpModule(HloOpcode::kMultiply), R"(
+  CompileAndVerifyPtx(CreateBinaryOpModule(HloOpcode::kMultiply), R"(
     CHECK-NOT: mul.rn.f32
     CHECK: mul.rn.ftz.f32
     CHECK-NOT: mul.rn.f32
   )");
 }
 TEST_F(GpuFtzDisabledTest, MultiplyFtz) {
-  CompileAndOptionallyVerifyPtx(CreateBinaryOpModule(HloOpcode::kMultiply), R"(
+  CompileAndVerifyPtx(CreateBinaryOpModule(HloOpcode::kMultiply), R"(
     CHECK-NOT: mul.rn.ftz.f32
     CHECK: mul.rn.f32
     CHECK-NOT: mul.rn.ftz.f32
@@ -97,19 +94,21 @@ TEST_F(GpuFtzDisabledTest, MultiplyFtz) {
 // when ftz is off, we get one call to the ftz version and one call to the
 // regular version.
 TEST_F(GpuFtzEnabledTest, ExpFtz) {
-  CompileAndOptionallyVerifyPtx(CreateUnaryOpModule(HloOpcode::kExp), R"(
+  CompileAndVerifyPtx(CreateUnaryOpModule(HloOpcode::kExp), R"(
     CHECK-NOT: ex2.approx.f32
     CHECK:     ex2.approx.ftz.f32
     CHECK-NOT: ex2.approx.f32
+    CHECK:     ex2.approx.ftz.f32
     CHECK-NOT: ex2.approx.f32
     CHECK-NOT: ex2.approx.ftz.f32
   )");
 }
 
 TEST_F(GpuFtzDisabledTest, ExpFtz) {
-  CompileAndOptionallyVerifyPtx(CreateUnaryOpModule(HloOpcode::kExp), R"(
+  CompileAndVerifyPtx(CreateUnaryOpModule(HloOpcode::kExp), R"(
     CHECK-NOT: ex2.approx.f32
     CHECK-DAG: ex2.approx.ftz.f32
+    CHECK-DAG: ex2.approx.f32
     CHECK-NOT: ex2.approx.f32
     CHECK-NOT: ex2.approx.ftz.f32
   )");

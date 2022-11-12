@@ -176,8 +176,7 @@ def _internal_input_layer(features,
                           cols_to_vars=None,
                           scope=None,
                           cols_to_output_tensors=None,
-                          from_template=False,
-                          adaptive_mask_tensors=None):
+                          from_template=False):
   """See input_layer. `scope` is a name or variable scope to use."""
 
   feature_columns = _normalize_feature_columns(feature_columns)
@@ -194,7 +193,7 @@ def _internal_input_layer(features,
     weight_collections.append(ops.GraphKeys.MODEL_VARIABLES)
 
   def _get_logits():  # pylint: disable=missing-docstring
-    builder = _LazyBuilder(features, adaptive_mask_tensors)
+    builder = _LazyBuilder(features)
     output_tensors = []
     ordered_columns = []
     for column in sorted(feature_columns, key=lambda x: x.name):
@@ -205,10 +204,10 @@ def _internal_input_layer(features,
             builder,
             weight_collections=weight_collections,
             trainable=trainable)
-        output_shape = column._output_shape(tensor)  # pylint: disable=protected-access
+        num_elements = column._variable_shape.num_elements()  # pylint: disable=protected-access
         batch_size = array_ops.shape(tensor)[0]
         output_tensor = array_ops.reshape(
-            tensor, shape=output_shape)
+            tensor, shape=(batch_size, num_elements))
         output_tensors.append(output_tensor)
         if cols_to_vars is not None:
           # Retrieve any variables created (some _DenseColumn's don't create
@@ -219,7 +218,7 @@ def _internal_input_layer(features,
         if cols_to_output_tensors is not None:
           cols_to_output_tensors[column] = output_tensor
     _verify_static_batch_size_equality(output_tensors, ordered_columns)
-    return array_ops.concat(output_tensors, -1)
+    return array_ops.concat(output_tensors, 1)
 
   # If we're constructing from the `make_template`, that by default adds a
   # variable scope with the name of the layer. In that case, we dont want to
@@ -238,8 +237,7 @@ def input_layer(features,
                 weight_collections=None,
                 trainable=True,
                 cols_to_vars=None,
-                cols_to_output_tensors=None,
-                adaptive_mask_tensors=None):
+                cols_to_output_tensors=None):
   """Returns a dense `Tensor` as input layer based on given `feature_columns`.
 
   Generally a single example in training data is described with FeatureColumns.
@@ -302,8 +300,7 @@ def input_layer(features,
       weight_collections=weight_collections,
       trainable=trainable,
       cols_to_vars=cols_to_vars,
-      cols_to_output_tensors=cols_to_output_tensors,
-      adaptive_mask_tensors=adaptive_mask_tensors)
+      cols_to_output_tensors=cols_to_output_tensors)
 
 
 # TODO(akshayka): InputLayer should be a subclass of Layer, and it
@@ -552,20 +549,11 @@ class _FCLinearWrapper(base.Layer):
 
   def build(self, _):
     if isinstance(self._feature_column, _CategoricalColumn):
-      from tensorflow.python.feature_column import feature_column_v2 as fc_new
-      if isinstance(self._feature_column, fc_new.EmbeddingCategoricalColumn):
-        weight = self.add_variable(
-            name='weights',
-            shape= self._units,  # pylint: disable=protected-access
-            initializer=init_ops.zeros_initializer(),
-            trainable=self.trainable,
-            ev_option = self._feature_column.ev_option)
-      else:
-        weight = self.add_variable(
-            name='weights',
-            shape=(self._feature_column._num_buckets, self._units),  # pylint: disable=protected-access
-            initializer=init_ops.zeros_initializer(),
-            trainable=self.trainable)
+      weight = self.add_variable(
+          name='weights',
+          shape=(self._feature_column._num_buckets, self._units),  # pylint: disable=protected-access
+          initializer=init_ops.zeros_initializer(),
+          trainable=self.trainable)
     else:
       num_elements = self._feature_column._variable_shape.num_elements()  # pylint: disable=protected-access
       weight = self.add_variable(
@@ -1912,12 +1900,6 @@ class _DenseColumn(_FeatureColumn):
     """
     pass
 
-  def _output_shape(self, inputs):
-    """Tuple of column output shape"""
-    batch_size = array_ops.shape(inputs)[0]
-    num_elements = self._variable_shape.num_elements()
-    return (batch_size, num_elements)
-
 
 def _create_weighted_sum(column,
                          builder,
@@ -2123,7 +2105,7 @@ class _LazyBuilder(object):
   The `_LazyBuilder` eliminates this duplication.
   """
 
-  def __init__(self, features, adaptive_mask_tensors=None):
+  def __init__(self, features):
     """Creates a `_LazyBuilder`.
 
     Args:
@@ -2136,7 +2118,6 @@ class _LazyBuilder(object):
     """
     self._features = features.copy()
     self._feature_tensors = {}
-    self._adaptive_mask_tensors = adaptive_mask_tensors
 
   def get(self, key):
     """Returns a `Tensor` for the given key.
@@ -2174,8 +2155,6 @@ class _LazyBuilder(object):
 
     column = key
     logging.debug('Transforming feature_column %s.', column)
-    if self._adaptive_mask_tensors is not None and column.name in self._adaptive_mask_tensors:
-      column.set_adaptive_mask_tensor(self._adaptive_mask_tensors[column.name])
     transformed = column._transform_feature(self)  # pylint: disable=protected-access
     if transformed is None:
       raise ValueError('Column {} is not supported.'.format(column.name))
@@ -2572,7 +2551,7 @@ class _SharedEmbeddingColumn(
         '_SharedEmbeddingColumn',
         ('categorical_column', 'dimension', 'combiner', 'initializer',
          'shared_embedding_collection_name', 'ckpt_to_load_from',
-         'tensor_name_in_ckpt', 'max_norm', 'trainable', 'do_fusion'))):
+         'tensor_name_in_ckpt', 'max_norm', 'trainable'))):
   """See `embedding_column`."""
 
   @property
@@ -2654,22 +2633,13 @@ class _SharedEmbeddingColumn(
         })
 
       # Return embedding lookup result.
-      if self.do_fusion:
-        return embedding_ops.fused_safe_embedding_lookup_sparse(
-            embedding_weights=embedding_weights,
-            sparse_ids=sparse_ids,
-            sparse_weights=sparse_weights,
-            combiner=self.combiner,
-            name='%s_weights' % self.name,
-            max_norm=self.max_norm)
-      else:
-        return embedding_ops.safe_embedding_lookup_sparse(
-            embedding_weights=embedding_weights,
-            sparse_ids=sparse_ids,
-            sparse_weights=sparse_weights,
-            combiner=self.combiner,
-            name='%s_weights' % self.name,
-            max_norm=self.max_norm)
+      return embedding_ops.safe_embedding_lookup_sparse(
+          embedding_weights=embedding_weights,
+          sparse_ids=sparse_ids,
+          sparse_weights=sparse_weights,
+          combiner=self.combiner,
+          name='%s_weights' % self.name,
+          max_norm=self.max_norm)
 
   def _get_dense_tensor(self, inputs, weight_collections=None, trainable=None):
     if isinstance(self.categorical_column, _SequenceCategoricalColumn):

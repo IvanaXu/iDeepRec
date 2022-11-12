@@ -216,11 +216,6 @@ class DynamicStitchTest(DynamicStitchTestBase, test.TestCase):
     test.TestCase.__init__(self, *test_case_args)
     DynamicStitchTestBase.__init__(self, data_flow_ops.dynamic_stitch)
 
-class DynamicStitchFastTest(DynamicStitchTestBase, test.TestCase):
-
-  def __init__(self, *test_case_args):
-    test.TestCase.__init__(self, *test_case_args)
-    DynamicStitchTestBase.__init__(self, data_flow_ops.dynamic_stitch_fast)
 
 class ParallelDynamicStitchTest(DynamicStitchTestBase, test.TestCase):
 

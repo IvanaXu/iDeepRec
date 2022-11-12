@@ -500,98 +500,6 @@ Status BundleWriter::AddSlice(StringPiece full_tensor_key,
   return status_;
 }
 
-Status BundleWriter::AddTensorHeader(StringPiece key, DataType dtype) {
-  if (!status_.ok()) return status_;
-  CHECK_NE(key, kHeaderEntryKey);
-  const string key_string(key);
-  if (entries_.find(key_string) != entries_.end()) {
-    status_ = errors::InvalidArgument("Adding duplicate key: ", key);
-    return status_;
-  }
-
-  entry_seg_ = &entries_[key_string];
-  entry_seg_->set_dtype(dtype);
-  entry_seg_->set_shard_id(0);
-  entry_seg_->set_offset(size_);
-
-  out_->clear_crc32c();
-  return status_;
-}
-
-Status BundleWriter::AddSliceHeader(
-    string tensor_name, const TensorShape& shape, DataType type, bool is_hash,
-    TensorSliceProto** proto) {
-  if (!status_.ok()) return status_;
-  BundleEntryProto* full_entry = &entries_[tensor_name];
-  if (full_entry->dtype() != DT_INVALID) {
-    CHECK_EQ(full_entry->dtype(), type);
-  }
-  if (full_entry->has_shape()) {
-    CHECK(TensorShape(full_entry->shape()) == shape);
-  }
-
-  full_entry->set_is_hash_table(is_hash);
-  full_entry->set_dtype(type);
-  shape.AsProto(full_entry->mutable_shape());
-  *proto = full_entry->add_slices();
-  return Status::OK();
-}
-
-Status BundleWriter::AddTensorHeader(StringPiece key, DataType dtype, TensorShape shape) {
-  if (!status_.ok()) return status_;
-  CHECK_NE(key, kHeaderEntryKey);
-  const string key_string(key);
-  if (entries_.find(key_string) != entries_.end()) {
-    status_ = errors::InvalidArgument("Adding duplicate key: ", key);
-    return status_;
-  }
-
-  entry_seg_ = &entries_[key_string];
-  entry_seg_->set_dtype(dtype);
-  shape.AsProto(entry_seg_->mutable_shape());
-  entry_seg_->set_shard_id(0);
-  entry_seg_->set_offset(size_);
-
-  out_->clear_crc32c();
-  return status_;
-}
-
-// use if tensor is less or equal than buffer_size, just dump once
-Status BundleWriter::AddCompeleteData(char* content, int64 data_bytes_written) {
-   uint32 crc32c = 0;
-
-   status_ = out_->Append(StringPiece(content, data_bytes_written));
-   if (!status_.ok())
-     return status_;
-
-   crc32c = out_->crc32c();
-
-   if (status_.ok()) {
-     entry_seg_->set_size(data_bytes_written);
-     entry_seg_->set_crc32c(crc32c::Mask(crc32c));
-     size_ += data_bytes_written;
-   }
-   return status_;
-}
-
-void BundleWriter::FillTensorShape(TensorShape shape) {
-  shape.AsProto(entry_seg_->mutable_shape());
-}
-// dump mutiple times;
-Status BundleWriter::AppendSegmentData(char* content, int64 data_bytes_written) {
-  return out_->AppendSegment(StringPiece(content, data_bytes_written));
-}
-
-void BundleWriter::EndSegmentData(int64 total_bytes_written, int64 end_bytes_written) {
-
-  //out_->EndSegment(end_bytes_written);
-  uint32 crc32c = out_->crc32c();
-
-  entry_seg_->set_size(total_bytes_written);
-  entry_seg_->set_crc32c(crc32c::Mask(crc32c));
-  size_ += total_bytes_written;
-}
-
 // TODO(zongheng): on metadata write failure or !status_.ok(), consider removing
 // the orphaned data file.
 Status BundleWriter::Finish() {
@@ -767,74 +675,6 @@ static Status MergeOneBundle(Env* env, StringPiece prefix,
   return Status::OK();
 }
 
-Status FixMergeHashTableBundles(MergeState* state) {
-  std::unordered_map<string, string> bundle_mapping;
-  for (auto&& item : state->entries) {
-    if (!item.second.is_hash_table()) {
-      continue;
-    }
-    std::multimap<int64, TensorSliceProto*> sorter;
-    for (int slice = 0; slice < item.second.slices_size(); slice++) {
-      sorter.emplace(item.second.slices(slice).hash_slice_begin(),
-          item.second.mutable_slices(slice));
-    }
-    int64 idx = 0;
-    std::vector<TensorSliceProto> slices;
-    for (auto&& itemx : sorter) {
-      if (itemx.second->extent(0).length() > 0) {
-        slices.emplace_back();
-        TensorSliceProto& slice = slices.back();
-        slice.CopyFrom(*itemx.second);
-        slice.mutable_extent(0)->set_start(idx);
-        idx += slice.extent(0).length();
-        TensorSlice from_slice(1);
-        from_slice.set_start(0, slice.hash_slice_begin());
-        from_slice.set_length(0, slice.hash_slice_length());
-        string from = checkpoint::EncodeTensorNameSlice(
-            item.first, from_slice);
-        string to = checkpoint::EncodeTensorNameSlice(
-            item.first, TensorSlice(slice));
-        if (!bundle_mapping.emplace(from, to).second) {
-          return errors::FailedPrecondition(
-              "FixMergeHashTableBundles has some error when create bundle mapping.");
-        }
-      } else {
-        TensorSlice from_slice(1);
-        from_slice.set_start(0, itemx.second->hash_slice_begin());
-        from_slice.set_length(0, itemx.second->hash_slice_length());
-        string from = checkpoint::EncodeTensorNameSlice(
-            item.first, from_slice);
-        if (!bundle_mapping.emplace(from, "").second) {
-          return errors::FailedPrecondition(
-              "FixMergeHashTableBundles has some error when create bundle mapping. 2");
-        }
-      }
-    }
-    item.second.clear_slices();
-    for (auto&& itemx : slices) {
-      item.second.add_slices()->CopyFrom(itemx);
-    }
-    item.second.mutable_shape()->mutable_dim(0)->set_size(idx);
-  }
-  std::map<string, BundleEntryProto> entries_tmp;
-  entries_tmp.swap(state->entries);
-  for (auto&& item : entries_tmp) {
-    auto iter = bundle_mapping.find(item.first);
-    string real_name;
-    if (iter == bundle_mapping.end()) {
-      real_name = item.first;
-    } else {
-      real_name = iter->second;
-    }
-    if (real_name == "") {
-      LOG(INFO) << "Ignore Hash Table: " << str_util::CEscape(item.first);
-      continue;
-    }
-    state->entries.emplace(real_name, item.second);
-  }
-  return Status::OK();
-};
-
 Status MergeBundles(Env* env, gtl::ArraySlice<tstring> prefixes,
                     StringPiece merged_prefix) {
   // Merges all metadata tables.
@@ -845,8 +685,6 @@ Status MergeBundles(Env* env, gtl::ArraySlice<tstring> prefixes,
   for (int i = 0; i < prefixes.size(); ++i) {
     TF_RETURN_IF_ERROR(MergeOneBundle(env, prefixes[i], &merge));
   }
-
-  TF_RETURN_IF_ERROR(FixMergeHashTableBundles(&merge));
 
   // Renames data files to contain the merged bundle prefix.
   for (const auto& p : merge.shard_ids) {
@@ -1076,104 +914,6 @@ Status BundleReader::Lookup(StringPiece key, Tensor* val) {
   }
 }
 
-Status BundleReader::LookupHeader(StringPiece tensor_key, int64 total_bytes) {
-  BundleEntryProto entry;
-  TF_RETURN_IF_ERROR(GetBundleEntryProto(tensor_key, &entry));
-  if (entry.size() != total_bytes) {
-    return errors::DataLoss("Invalid size in bundle entry: key ", key(),
-        "; stored size ", entry.size(),
-        "; expected size ", total_bytes);
-  }
-  io::InputBuffer* buffered_file = data_[entry.shard_id()];
-  if (buffered_file == nullptr) {
-    std::unique_ptr<RandomAccessFile> file = nullptr;
-    TF_RETURN_IF_ERROR(env_->NewRandomAccessFile(
-          DataFilename(prefix_, entry.shard_id(), num_shards_), &file));
-    buffered_file =
-      new io::InputBuffer(file.release(), 256 << 10 /* 256KB buffer */);
-    // The InputBuffer and RandomAccessFile objects are both released in dtor.
-    data_[entry.shard_id()] = buffered_file;
-  }
-  CHECK(buffered_file != nullptr);
-
-  TF_RETURN_IF_ERROR(buffered_file->Seek(entry.offset()));
-  if (!DataTypeCanUseMemcpy(entry.dtype())) {
-    return errors::DataLoss("segment lookup not support string");
-  }
-  LookupSegItem seg_item;
-  seg_item.entry = entry;
-  seg_item.total_size = entry.size();
-  seg_item.bytes_read = 0;
-
-  tmp_lookupseg_items_[string(tensor_key)] = seg_item;
-  return Status::OK();
-
-}
-
-Status BundleReader::LookupSegment(StringPiece key, size_t buffer_size, char* destination, size_t& real_bytes_read) {
-  LookupSegItem& seg_item = tmp_lookupseg_items_[string(key)];
-  const size_t desired_bytes = std::min(buffer_size, seg_item.total_size);
-  if (desired_bytes == 0) {
-    real_bytes_read = 0;
-    return Status::OK();
-  }
-
-  io::InputBuffer* buffered_file = data_[seg_item.entry.shard_id()];
-  StringPiece result;
-  Status status = buffered_file->file()->Read(seg_item.entry.offset() + seg_item.bytes_read, desired_bytes, &result, destination);
-
-  if (!status.ok()) {
-    return errors::InvalidArgument("Read Error! ", buffer_size, " ", seg_item.total_size, " ", seg_item.entry.offset() + seg_item.bytes_read, " ", desired_bytes, " ", status.ToString());
-  }
-  if (result.size() != desired_bytes) {
-    return errors::DataLoss("Requested ", desired_bytes, " bytes but read ",
-        result.size(), " bytes.");
-  }
-  // Data is already in the correct location.
-  seg_item.bytes_read += result.size();
-  seg_item.total_size -= result.size();
-  real_bytes_read = result.size();
-  return Status::OK();
-}
-
-Status BundleReader::LookupSegmentOffset(StringPiece key, uint64_t offset, size_t buffer_size, char* destination, size_t& real_bytes_read) {
-  LookupSegItem& seg_item = tmp_lookupseg_items_[string(key)];
-  const size_t desired_bytes = std::min(buffer_size, seg_item.total_size);
-  if (desired_bytes == 0) {
-    real_bytes_read = 0;
-    return Status::OK();
-  }
-
-  io::InputBuffer* buffered_file = data_[seg_item.entry.shard_id()];
-  StringPiece result;
-  Status status = buffered_file->file()->Read(seg_item.entry.offset() + offset, desired_bytes, &result, destination);
-
-  if (!status.ok()) {
-    return errors::InvalidArgument("Read Error! ", buffer_size, " ", seg_item.total_size, " ", seg_item.entry.offset() + seg_item.bytes_read, " ", desired_bytes, " ", status.ToString());
-  }
-  if (result.size() != desired_bytes) {
-    return errors::DataLoss("Requested ", desired_bytes, " bytes but read ",
-        result.size(), " bytes.");
-  }
-  // Data is already in the correct location.
-  seg_item.bytes_read += result.size();
-  seg_item.total_size -= result.size();
-  real_bytes_read = result.size();
-  return Status::OK();
-}
-
-Status BundleReader::GetTensorInfo(
-    StringPiece key, int64* size,
-    std::unique_ptr<RandomAccessFile>* file, int64* offset) {
-  BundleEntryProto entry;
-  TF_RETURN_IF_ERROR(GetBundleEntryProto(key, &entry));
-  TF_RETURN_IF_ERROR(env_->NewRandomAccessFile(
-        DataFilename(prefix_, entry.shard_id(), num_shards_), file));
-  *size = entry.size();
-  *offset = entry.offset();
-  return Status::OK();
-}
-
 Status BundleReader::ReadCurrent(Tensor* val) {
   CHECK(val != nullptr);
   BundleEntryProto entry;
@@ -1210,18 +950,6 @@ Status BundleReader::LookupSlice(StringPiece full_tensor_key,
   BundleEntryProto entry;
   TF_RETURN_IF_ERROR(GetBundleEntryProto(full_tensor_key, &entry));
   return GetSliceValue(full_tensor_key, entry, slice_spec, val);
-}
-
-Status BundleReader::LookupTensorSliceProtos(
-      StringPiece key, std::vector<TensorSliceProto>* slices) {
-  slices->clear();
-  BundleEntryProto entry;
-  TF_RETURN_IF_ERROR(GetBundleEntryProto(key, &entry));
-  slices->reserve(entry.slices_size());
-  for (const auto& slice : entry.slices()) {
-    slices->emplace_back(slice);
-  }
-  return Status::OK();
 }
 
 Status BundleReader::GetSliceValue(StringPiece full_tensor_key,
@@ -1407,15 +1135,6 @@ Status FileOutputBuffer::Append(StringPiece data) {
   return Status::OK();
 }
 
-Status FileOutputBuffer::AppendSegment(StringPiece data) {
-  TF_RETURN_IF_ERROR(FlushBuffer());
-  memcpy(&buffer_[0], data.data(), data.size());
-  crc32c_ = crc32c::Extend(crc32c_, &buffer_[0], data.size());
-  position_ = data.size();
-  TF_RETURN_IF_ERROR(FlushBuffer());
-  return Status::OK();
-}
-
 Status FileOutputBuffer::Close() {
   TF_RETURN_IF_ERROR(FlushBuffer());
   return file_->Close();
@@ -1426,113 +1145,6 @@ Status FileOutputBuffer::FlushBuffer() {
     TF_RETURN_IF_ERROR(file_->Append(StringPiece(&buffer_[0], position_)));
     position_ = 0;
   }
-  return Status::OK();
-}
-
-SegmentBundleWriter::SegmentBundleWriter(
-    BundleWriter* writer, const string& name,
-    const TensorShape& shape, DataType type, int64 buffer_size)
-  : writer_(writer), name_(name), shape_(shape), type_(type),
-    buffer_size_(buffer_size), buffer_(new char[buffer_size]),
-    buffer_ptr_(0), write_counter_(0) {}
-
-Status SegmentBundleWriter::Begin() {
-  return writer_->AddTensorHeader(name_, type_, shape_);
-}
-
-Status SegmentBundleWriter::WriteData(const void* data, int64 size) {
-  while (size > 0) {
-    if (buffer_ptr_ + size <= buffer_size_) {
-      memcpy(buffer_.get() + buffer_ptr_, data, size);
-      buffer_ptr_ += size;
-      size = 0;
-    } else {
-      int64 w = buffer_size_ - buffer_ptr_;
-      memcpy(buffer_.get() + buffer_ptr_, data, w);
-      TF_RETURN_IF_ERROR(writer_->AppendSegmentData(buffer_.get(), buffer_size_));
-      size -= w;
-      data = (const char*)data + w;
-      buffer_ptr_ = 0;
-      write_counter_++;
-    }
-  }
-  return Status::OK();
-}
-
-Status SegmentBundleWriter::End() {
-  if (write_counter_ * buffer_size_ + buffer_ptr_ !=
-      shape_.num_elements() * DataTypeSize(type_)) {
-    return errors::Internal("SegmentBundleWriter write size error");
-  }
-  if (write_counter_ == 0) {
-    return writer_->AddCompeleteData(buffer_.get(), buffer_ptr_);
-  } else if (buffer_ptr_ > 0) {
-    TF_RETURN_IF_ERROR(writer_->AppendSegmentData(buffer_.get(), buffer_ptr_));
-    writer_->EndSegmentData(
-        write_counter_ * buffer_size_ + buffer_ptr_,  buffer_ptr_);
-    return Status::OK();
-  } else {
-    writer_->EndSegmentData(
-        write_counter_ * buffer_size_ + buffer_ptr_,  buffer_size_);
-    return Status::OK();
-  }
-}
-
-SegmentBundleReader::SegmentBundleReader(
-    BundleReader* reader, const string& name,
-    int64 offset, int64 size, int64 buffer_size)
-  : reader_(reader), name_(name), buffer_size_(buffer_size),
-    offset_(offset), size_(size) { }
-
-Status SegmentBundleReader::Begin() {
-  TF_RETURN_WITH_CONTEXT_IF_ERROR(reader_->LookupDtypeAndShape(name_, &type_, &shape_), "xx1");
-  if (size_ == -1) {
-    size_ = shape_.dim_size(0);
-  }
-  if (offset_ + size_ > shape_.dim_size(0)) {
-    return errors::InvalidArgument("SegmentBundleReader offset error");
-  }
-  int64 xsize = DataTypeSize(type_);
-  for (int i = 1; i < shape_.dims(); i++) {
-    xsize *= shape_.dim_size(i);
-  }
-  int64 real_size_ = xsize * size_;
-  if (real_size_ < buffer_size_) {
-    buffer_size_ = real_size_;
-  }
-  remain_size_ = real_size_;
-  int64 var_offset;
-  int64 var_size;
-  TF_RETURN_IF_ERROR(reader_->GetTensorInfo(name_, &var_size, &file_, &var_offset));
-  input_.reset(new io::InputBuffer(file_.get(), buffer_size_));
-  TF_RETURN_IF_ERROR(input_->Seek(var_offset + xsize * offset_));
-  return Status::OK();
-}
-
-const TensorShape& SegmentBundleReader::shape() {
-  return shape_;
-}
-
-DataType SegmentBundleReader::type() {
-  return type_;
-}
-
-Status SegmentBundleReader::Read(void* data, int64 size) {
-  if (size > remain_size_) {
-    return errors::InvalidArgument("SegmentBundleReader Read Exhuasted");
-  }
-  size_t read_size;
-  TF_RETURN_IF_ERROR(input_->ReadNBytes(size, (char*)data, &read_size));
-  remain_size_ -= size;
-  return Status::OK();
-}
-
-Status SegmentBundleReader::Skip(int64 size) {
-  if (size > remain_size_) {
-    return errors::InvalidArgument("SegmentBundleReader Read Exhuasted");
-  }
-  TF_RETURN_IF_ERROR(input_->SkipNBytes(size));
-  remain_size_ -= size;
   return Status::OK();
 }
 

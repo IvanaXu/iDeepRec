@@ -299,34 +299,16 @@ cuda_py_test(
     xla_enable_strict_auto_jit = True,
 )
 
-py_library(
-    name = "cudnn_deterministic_base",
-    srcs = ["cudnn_deterministic_base.py"],
-    deps = [
-        "//tensorflow/python:client_testlib",
+cuda_py_test(
+    name = "cudnn_determinism_test",
+    size = "small",
+    srcs = ["cudnn_determinism_test.py"],
+    additional_deps = [
+        "//third_party/py/numpy",
         "//tensorflow/python:constant_op",
         "//tensorflow/python:dtypes",
+        "//tensorflow/python:client_testlib",
         "//tensorflow/python:nn_ops",
-        "//third_party/py/numpy",
-    ],
-)
-
-cuda_py_test(
-    name = "cudnn_deterministic_ops_test",
-    size = "small",
-    srcs = ["cudnn_deterministic_ops_test.py"],
-    additional_deps = [
-        ":cudnn_deterministic_base",
-    ],
-    xla_enable_strict_auto_jit = True,
-)
-
-cuda_py_test(
-    name = "cudnn_deterministic_test",
-    size = "small",
-    srcs = ["cudnn_deterministic_test.py"],
-    additional_deps = [
-        ":cudnn_deterministic_base",
     ],
     xla_enable_strict_auto_jit = True,
 )
@@ -812,7 +794,6 @@ tf_py_test(
         "//tensorflow/python:parsing_ops",
         "//tensorflow/python:platform",
     ],
-    tags = ["no_mac"],
 )
 
 tf_py_test(
@@ -991,7 +972,7 @@ tf_py_test(
 tf_py_test(
     name = "sparse_conditional_accumulator_test",
     size = "small",
-    srcs = ["sparse_conditional_accumulator_test.py", "sparse_conditional_accumulator_ali_test.py"],
+    srcs = ["sparse_conditional_accumulator_test.py"],
     additional_deps = [
         "//third_party/py/numpy",
         "//tensorflow/python:array_ops",
@@ -1687,36 +1668,18 @@ cuda_py_test(
     xla_enable_strict_auto_jit = True,
 )
 
-py_library(
-    name = "bias_op_base",
-    srcs = ["bias_op_base.py"],
-    deps = [
+cuda_py_test(
+    name = "bias_op_test",
+    size = "medium",
+    srcs = ["bias_op_test.py"],
+    additional_deps = [
+        "//third_party/py/numpy",
         "//tensorflow/python:array_ops",
         "//tensorflow/python:client_testlib",
         "//tensorflow/python:framework_for_generated_wrappers",
         "//tensorflow/python:gradients",
         "//tensorflow/python:nn_grad",
         "//tensorflow/python:nn_ops",
-        "//third_party/py/numpy",
-    ],
-)
-
-cuda_py_test(
-    name = "bias_op_deterministic_test",
-    size = "medium",
-    srcs = ["bias_op_deterministic_test.py"],
-    additional_deps = [
-        ":bias_op_base",
-    ],
-    xla_enable_strict_auto_jit = False,
-)
-
-cuda_py_test(
-    name = "bias_op_test",
-    size = "medium",
-    srcs = ["bias_op_test.py"],
-    additional_deps = [
-        ":bias_op_base",
     ],
     xla_enable_strict_auto_jit = True,
 )
@@ -3275,40 +3238,22 @@ cuda_py_test(
     xla_enable_strict_auto_jit = True,
 )
 
-py_library(
-    name = "sparse_tensor_dense_matmul_op_base",
-    srcs = ["sparse_tensor_dense_matmul_op_base.py"],
-    deps = [
-        "//third_party/py/numpy",
-        "//tensorflow/core:protos_all_py",
-        "//tensorflow/python:array_ops",
-        "//tensorflow/python:client",
-        "//tensorflow/python:framework",
-        "//tensorflow/python:platform",
-        "//tensorflow/python:sparse_ops",
-    ],
-)
-
 cuda_py_test(
     name = "sparse_tensor_dense_matmul_op_test",
     size = "medium",
     srcs = ["sparse_tensor_dense_matmul_op_test.py"],
     additional_deps = [
+        "//third_party/py/numpy",
+        "//tensorflow/core:protos_all_py",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:client",
         "//tensorflow/python:client_testlib",
         "//tensorflow/python:control_flow_ops",
+        "//tensorflow/python:framework",
         "//tensorflow/python:framework_for_generated_wrappers",
         "//tensorflow/python:math_ops",
-        ":sparse_tensor_dense_matmul_op_base",
-    ],
-    xla_enable_strict_auto_jit = True,
-)
-
-cuda_py_test(
-    name = "sparse_tensor_dense_matmul_op_deterministic_test",
-    size = "small",
-    srcs = ["sparse_tensor_dense_matmul_op_deterministic_test.py"],
-    additional_deps = [
-        ":sparse_tensor_dense_matmul_op_base",
+        "//tensorflow/python:platform",
+        "//tensorflow/python:sparse_ops",
     ],
     xla_enable_strict_auto_jit = True,
 )
@@ -3343,7 +3288,6 @@ cuda_py_test(
         "//tensorflow/python:framework_for_generated_wrappers",
     ],
     tags = [
-        "no_mac",  # timeouts on GPU
         "no_pip",
         "notap",  # http://b/31080670
     ],
@@ -3985,43 +3929,4 @@ cuda_py_test(
     shard_count = 10,
     tags = ["no_rocm"],
     xla_enable_strict_auto_jit = True,
-)
-
-tf_py_test(
-    name = "string_split_and_pad_ali_op_test",
-    size = "small",
-    srcs = ["string_split_and_pad_ali_op_test.py"],
-    additional_deps = [
-        "//third_party/py/numpy",
-        "//tensorflow/python:client_testlib",
-        "//tensorflow/python:errors",
-        "//tensorflow/python:framework_for_generated_wrappers",
-        "//tensorflow/python:string_ops",
-    ],
-)
-
-tf_py_test(
-    name = "sparse_decode_ali_ops_test",
-    size = "small",
-    srcs = ["sparse_decode_ali_ops_test.py"],
-    additional_deps = [
-        "//third_party/py/numpy",
-        "//tensorflow/python:client_testlib",
-        "//tensorflow/python:errors",
-        "//tensorflow/python:framework_for_generated_wrappers",
-        "//tensorflow/python:string_ops",
-    ],
-)
-
-tf_py_test(
-    name = "trans_csv_ali_ops_test",
-    size = "small",
-    srcs = ["trans_csv_ali_ops_test.py"],
-    additional_deps = [
-        "//third_party/py/numpy",
-        "//tensorflow/python:client_testlib",
-        "//tensorflow/python:errors",
-        "//tensorflow/python:framework_for_generated_wrappers",
-        "//tensorflow/python:string_ops",
-    ],
 )

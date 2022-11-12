@@ -48,12 +48,10 @@ class ExecutionOutput {
  public:
   ExecutionOutput(ScopedShapedBuffer result,
                   std::vector<se::OwningDeviceMemory> to_be_released,
-                  std::vector<ShapeIndex> aliased_indices,
-                  se::OwningDeviceMemory output_shape_table)
+                  std::vector<ShapeIndex> aliased_indices)
       : result_(std::move(result)),
         to_be_released_(std::move(to_be_released)),
-        aliased_indices_(std::move(aliased_indices)),
-        output_shape_table_(std::move(output_shape_table)) {}
+        aliased_indices_(std::move(aliased_indices)) {}
   ExecutionOutput(ExecutionOutput&&) = default;
   ExecutionOutput& operator=(ExecutionOutput&&) = default;
 
@@ -75,17 +73,9 @@ class ExecutionOutput {
 
   const ScopedShapedBuffer& Result() const { return result_; }
 
-  const se::OwningDeviceMemory& ShapeTable() const {
-    return output_shape_table_;
-  }
-
   ScopedShapedBuffer ConsumeResult() {
     aliased_indices_.clear();
     return std::move(result_);
-  }
-
-  se::OwningDeviceMemory ConsumeShapeTable() {
-    return std::move(output_shape_table_);
   }
 
   const std::vector<se::OwningDeviceMemory>& ToBeReleased() const {
@@ -108,10 +98,6 @@ class ExecutionOutput {
   // the buffer, so we track the indices here, and unless the ExecutionOutput is
   // committed, we remove them from the result_ before destruction.
   std::vector<ShapeIndex> aliased_indices_;
-
-  // A shape table is a continuous region in memory that is used to hold the
-  // runtime dimension sizes of dynamic output shapes.
-  se::OwningDeviceMemory output_shape_table_;
 };
 
 // A given platform's compiler will produce an Executable -- this is a uniform
@@ -163,19 +149,19 @@ class Executable {
   virtual StatusOr<ScopedShapedBuffer> ExecuteAsyncOnStream(
       const ServiceExecutableRunOptions* run_options,
       absl::Span<const ShapedBuffer* const> arguments,
-      HloExecutionProfile* hlo_execution_profile);
+      HloExecutionProfile* hlo_execution_profile) = 0;
 
   // Same as ExecuteAsyncOnStream(), but blocks waiting for the computation to
   // complete.
   StatusOr<ExecutionOutput> ExecuteOnStream(
       const ServiceExecutableRunOptions* run_options,
-      std::vector<ShapeTree<MaybeOwningDeviceMemory>> arguments,
+      std::vector<ShapeTree<xla::MaybeOwningDeviceMemory>> arguments,
       HloExecutionProfile* hlo_execution_profile);
 
   virtual StatusOr<ExecutionOutput> ExecuteAsyncOnStream(
       const ServiceExecutableRunOptions* run_options,
-      std::vector<ShapeTree<MaybeOwningDeviceMemory>> arguments,
-      HloExecutionProfile* hlo_execution_profile) = 0;
+      std::vector<ShapeTree<xla::MaybeOwningDeviceMemory>> arguments,
+      HloExecutionProfile* hlo_execution_profile);
 
   // Same as ExecuteOnStream(), but runs this executable on multiple
   // streams. arguments[i] contains the arguments to the execution on
@@ -205,10 +191,6 @@ class Executable {
   StatusOr<ScopedShapedBuffer> ExecuteAsyncOnStreamWrapper(
       const ServiceExecutableRunOptions* run_options,
       absl::Span<const ShapedBuffer* const> arguments);
-
-  StatusOr<ExecutionOutput> ExecuteAsyncOnStreamWrapper(
-      const ServiceExecutableRunOptions* run_options,
-      std::vector<ShapeTree<MaybeOwningDeviceMemory>> arguments);
 
   const HloProfilePrinterData& hlo_profile_printer_data() const {
     CHECK(hlo_profiling_enabled());

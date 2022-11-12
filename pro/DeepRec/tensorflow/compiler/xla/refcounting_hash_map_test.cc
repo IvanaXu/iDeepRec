@@ -18,7 +18,6 @@ limitations under the License.
 #include <functional>
 
 #include "tensorflow/compiler/xla/test.h"
-#include "tensorflow/compiler/xla/types.h"
 
 namespace xla {
 namespace {
@@ -47,25 +46,22 @@ struct DeleteNotifier {
 
 TEST(RefcountingHashMapTest, PointerIdentity) {
   RefcountingHashMap<int, int> m;
-  auto factory = [](const int&) { return absl::make_unique<int>(); };
-  std::shared_ptr<int> a = m.GetOrCreateIfAbsent(0, factory);
-  std::shared_ptr<int> b = m.GetOrCreateIfAbsent(0, factory);
-  std::shared_ptr<int> c = m.GetOrCreateIfAbsent(1, factory);
+  std::shared_ptr<int> a = m[0];
+  std::shared_ptr<int> b = m[0];
+  std::shared_ptr<int> c = m[1];
   EXPECT_EQ(a.get(), b.get());
   EXPECT_NE(a.get(), c.get());
 }
 
 TEST(RefcountingHashMapTest, DefaultInitialized) {
   RefcountingHashMap<int, int> m;
-  auto factory = [](const int&) { return absl::make_unique<int>(); };
-  EXPECT_EQ(*m.GetOrCreateIfAbsent(42, factory), 0);
+  EXPECT_EQ(*m[42], 0);
 }
 
 TEST(RefcountingHashMapTest, DeletesEagerly) {
   RefcountingHashMap<int, DeleteNotifier> m;
   bool deleted = false;
-  auto factory = [](const int&) { return absl::make_unique<DeleteNotifier>(); };
-  auto handle = m.GetOrCreateIfAbsent(0, factory);
+  auto handle = m[0];
   handle->fn = [&] { deleted = true; };
   EXPECT_FALSE(deleted);
   handle = nullptr;
@@ -73,10 +69,10 @@ TEST(RefcountingHashMapTest, DeletesEagerly) {
 }
 
 TEST(RefcountingHashMapTest, CustomFactory) {
-  RefcountingHashMap<int, int> m;
-  auto factory = [](const int& x) { return absl::make_unique<int>(x + 1); };
-  EXPECT_EQ(*m.GetOrCreateIfAbsent(0, factory), 1);
-  EXPECT_EQ(*m.GetOrCreateIfAbsent(100, factory), 101);
+  RefcountingHashMap<int, int> m(
+      [](const int& x) { return absl::make_unique<int>(x + 1); });
+  EXPECT_EQ(*m[0], 1);
+  EXPECT_EQ(*m[100], 101);
 }
 
 TEST(RefcountingHashMapTest, ForEachEmpty) {
@@ -88,9 +84,8 @@ TEST(RefcountingHashMapTest, ForEachEmpty) {
 
 TEST(RefcountingHashMapTest, ForEachNonempty) {
   RefcountingHashMap<int, int> m;
-  auto factory = [](const int&) { return absl::make_unique<int>(); };
-  auto a = m.GetOrCreateIfAbsent(0, factory);
-  auto b = m.GetOrCreateIfAbsent(1, factory);
+  auto a = m[0];
+  auto b = m[1];
 
   std::vector<int> seen_keys;
   std::vector<int*> seen_values;

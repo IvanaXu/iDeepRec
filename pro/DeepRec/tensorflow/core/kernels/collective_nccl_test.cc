@@ -39,7 +39,6 @@ limitations under the License.
 #include "tensorflow/core/lib/core/notification.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
 #include "tensorflow/core/lib/strings/strcat.h"
-#include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/public/session_options.h"
 #include "tensorflow/core/public/version.h"
@@ -303,6 +302,9 @@ class NcclTestBase : public ::testing::Test {
       gtl::InlinedVector<AllocatorAttributes, 4> input_aa(
           {AllocatorAttributes()});
       op_params.input_alloc_attrs = &input_aa;
+      gtl::InlinedVector<DeviceContext*, 4> input_dc;
+      input_dc.push_back(op_params.op_device_context);
+      op_params.input_device_contexts = &input_dc;
       int forward_from = 0;
       op_params.forward_from_array = &forward_from;
       AllocatorAttributes generic_alloc_attr;

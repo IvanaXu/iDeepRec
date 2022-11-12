@@ -46,8 +46,7 @@ class EinsumOpTest(test.TestCase):
       inputs.append(arr)
     input_tensors = [constant_op.constant(x, shape=x.shape) for x in inputs]
     a = np.einsum(s, *inputs)
-    with ops.device("/cpu:0"):
-      b = self.evaluate(gen_linalg_ops.einsum(input_tensors, s))
+    b = self.evaluate(gen_linalg_ops.einsum(input_tensors, s))
     self.assertAllClose(a, b, atol=1e-4, rtol=1e-4)
 
   def testUnary(self):

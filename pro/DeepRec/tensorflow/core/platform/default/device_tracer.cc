@@ -189,11 +189,7 @@ class CuptiCallbackHook {
     return Status::OK();
   }
 
-  ~CuptiCallbackHook() {
-    if (subscriber_ != nullptr) {
-      LogIfError(ToStatus(cuptiUnsubscribe(subscriber_)));
-    }
-  }
+  ~CuptiCallbackHook() { LogIfError(ToStatus(cuptiUnsubscribe(subscriber_))); }
 
  private:
   static void CUPTIAPI CuptiCallback(void* userdata,

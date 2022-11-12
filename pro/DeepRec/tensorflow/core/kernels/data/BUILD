@@ -5,7 +5,6 @@ load(
     "//tensorflow:tensorflow.bzl",
     "tf_cc_test",
     "tf_kernel_library",
-    "pybind_extension",
 )
 
 package(
@@ -1077,20 +1076,6 @@ tf_cc_test(
 )
 
 tf_kernel_library(
-    name = "kafka_dataset_op",
-    srcs = ["kafka_dataset_op.cc"],
-    deps = [
-        "@kafka",
-        ":name_utils",
-        "//tensorflow/core:core_cpu_internal",
-        "//tensorflow/core:dataset_ops_op_lib",
-        "//tensorflow/core:framework",
-        "//tensorflow/core:lib",
-        "//tensorflow/core:lib_internal",
-    ],
-)
-
-tf_kernel_library(
     name = "iterator_ops",
     srcs = ["iterator_ops.cc"],
     hdrs = ["iterator_ops.h"],
@@ -1264,7 +1249,6 @@ tf_kernel_library(
 tf_kernel_library(
     name = "data",
     deps = [
-        ":parquet_dataset_ops",
         ":batch_dataset_op",
         ":cache_dataset_ops",
         ":concatenate_dataset_op",
@@ -1296,7 +1280,6 @@ tf_kernel_library(
         ":tensor_slice_dataset_op",
         ":text_line_dataset_op",
         ":tf_record_dataset_op",
-        ":kafka_dataset_op",
         ":window_dataset_op",
         ":zip_dataset_op",
         "//tensorflow/core:array_ops_op_lib",
@@ -1366,48 +1349,4 @@ tf_kernel_library(
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
     ],
-)
-
-cc_library(
-    name = "parquet_dataset_ops",
-    srcs = [
-        "parquet_dataset_ops.cc",
-        "parquet_batch_reader.h",
-        "parquet_batch_reader.cc",
-    ],
-    hdrs = ["parquet_dataset_ops.h"],
-    deps = [
-        ":arrow_util",
-        ":dataset_ops",
-        "//tensorflow/core:framework",
-    ],
-)
-
-pybind_extension(
-    name = "_parquet_pybind",
-    srcs = ["parquet_pybind.cc"],
-    copts = ["-fexceptions"],
-    features = ["-use_header_modules"],
-    module_name = "_parquet_pybind",
-    deps = [
-        ":arrow_util",
-        "@pybind11",
-    ],
-)
-
-cc_library(
-    name = "arrow_util",
-    srcs = ["arrow_util.cc",
-            "eigen.h"],
-    hdrs = ["arrow_util.h"],
-    deps = [
-        "@arrow",
-        "//third_party/eigen3",
-        "//tensorflow/core:framework",
-    ],
-    defines = [
-        "DEEPREC_ARROW_HDFS",
-        "DEEPREC_ARROW_S3",
-        "DEEPREC_ARROW_ZEROCOPY",
-    ]
 )

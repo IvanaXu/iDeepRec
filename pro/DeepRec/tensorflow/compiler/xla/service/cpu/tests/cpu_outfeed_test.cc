@@ -13,16 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include <memory>
-
 #include "tensorflow/compiler/xla/service/cpu/cpu_compiler.h"
 #include "tensorflow/compiler/xla/service/cpu/tests/cpu_codegen_test.h"
+#include "tensorflow/compiler/xla/service/hlo_parser.h"
 
 namespace xla {
 namespace cpu {
 namespace {
-
-using CpuOutfeedTest = CpuCodegenTest;
+class CpuOutfeedTest : public CpuCodegenTest {};
 
 TEST_F(CpuOutfeedTest, OutfeedRoot) {
   const string hlo_text = R"(
@@ -43,7 +41,8 @@ ENTRY main {
 CHECK: private unnamed_addr constant [48 x i8]
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module, ParseAndReturnVerifiedModule(hlo_text));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_text));
 
   CpuAotCompilationOptions options{
       /*triple=*/"x86_64-pc-linux", /*cpu_name=*/"", /*features=*/"",
@@ -70,7 +69,8 @@ ENTRY main {
 CHECK: Outfeed
 )";
 
-  TF_ASSERT_OK_AND_ASSIGN(auto module, ParseAndReturnVerifiedModule(hlo_text));
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<HloModule> module,
+                          ParseAndReturnUnverifiedModule(hlo_text));
 
   CpuAotCompilationOptions options{
       /*triple=*/"x86_64-pc-linux", /*cpu_name=*/"", /*features=*/"",

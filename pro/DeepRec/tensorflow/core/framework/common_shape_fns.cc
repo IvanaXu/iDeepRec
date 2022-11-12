@@ -663,7 +663,8 @@ Status ShapeFromDimensions(DimensionHandle batch_dim,
 namespace {
 
 Status Conv2DShapeImpl(shape_inference::InferenceContext* c,
-                       bool supports_explicit_padding) {
+                       bool supports_explicit_padding,
+                       string padding_attr_name = "explicit_paddings") {
   string data_format_str, filter_format_str;
   if (!c->GetAttr("data_format", &data_format_str).ok()) {
     data_format_str = "NHWC";
@@ -774,14 +775,18 @@ Status Conv2DShapeImpl(shape_inference::InferenceContext* c,
 
   std::vector<int64> explicit_paddings;
   if (supports_explicit_padding) {
-    Status s = c->GetAttr("explicit_paddings", &explicit_paddings);
+    Status s = c->GetAttr(padding_attr_name, &explicit_paddings);
     // Use the default value, which is an empty list, if the attribute is not
     // found. Otherwise return the error to the caller.
     if (!s.ok() && !errors::IsNotFound(s)) {
       return s;
     }
-    TF_RETURN_IF_ERROR(CheckValidPadding(padding, explicit_paddings,
-                                         /*num_dims=*/4, data_format));
+    // Due to historical reasons, some QuantizedConv2D-like ops are allowed to
+    // have non-empty padding_list attribute if the padding attribute is Valid
+    if (!(padding == Padding::VALID && padding_attr_name == "padding_list")) {
+      TF_RETURN_IF_ERROR(CheckValidPadding(padding, explicit_paddings,
+                                           /*num_dims=*/4, data_format));
+    }
   } else {
     CHECK(padding != Padding::EXPLICIT);  // Crash ok.
   }
@@ -821,6 +826,11 @@ Status Conv2DShapeWithExplicitPadding(shape_inference::InferenceContext* c) {
 // padding.
 Status Conv2DShape(shape_inference::InferenceContext* c) {
   return Conv2DShapeImpl(c, false);
+}
+
+// Shape function for QuantizedConv2D-like operations
+Status QuantizedConv2DShape(shape_inference::InferenceContext* c) {
+  return Conv2DShapeImpl(c, true, "padding_list");
 }
 
 // TODO(mjanusz): Unify all conv/pooling shape functions.
@@ -1078,6 +1088,12 @@ Status AvgPoolShape(shape_inference::InferenceContext* c) {
 }
 
 Status FusedBatchNormShape(shape_inference::InferenceContext* c) {
+  ShapeHandle x;
+  TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 4, &x));
+
+  bool is_training;
+  TF_RETURN_IF_ERROR(c->GetAttr("is_training", &is_training));
+  int number_inputs = (is_training) ? 3 : 5;
   string data_format_str;
   TF_RETURN_IF_ERROR(c->GetAttr("data_format", &data_format_str));
   TensorFormat data_format;
@@ -1085,16 +1101,7 @@ Status FusedBatchNormShape(shape_inference::InferenceContext* c) {
     return errors::InvalidArgument("Invalid data format string: ",
                                    data_format_str);
   }
-  const int rank =
-      (data_format_str == "NDHWC" or data_format_str == "NCDHW") ? 5 : 4;
-  ShapeHandle x;
-  TF_RETURN_IF_ERROR(c->WithRank(c->input(0), rank, &x));
-
-  bool is_training;
-  TF_RETURN_IF_ERROR(c->GetAttr("is_training", &is_training));
-  int number_inputs = (is_training) ? 3 : 5;
-
-  int channel_dim_index = GetTensorFeatureDimIndex(rank, data_format); 
+  int channel_dim_index = GetTensorFeatureDimIndex(4, data_format);
   DimensionHandle channel_dim = c->Dim(x, channel_dim_index);
 
   // covers scale, offset, and if is_training is false, mean, variance
@@ -1147,6 +1154,13 @@ Status FusedBatchNormExShape(shape_inference::InferenceContext* c) {
 }
 
 Status FusedBatchNormGradShape(shape_inference::InferenceContext* c) {
+  ShapeHandle y_backprop;
+  TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 4, &y_backprop));
+  ShapeHandle x;
+  TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 4, &x));
+
+  bool is_training;
+  TF_RETURN_IF_ERROR(c->GetAttr("is_training", &is_training));
   string data_format_str;
   TF_RETURN_IF_ERROR(c->GetAttr("data_format", &data_format_str));
   TensorFormat data_format;
@@ -1154,17 +1168,7 @@ Status FusedBatchNormGradShape(shape_inference::InferenceContext* c) {
     return errors::InvalidArgument("Invalid data format string: ",
                                    data_format_str);
   }
-  const int rank =
-      (data_format_str == "NDHWC" or data_format_str == "NCDHW") ? 5 : 4;
-  ShapeHandle y_backprop;
-  TF_RETURN_IF_ERROR(c->WithRank(c->input(0), rank, &y_backprop));
-  ShapeHandle x;
-  TF_RETURN_IF_ERROR(c->WithRank(c->input(1), rank, &x));
-  
-  bool is_training;
-  TF_RETURN_IF_ERROR(c->GetAttr("is_training", &is_training));
-
-  int channel_dim_index = GetTensorFeatureDimIndex(rank, data_format);
+  int channel_dim_index = GetTensorFeatureDimIndex(4, data_format);
   DimensionHandle channel_dim = c->Dim(y_backprop, channel_dim_index);
   TF_RETURN_IF_ERROR(
       c->Merge(channel_dim, c->Dim(x, channel_dim_index), &channel_dim));

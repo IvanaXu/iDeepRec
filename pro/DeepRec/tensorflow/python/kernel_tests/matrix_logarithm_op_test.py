@@ -42,9 +42,8 @@ class LogarithmOpTest(test.TestCase):
     inp = x.astype(np_type)
     with test_util.use_gpu():
       # Verify that expm(logm(A)) == A.
-      log_result = gen_linalg_ops.matrix_logarithm(inp)
-      with ops.device("/cpu:0"):
-        tf_ans = linalg_impl.matrix_exponential(log_result)
+      tf_ans = linalg_impl.matrix_exponential(
+          gen_linalg_ops.matrix_logarithm(inp))
       out = self.evaluate(tf_ans)
       self.assertAllClose(inp, out, rtol=1e-4, atol=1e-3)
 

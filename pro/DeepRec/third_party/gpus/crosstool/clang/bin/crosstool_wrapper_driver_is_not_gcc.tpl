@@ -52,7 +52,6 @@ GCC_HOST_COMPILER_PATH = ('%{gcc_host_compiler_path}')
 NVCC_PATH = '%{nvcc_path}'
 PREFIX_DIR = os.path.dirname(GCC_HOST_COMPILER_PATH)
 NVCC_VERSION = '%{cuda_version}'
-CCACHE = '%{ccache}'
 
 def Log(s):
   print('gpus/crosstool: {0}'.format(s))
@@ -171,7 +170,7 @@ def InvokeNvcc(argv, log=False):
   undefines = ''.join([' -U' + define for define in undefines])
   std_options = GetOptionValue(argv, 'std')
   # currently only c++11 is supported by Cuda 7.0 std argument
-  nvcc_allowed_std_options = ["c++14"]
+  nvcc_allowed_std_options = ["c++11"]
   std_options = ''.join([' -std=' + define
       for define in std_options if define in nvcc_allowed_std_options])
 
@@ -190,7 +189,7 @@ def InvokeNvcc(argv, log=False):
     return 1
 
   opt = (' -O2' if (len(opt_option) > 0 and int(opt_option[0]) > 0)
-         else ' -g')
+         else ' -g -G')
 
   includes = (' -I ' + ' -I '.join(include_options)
               if len(include_options) > 0
@@ -216,14 +215,10 @@ def InvokeNvcc(argv, log=False):
   nvccopts += m_options
   nvccopts += warning_options
 
-  ccache = ''
-  if CCACHE:
-    ccache = CCACHE + ' '
-
   if depfiles:
     # Generate the dependency file
     depfile = depfiles[0]
-    cmd = (ccache + NVCC_PATH + ' ' + nvccopts +
+    cmd = (NVCC_PATH + ' ' + nvccopts +
            ' --compiler-options "' + host_compiler_options + '"' +
            ' --compiler-bindir=' + GCC_HOST_COMPILER_PATH +
            ' -I .' +
@@ -233,7 +228,7 @@ def InvokeNvcc(argv, log=False):
     if exit_status != 0:
       return exit_status
 
-  cmd = (ccache + NVCC_PATH + ' ' + nvccopts +
+  cmd = (NVCC_PATH + ' ' + nvccopts +
          ' --compiler-options "' + host_compiler_options + ' -fPIC"' +
          ' --compiler-bindir=' + GCC_HOST_COMPILER_PATH +
          ' -I .' +
@@ -265,12 +260,8 @@ def main():
   # this).
   cpu_compiler_flags = [flag for flag in sys.argv[1:]
                              if not flag.startswith(('--cuda_log'))]
-  if CCACHE:
-    cmd = [CCACHE, CPU_COMPILER] + cpu_compiler_flags
-  else:
-    cmd = [CPU_COMPILER] + cpu_compiler_flags
 
-  return subprocess.call(cmd)
+  return subprocess.call([CPU_COMPILER] + cpu_compiler_flags)
 
 if __name__ == '__main__':
   sys.exit(main())

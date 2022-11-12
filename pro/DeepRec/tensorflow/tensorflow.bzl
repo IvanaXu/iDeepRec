@@ -58,7 +58,7 @@ def register_extension_info(**kwargs):
 # not contain rc or alpha, only numbers.
 # Also update tensorflow/core/public/version.h
 # and tensorflow/tools/pip_package/setup.py
-VERSION = "1.15.5"
+VERSION = "1.15.0"
 VERSION_MAJOR = VERSION.split(".")[0]
 
 def if_v2(a):
@@ -238,11 +238,11 @@ def if_override_eigen_strong_inline(a):
         "//conditions:default": [],
     })
 
-def if_nccl(if_true, if_false = []):
+def if_nccl(a):
     return select({
-        clean_dep("//tensorflow:no_nccl_support"): if_false,
-        clean_dep("//tensorflow:windows"): if_false,
-        "//conditions:default": if_true,
+        "//tensorflow:no_nccl_support": [],
+        "//tensorflow:windows": [],
+        "//conditions:default": a,
     })
 
 def get_win_copts(is_external = False):
@@ -293,10 +293,9 @@ def tf_copts(
         (if_not_windows(["-fno-exceptions"]) if not allow_exceptions else []) +
         if_cuda(["-DGOOGLE_CUDA=1"]) +
         if_tensorrt(["-DGOOGLE_TENSORRT=1"]) +
-        if_nccl(["-DGOOGLE_NCCL=1"]) +
-        if_mkl(["-DINTEL_MKL=1"]) +
+        if_mkl(["-DINTEL_MKL=1", "-DENABLE_MKLDNN_V1", "-DENABLE_INTEL_MKL_BFLOAT16"]) +
         if_mkl_open_source_only(["-DINTEL_MKL_DNN_ONLY"]) +
-        if_mkldnn_threadpool(["-DENABLE_DNNL_THREADPOOL"]) +
+        if_mkldnn_threadpool(["-DENABLE_MKLDNN_THREADPOOL"]) +
         if_enable_mkl(["-DENABLE_MKL"]) +
         if_ngraph(["-DINTEL_NGRAPH=1"]) +
         if_android_arm(["-mfpu=neon"]) +
@@ -1069,7 +1068,7 @@ def tf_gpu_cc_test(
         srcs = srcs,
         args = args,
         data = data,
-        extra_copts = extra_copts + if_cuda(["-DNV_CUDNN_DISABLE_EXCEPTION"]),
+        extra_copts = extra_copts,
         kernels = kernels,
         linkopts = linkopts,
         linkstatic = linkstatic,
@@ -1082,7 +1081,7 @@ def tf_gpu_cc_test(
         srcs = srcs,
         args = args,
         data = data,
-        extra_copts = extra_copts + if_cuda(["-DNV_CUDNN_DISABLE_EXCEPTION"]),
+        extra_copts = extra_copts,
         kernels = kernels,
         linkopts = linkopts,
         linkstatic = select({
@@ -1352,8 +1351,7 @@ def tf_gpu_library(deps = None, cuda_deps = None, copts = tf_copts(), **kwargs):
       - The cuda runtime is added as a dependency (if necessary).
       - The library additionally passes -DGOOGLE_CUDA=1 to the list of copts.
       - In addition, when the library is also built with TensorRT enabled, it
-          additionally passes -DGOOGLE_TENSORRT=1 to the list of copts. Likewise
-	  for NCCL and -DGOOGLE_NCCL=1.
+          additionally passes -DGOOGLE_TENSORRT=1 to the list of copts.
 
       Args:
       - cuda_deps: BUILD dependencies which will be linked if and only if:
@@ -1375,7 +1373,7 @@ def tf_gpu_library(deps = None, cuda_deps = None, copts = tf_copts(), **kwargs):
         ]) + if_rocm_is_configured(cuda_deps + [
             "@local_config_rocm//rocm:rocm_headers",
         ]),
-        copts = (copts + if_cuda(["-DGOOGLE_CUDA=1", "-DNV_CUDNN_DISABLE_EXCEPTION"]) + if_rocm(["-DTENSORFLOW_USE_ROCM=1"]) + if_mkl(["-DINTEL_MKL=1"]) + if_mkl_open_source_only(["-DINTEL_MKL_DNN_ONLY"]) + if_enable_mkl(["-DENABLE_MKL"]) + if_tensorrt(["-DGOOGLE_TENSORRT=1"]) + if_nccl(["-DGOOGLE_NCCL=1"])),
+        copts = (copts + if_cuda(["-DGOOGLE_CUDA=1"]) + if_rocm(["-DTENSORFLOW_USE_ROCM=1"]) + if_mkl(["-DINTEL_MKL=1"]) + if_mkl_open_source_only(["-DINTEL_MKL_DNN_ONLY"]) + if_enable_mkl(["-DENABLE_MKL"]) + if_tensorrt(["-DGOOGLE_TENSORRT=1"])),
         **kwargs
     )
 
@@ -1437,7 +1435,7 @@ def tf_kernel_library(
     if not gpu_copts:
         gpu_copts = []
     textual_hdrs = []
-    copts = copts + tf_copts(is_external = is_external) + if_cuda(["-DNV_CUDNN_DISABLE_EXCEPTION"])
+    copts = copts + tf_copts(is_external = is_external)
 
     # Override EIGEN_STRONG_INLINE to inline when
     # --define=override_eigen_strong_inline=true to avoid long compiling time.
@@ -1789,14 +1787,14 @@ def tf_custom_op_library(name, srcs = [], gpu_srcs = [], deps = [], linkopts = [
     # Override EIGEN_STRONG_INLINE to inline when
     # --define=override_eigen_strong_inline=true to avoid long compiling time.
     # See https://github.com/tensorflow/tensorflow/issues/10521
-    copts = copts + if_override_eigen_strong_inline(["/DEIGEN_STRONG_INLINE=inline"]) + if_cuda(["-DNV_CUDNN_DISABLE_EXCEPTION"])
+    copts = copts + if_override_eigen_strong_inline(["/DEIGEN_STRONG_INLINE=inline"])
 
     if gpu_srcs:
         basename = name.split(".")[0]
         native.cc_library(
             name = basename + "_gpu",
             srcs = gpu_srcs,
-            copts = copts + _cuda_copts() + if_tensorrt(["-DGOOGLE_TENSORRT=1"]) + if_nccl(["-DGOOGLE_NCCL=1"]),
+            copts = copts + _cuda_copts() + if_tensorrt(["-DGOOGLE_TENSORRT=1"]),
             features = if_cuda(["-use_header_modules"]),
             deps = deps + if_cuda_is_configured_compat(cuda_deps) + if_rocm_is_configured(rocm_deps),
             **kwargs
@@ -2566,9 +2564,3 @@ def if_mlir_tflite(if_true, if_false = []):
 
 def tfcompile_extra_flags():
     return ""
-
-def tf_grpc_dependency():
-    return "//tensorflow:grpc"
-
-def tf_grpc_cc_dependency():
-    return "//tensorflow:grpc++"

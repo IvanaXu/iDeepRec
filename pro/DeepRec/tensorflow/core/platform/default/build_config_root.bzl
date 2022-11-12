@@ -20,9 +20,6 @@ def tf_exec_compatible_with(kwargs):
         return ["@org_tensorflow//third_party/toolchains:gpu_test"]
     return []
 
-def tf_exec_properties(kwargs):
-     return tf_exec_compatible_with(kwargs)
-
 def tf_additional_plugin_deps():
     return select({
         str(Label("//tensorflow:with_xla_support")): [
@@ -39,7 +36,7 @@ def tf_additional_grpc_deps_py():
 
 def tf_additional_license_deps():
     return select({
-        str(Label("//tensorflow:with_xla_support")): ["@llvm-project//llvm:LICENSE.TXT"],
+        str(Label("//tensorflow:with_xla_support")): ["@llvm//:LICENSE.TXT"],
         "//conditions:default": [],
     })
 
@@ -64,15 +61,6 @@ def tf_additional_gdr_deps():
     return select({
         str(Label("//tensorflow:with_gdr_support")): [
             str(Label("//tensorflow/contrib/gdr:gdr_server_lib")),
-        ],
-        "//conditions:default": [],
-    })
-
-def tf_additional_star_deps():
-    return select({
-        str(Label("//tensorflow:with_star_support")): [
-             str(Label("//tensorflow/contrib/star:star_server_base_lib")),
-             str(Label("//tensorflow/contrib/star_server:star_server_lib")),
         ],
         "//conditions:default": [],
     })

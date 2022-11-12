@@ -37,16 +37,13 @@ from tensorflow.python.client import session
 from tensorflow.python.eager import context
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import device as pydev
-from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import errors
 from tensorflow.python.framework import meta_graph
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import gen_io_ops
-from tensorflow.python.ops import gen_kv_variable_ops
 from tensorflow.python.ops import io_ops
-from tensorflow.python.ops import kv_variable_ops
 from tensorflow.python.ops import string_ops
 from tensorflow.python.ops import variables
 from tensorflow.python.platform import gfile
@@ -70,91 +67,6 @@ get_checkpoint_mtimes = checkpoint_management.get_checkpoint_mtimes
 remove_checkpoint = checkpoint_management.remove_checkpoint
 
 
-class BloomFilterSaveable(saveable_object.SaveableObject):
-  """SaveableObject implementation that handles BloomFilterAdmitStrategy"""
-  custom_restore = True
-
-  def __init__(self, bloom_filter):
-    self._init = bloom_filter.false_initializer
-    self._handle = bloom_filter.handle
-    slice_spec = "{} {},{}".format(bloom_filter.max_slice_size,
-        bloom_filter.slice_offset, bloom_filter.slice_size)
-    self._restore_name = bloom_filter.distributed_name
-    spec = saveable_object.SaveSpec(self._handle, slice_spec, self._restore_name)
-    self._restore_slice = slice_spec
-    super(BloomFilterSaveable, self).__init__(self._handle, [spec], bloom_filter.name)
-
-  def restore_specs(self):
-    return []
-
-  def restore(self, restored_tensors, restored_shapes):
-    with ops.colocate_with(self._handle):
-      with ops.control_dependencies([self._init]):
-        return gen_io_ops.restore_bloom_filter(
-            restored_tensors[0], self._restore_name, self._restore_slice,
-            self._handle)
-
-class HashTableSaveable(saveable_object.SaveableObject):
-  """SaveableObject implementation that handles HashTable."""
-  custom_restore = True
-
-  def __init__(self,
-               hash_tables,
-               restore_tensor_names=None):
-    simple_hash_table = hash_tables[0].hash_table
-    ht = [simple_hash_table] + hash_tables
-    inits = [i.false_initializer for i in hash_tables]
-    self._restore_name = []
-    with ops.colocate_with(ht[0]):
-      if restore_tensor_names is None:
-        names = [i.distributed_name for i in ht]
-        distributed_name = names[0]
-        names[0] += "/ids"
-        if not simple_hash_table.children:
-          self._restore_name.append(";".join(names))
-        else:
-          for child in simple_hash_table.children:
-            child_names = [name.replace(distributed_name, child)
-                for name in names]
-            self._restore_name.append(";".join(child_names))
-      else:
-        names = [restore_tensor_names[0]] + restore_tensor_names
-        names[0] += "/ids"
-        self._restore_name.append(";".join(names))
-      self._restore_name.sort()
-      handles = [i.handle for i in ht]
-      handles = array_ops.stack(handles)
-      self._handles = handles
-      slicex = "{} {},{}".format(ht[0].slicer[2], ht[0].slicer[0],
-          ht[0].slicer[1] - ht[0].slicer[0])
-      spec = saveable_object.SaveSpec(
-          handles, slicex, "|".join(self._restore_name))
-      self._restore_slice = slicex
-      self._restore_specs = []
-      self._inits = inits
-      for i in ht:
-        if i is ht[0]:
-          name = i.distributed_name + "/ids"
-        else:
-          name = i.distributed_name
-        handle = i.handle
-        self._restore_specs.append(saveable_object.SaveSpec(handle, slicex, name))
-      super(HashTableSaveable, self).__init__(
-          handles, [spec], ht[0].name)
-
-  def restore_specs(self):
-    return []
-
-  def restore(self, restored_tensors, restored_shapes):
-    from tensorflow.python.ops.hash_table import hash_table
-    restore_clear = hash_table.restore_clear()
-    with ops.colocate_with(self._handles):
-      with ops.control_dependencies(self._inits):
-        return gen_io_ops.restore_hash_table(
-            restored_tensors[0], self._restore_name, self._restore_slice,
-            self._handles, clear=restore_clear)
-
-
 class BaseSaverBuilder(object):
   """Base class for Savers.
 
@@ -167,32 +79,9 @@ class BaseSaverBuilder(object):
   # Aliases for code which was moved but still has lots of users.
   VariableSaveable = saveable_object_util.ReferenceVariableSaveable
   ResourceVariableSaveable = saveable_object_util.ResourceVariableSaveable
-  EmbeddingVariableSaveable = saveable_object_util.EmbeddingVariableSaveable
 
-  def __init__(self,
-               write_version=saver_pb2.SaverDef.V2,
-               build_incr_activateop = False,
-               incremental_include_normal_var = False):
+  def __init__(self, write_version=saver_pb2.SaverDef.V2):
     self._write_version = write_version
-    self._build_incr_activateop = build_incr_activateop
-    # if incremental_include_normal_var set False, don't save normal-Variable in incr ckpt
-    self._incremental_include_normal_var = incremental_include_normal_var
-
-  def _GetTensorNameAndIsSparse(self, spec, saveable):
-    # if-else BRANCH   single-EV    part-EV    single-normal    part-normal
-    # save_incr_sparse     1           1             2              3
-    # not save_incr_sparse -           -             2              2
-
-    save_incr_sparse = saveable.is_sparse and self._incremental_include_normal_var
-    # EV
-    if isinstance(saveable, BaseSaverBuilder.EmbeddingVariableSaveable):
-      return saveable.name, True
-    # normal single variable
-    if spec.slice_spec == "" or save_incr_sparse is False:
-      return spec.name, save_incr_sparse
-    # normal partitioned variable
-    else:
-      return saveable._full_name, save_incr_sparse
 
   def save_op(self, filename_tensor, saveables):
     """Create an Op to save 'saveables'.
@@ -215,23 +104,7 @@ class BaseSaverBuilder(object):
     tensor_names = []
     tensors = []
     tensor_slices = []
-    ev_key_types = []
-    has_ev = False
     for saveable in saveables:
-      if isinstance(saveable, BaseSaverBuilder.EmbeddingVariableSaveable):
-        tensors.append(training_util.get_or_create_global_step())
-        tensor_names.append("global_step")
-        tensor_slices.append("")
-        has_ev = True
-        break
-
-    for saveable in saveables:
-      if isinstance(saveable, BaseSaverBuilder.EmbeddingVariableSaveable):
-        tensor_names.append(saveable.name)
-        tensors.append(saveable.handle_op)
-        tensor_slices.append("")
-        ev_key_types.append(saveable.key_type)
-        continue
       for spec in saveable.specs:
         tensor_names.append(spec.name)
         tensors.append(spec.tensor)
@@ -246,7 +119,7 @@ class BaseSaverBuilder(object):
       # "filename_tensor" is interpreted *NOT AS A FILENAME*, but as a prefix
       # of a V2 checkpoint: e.g. "/fs/train/ckpt-<step>/tmp/worker<i>-<step>".
       return io_ops.save_v2(filename_tensor, tensor_names, tensor_slices,
-                            tensors, ev_key_types, has_ev)
+                            tensors)
     else:
       raise RuntimeError("Unexpected write_version: " + self._write_version)
 
@@ -330,22 +203,8 @@ class BaseSaverBuilder(object):
     Returns:
       A tensor with the filename used to save.
     """
-    if self._build_incr_activateop:
-      save = self.save_op(filename_tensor, saveables)
-      tensor_names = []
-      for saveable in saveables:
-        if isinstance(saveable, BaseSaverBuilder.EmbeddingVariableSaveable):
-          tensor_names.append(saveable.name)
-        else:
-          for spec in saveable.specs:
-            tensor_names.append(self._GetTensorNameAndIsSparse(spec, saveable)[0])
-      activate_op = gen_io_ops.activate_sparse_recorder(tensor_names)
-      with ops.control_dependencies([save]):
-        save = control_flow_ops.group(activate_op)
-      return control_flow_ops.with_dependencies([save], filename_tensor)
-    else:
-      save = self.save_op(filename_tensor, saveables)
-      return control_flow_ops.with_dependencies([save], filename_tensor)
+    save = self.save_op(filename_tensor, saveables)
+    return control_flow_ops.with_dependencies([save], filename_tensor)
 
   def _AddShardedSaveOpsForV2(self, checkpoint_prefix, per_device):
     """Add ops to save the params per shard, for the V2 format.
@@ -486,16 +345,9 @@ class BaseSaverBuilder(object):
           if not shape.is_fully_defined():
             shape = array_ops.shape(v)
           shapes.append(shape)
-      if isinstance(saveable, BaseSaverBuilder.EmbeddingVariableSaveable):
-        saveable_tensors = [filename_tensor]
-        assign_ops.append(saveable.restore(saveable_tensors, shapes))
-      elif saveable.custom_restore:
-        saveable_tensors = [filename_tensor]
-        assign_ops.append(saveable.restore(saveable_tensors, shapes))
-      else:
-        saveable_tensors = all_tensors[idx:idx + len(saveable.specs)]
-        idx += len(saveable.specs)
-        assign_ops.append(saveable.restore(saveable_tensors, shapes))
+      saveable_tensors = all_tensors[idx:idx + len(saveable.specs)]
+      idx += len(saveable.specs)
+      assign_ops.append(saveable.restore(saveable_tensors, shapes))
 
     # Create a Noop that has control dependencies from all the updates.
     return control_flow_ops.group(*assign_ops, name=name)
@@ -639,7 +491,6 @@ class BaseSaverBuilder(object):
       # Keep the name "Const" for backwards compatibility.
       filename_tensor = array_ops.placeholder_with_default(
           filename_tensor, shape=(), name="Const")
-      self.filename_tensor = filename_tensor
 
       # Add the save ops.
       if sharded:
@@ -694,9 +545,7 @@ class BaseSaverBuilder(object):
               # Create a concat op for this PartitionedVariable. The user may
               # not need it, but we'll try looking it up on MetaGraph restore
               # since it's in a collection.
-              params=list(element)
-              if not isinstance(params[0], kv_variable_ops.DynamicEmbeddingVariable):
-                element.as_tensor()
+              element.as_tensor()
       return saver_pb2.SaverDef(
           filename_tensor_name=filename_tensor.name,
           save_tensor_name=save_tensor.name,
@@ -717,65 +566,16 @@ class BulkSaverBuilder(BaseSaverBuilder):
     del restore_sequentially
     restore_specs = []
     for saveable in saveables:
-      if isinstance(saveable, BaseSaverBuilder.EmbeddingVariableSaveable):
-        continue
-      if saveable.custom_restore:
-        continue
       for spec in saveable.specs:
         restore_specs.append((spec.name, spec.slice_spec, spec.dtype))
 
-    if len(restore_specs) > 0:
-      names, slices, dtypes = zip(*restore_specs)
-      # Load all tensors onto CPU 0 for compatibility with existing code.
-      with ops.device("cpu:0"):
-        return io_ops.restore_v2(filename_tensor, names, slices, dtypes)
+    names, slices, dtypes = zip(*restore_specs)
+    # Load all tensors onto CPU 0 for compatibility with existing code.
+    with ops.device("cpu:0"):
+      return io_ops.restore_v2(filename_tensor, names, slices, dtypes)
 
-class PartialRestoreSaverBuilder(BulkSaverBuilder):
-  """SaverBuilder with support for custom save and restore.
-  """
-  def __init__(self, *args, **kwargs):
-    self._ckpt_dir_or_file = kwargs.pop("checkpoint_dir", True)
-    super(PartialRestoreSaverBuilder, self).__init__(*args, **kwargs)
 
-  def restore_op(self, filename_tensor, saveable, preferred_shard):
-    """Create ops to restore 'saveable'.
-    """
-    if hasattr(saveable, "load_from_checkpoint"):
-      return saveable.load_from_checkpoint(
-          self._ckpt_dir_or_file, filename_tensor, preferred_shard)
-    return super(PartialRestoreSaverBuilder, self).restore_op(
-        filename_tensor, saveable, preferred_shard)
-
-  def bulk_restore(self, filename_tensor, saveables, preferred_shard,
-                   restore_sequentially):
-    """Restore all tensors contained in saveables.
-    """
-    custom_saveables = []
-    other_saveables = []
-    offset = 0
-    for saveable in saveables:
-      if hasattr(saveable, "load_from_checkpoint"):
-        custom_saveables.append(
-            (offset,
-             saveable.load_from_checkpoint(
-                 self._ckpt_dir_or_file, filename_tensor, preferred_shard)))
-      else:
-        other_saveables.append(saveable)
-        offset += len(saveable.specs)
-    other_tensors = super(PartialRestoreSaverBuilder, self).bulk_restore(
-        filename_tensor, other_saveables, preferred_shard, restore_sequentially)
-    all_tensors = []
-    prev_offset = 0
-    for offset, tensors in custom_saveables:
-      if offset > prev_offset:
-        all_tensors.extend(other_tensors[prev_offset:offset])
-        prev_offset = offset
-      all_tensors.extend(tensors)
-    if len(other_tensors) > prev_offset:
-      all_tensors.extend(other_tensors[prev_offset: len(other_tensors)])
-    return all_tensors
-
-def _get_saver_or_default(incremental_save_restore=False):
+def _get_saver_or_default():
   """Returns the saver from SAVERS collection, or creates a default one.
 
   This method is used by other members of the training module, such as
@@ -796,8 +596,7 @@ def _get_saver_or_default(incremental_save_restore=False):
           "Please indicate which one to use by passing it to the constructor."
           .format(collection_key))
     return savers[0]
-  saver = Saver(sharded=True, allow_empty=True,
-                incremental_save_restore=incremental_save_restore)
+  saver = Saver(sharded=True, allow_empty=True)
   if saver is not None:
     ops.add_to_collection(collection_key, saver)
   return saver
@@ -894,9 +693,7 @@ class Saver(object):
                write_version=saver_pb2.SaverDef.V2,
                pad_step_number=False,
                save_relative_paths=False,
-               filename=None,
-               incremental_save_restore=False,
-               incremental_include_normal_var=False):
+               filename=None):
     """Creates a `Saver`.
 
     The constructor adds ops to save and restore variables.
@@ -1024,8 +821,6 @@ class Saver(object):
     self._filename = filename
     self._last_checkpoints = []
     self._checkpoints_to_be_deleted = []
-    self._incremental_save_restore = incremental_save_restore
-    self._incremental_include_normal_var = incremental_include_normal_var
     if context.executing_eagerly():
       self._next_checkpoint_time = (
           time.time() + self._keep_checkpoint_every_n_hours * 3600)
@@ -1057,50 +852,11 @@ class Saver(object):
 
     if not self.saver_def or context.executing_eagerly():
       if self._builder is None:
-        self._builder = BulkSaverBuilder(self._write_version, self._incremental_save_restore,
-                                         self._incremental_include_normal_var)
+        self._builder = BulkSaverBuilder(self._write_version)
 
       if self._var_list is None:
         # pylint: disable=protected-access
         self._var_list = variables._all_saveable_objects()
-      from tensorflow.python.ops import hash_table
-      if isinstance(self._var_list, dict):
-        ht = {}
-        lst = {}
-        for name, x in self._var_list.items():
-          if isinstance(x, hash_table.HashTable):
-            if x.hash_table not in ht:
-              ht[x.hash_table] = [x]
-            else:
-              ht[x.hash_table].append(x)
-          elif isinstance(x, hash_table.BloomFilterAdmitStrategy):
-            lst[name] = BloomFilterSaveable(x)
-          else:
-            lst[name] = x
-        if len(ht) != 0 and not self._sharded:
-          raise ValueError("HashTable can only use sharded saver")
-        for x, y in ht.items():
-          lst[x.name] = HashTableSaveable(y)
-        self._var_list = lst
-      else:
-        ht = {}
-        lst = []
-        for x in self._var_list:
-          if isinstance(x, hash_table.HashTable):
-            if x.hash_table not in ht:
-              ht[x.hash_table] = [x]
-            else:
-              ht[x.hash_table].append(x)
-          elif isinstance(x, hash_table.BloomFilterAdmitStrategy):
-            lst.append(BloomFilterSaveable(x))
-          else:
-            lst.append(x)
-        if len(ht) != 0 and not self._sharded:
-          raise ValueError("HashTable can only use sharded saver")
-        for x, y in ht.items():
-          lst.append(HashTableSaveable(y))
-        self._var_list = lst
-
       if not self._var_list:
         if self._allow_empty:
           self._is_empty = True
@@ -1762,7 +1518,6 @@ def export_meta_graph(filename=None,
                       clear_extraneous_savers=False,
                       strip_default_attrs=False,
                       save_debug_info=False,
-                      incr_saver_def=None,
                       **kwargs):
   # pylint: disable=line-too-long
   """Returns `MetaGraphDef` proto.
@@ -1831,7 +1586,6 @@ def export_meta_graph(filename=None,
       clear_extraneous_savers=clear_extraneous_savers,
       strip_default_attrs=strip_default_attrs,
       save_debug_info=save_debug_info,
-      incr_saver_def=incr_saver_def,
       **kwargs)
   return meta_graph_def
 

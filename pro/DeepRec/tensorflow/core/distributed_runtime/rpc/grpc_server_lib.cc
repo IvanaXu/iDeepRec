@@ -20,7 +20,6 @@ limitations under the License.
 #include <memory>
 #include <vector>
 
-#include "grpc/support/alloc.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/security/credentials.h"
 #include "grpcpp/server_builder.h"
@@ -46,7 +45,6 @@ limitations under the License.
 #include "tensorflow/core/distributed_runtime/server_lib.h"
 #include "tensorflow/core/distributed_runtime/worker_cache_wrapper.h"
 #include "tensorflow/core/distributed_runtime/worker_env.h"
-#include "tensorflow/core/distributed_runtime/worker_resource.h"
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 #include "tensorflow/core/platform/env.h"
@@ -62,7 +60,7 @@ namespace {
 class NoReusePortOption : public ::grpc::ServerBuilderOption {
  public:
   void UpdateArguments(::grpc::ChannelArguments* args) override {
-    args->SetInt(GRPC_ARG_ALLOW_REUSEPORT, 1);
+    args->SetInt(GRPC_ARG_ALLOW_REUSEPORT, 0);
   }
 
   void UpdatePlugins(std::vector<std::unique_ptr<::grpc::ServerBuilderPlugin>>*
@@ -346,14 +344,6 @@ Status GrpcServer::WorkerCacheFactory(const WorkerCacheFactoryOptions& options,
 
   *worker_cache = NewGrpcWorkerCacheWithLocalWorker(channel_cache,
                                                     worker_impl(), name_prefix);
-
-  for (auto device : master_env_.local_devices) {
-    ResourceMgr *rm = device->resource_manager();
-    WorkerResource *worker_resource = new WorkerResource();
-    worker_resource->worker_cache = *worker_cache;
-    rm->Create("worker_resource", "worker_resource", worker_resource);
-  }
-
   return Status::OK();
 }
 
@@ -496,12 +486,6 @@ class GrpcServerFactory : public ServerFactory {
 class GrpcServerRegistrar {
  public:
   GrpcServerRegistrar() {
-    gpr_allocation_functions alloc_fns;
-    memset(&alloc_fns, 0, sizeof(alloc_fns));
-    alloc_fns.malloc_fn = port::Malloc;
-    alloc_fns.realloc_fn = port::Realloc;
-    alloc_fns.free_fn = port::Free;
-    gpr_set_allocation_functions(alloc_fns);
     ServerFactory::Register("GRPC_SERVER", new GrpcServerFactory());
   }
 };

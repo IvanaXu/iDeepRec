@@ -119,7 +119,6 @@ class DfsHloVisitorBase {
   virtual Status HandleReplicaId(HloInstructionPtr hlo) = 0;
   virtual Status HandlePartitionId(HloInstructionPtr hlo) = 0;
   virtual Status HandleGetDimensionSize(HloInstructionPtr hlo) = 0;
-  virtual Status HandleSetDimensionSize(HloInstructionPtr hlo) = 0;
   virtual Status HandleCompare(HloInstructionPtr hlo) {
     return HandleElementwiseBinary(hlo);
   }
@@ -225,7 +224,6 @@ class DfsHloVisitorBase {
   virtual Status HandleInfeed(HloInstructionPtr hlo) = 0;
   virtual Status HandleOutfeed(HloInstructionPtr hlo) = 0;
   virtual Status HandleRng(HloInstructionPtr hlo) = 0;
-  virtual Status HandleRngBitGenerator(HloInstructionPtr hlo) = 0;
   virtual Status HandleRngGetAndUpdateState(HloInstructionPtr hlo) = 0;
   virtual Status HandleReverse(HloInstructionPtr hlo) = 0;
   virtual Status HandleSort(HloInstructionPtr hlo) = 0;
@@ -264,8 +262,6 @@ class DfsHloVisitorBase {
   virtual Status HandleRecv(HloInstructionPtr recv) = 0;
   virtual Status HandleRecvDone(HloInstructionPtr recv_done) = 0;
 
-  virtual Status HandleSoftmax(HloInstructionPtr hlo) = 0;
-
   virtual Status HandleBatchNormTraining(HloInstructionPtr hlo) = 0;
 
   virtual Status HandleBatchNormInference(HloInstructionPtr hlo) = 0;
@@ -274,8 +270,6 @@ class DfsHloVisitorBase {
 
   virtual Status HandleAddDependency(HloInstructionPtr add_dependency) = 0;
   virtual Status HandleAfterAll(HloInstructionPtr token) = 0;
-
-  virtual Status HandleAsyncOutSend(HloInstructionPtr hlo) = 0;
 
   // Invoked to inform the visitor that the traversal has completed, and that
   // the root was "root".

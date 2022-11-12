@@ -32,8 +32,7 @@ from tensorflow.python.util.tf_export import tf_export
     None,
     'This function will only be available through the v1 compatibility '
     'library as tf.compat.v1.saved_model.simple_save.')
-def simple_save(session, export_dir, inputs, outputs,
-                legacy_init_op=None, save_incr_model=False):
+def simple_save(session, export_dir, inputs, outputs, legacy_init_op=None):
   """Convenience function to build a SavedModel suitable for serving.
 
   In many common cases, saving models for serving will be as simple as:
@@ -81,7 +80,7 @@ def simple_save(session, export_dir, inputs, outputs,
       signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
           signature_def_utils.predict_signature_def(inputs, outputs)
   }
-  b = builder.SavedModelBuilder(export_dir, save_incr_model=save_incr_model)
+  b = builder.SavedModelBuilder(export_dir)
   b.add_meta_graph_and_variables(
       session,
       tags=[tag_constants.SERVING],

@@ -30,41 +30,6 @@ limitations under the License.
 namespace xla {
 namespace gpu {
 
-/*
-Persistent compilation cache.
-This cache store .ptx and .cubin files to be used by subsequent compilations.
-The cache is a directory of files. The file name is a hash of the file content.
-All file are read (disk IO) and stored in memory when the cache is consructed.
-When an uncached compilation occurs, the result is written (disk IO) to the
-cache directory immediately. Autotuning is currently non-deterministic, so a
-few executions might be required to populate the cache. 
-
-Deployemt:
-For best performance, keep the cache small (per model) containing only the
-binaries needed for this execution. In that scenario, after cache creation,
-there will be no disk IO.
-*/
-class persistentCompilationCache
-{
-    static const int64 ptx_hash_ = 0xBA55ED50;
-    string cache_dir_;
-    absl::flat_hash_map<int64, string > in_memory_cache_;
-
-    void addToCache(int64 key,  absl::string_view text, const string &kind);
-    template <typename T> bool LookupCache(int64 key, T &text,
-                                           const string &kind);
-  public:
-    bool in_use_;
-    persistentCompilationCache();
-    int64 createKey(llvm::Module* llvm_module,
-                    const std::pair<int, int> &compute_capability);
-    void addToCache(int64 key, const string &ptx);
-    bool LookupCache(int64 key, string &ptx);
-    void addToCache(int64 key, const std::vector<uint8> &cubin);
-    bool LookupCache(int64 key, std::vector<uint8> &cubin);
-};
-
-
 // NVPTXCompiler generates efficient GPU executables for NVPTX target.
 class NVPTXCompiler : public GpuCompiler {
  public:
@@ -97,12 +62,12 @@ class NVPTXCompiler : public GpuCompiler {
   // We cache the cuda_data_dir() and the result of our search, so that if the
   // next module we have to compile has the same cuda_data_dir(), we can skip
   // the search.
-  string cached_cuda_data_dir_ TF_GUARDED_BY(mutex_);
-  string cached_libdevice_dir_ TF_GUARDED_BY(mutex_);
+  string cached_cuda_data_dir_ GUARDED_BY(mutex_);
+  string cached_libdevice_dir_ GUARDED_BY(mutex_);
 
   // Tries to compile the given ptx string to cubin.  Returns a vector with the
   // compiled cubin.  If compilation was unsuccessful, returns an empty vector.
-  std::vector<uint8> CompileGpuAsmOrGetCachedResult(
+  std::vector<uint8> CompilePtxOrGetCachedResult(
       se::StreamExecutor* stream_exec, const string& ptx, int cc_major,
       int cc_minor, const HloModuleConfig& hlo_module_config);
 
@@ -151,14 +116,10 @@ class NVPTXCompiler : public GpuCompiler {
   // is critical here.
   absl::node_hash_map<CompilationCacheKey, CompilationCacheValue,
                       CompilationCacheHash, CompilationCacheEq>
-      compilation_cache_ TF_GUARDED_BY(mutex_);
-
-  persistentCompilationCache persistent_compilation_cache_;
+      compilation_cache_ GUARDED_BY(mutex_);
 
   TF_DISALLOW_COPY_AND_ASSIGN(NVPTXCompiler);
 };
-
-void WarnIfBadDriverJITVersion();
 
 }  // namespace gpu
 }  // namespace xla

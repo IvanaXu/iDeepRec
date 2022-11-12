@@ -61,8 +61,7 @@ class ParallelLoopEmitter : public llvm_ir::LoopEmitter {
   ~ParallelLoopEmitter() override = default;
 
   std::vector<llvm_ir::IrArray::Index> EmitIndexAndSetExitBasicBlock(
-      absl::string_view loop_name, llvm::Type* index_type,
-      llvm::Value* base_index) override;
+      absl::string_view loop_name, llvm::Type* index_type) override;
 
  private:
   const DynamicLoopBounds* dynamic_loop_bounds_;

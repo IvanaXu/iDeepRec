@@ -22,7 +22,6 @@ import numpy as np
 
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes as dtypes_lib
-from tensorflow.python.framework import ops
 from tensorflow.python.framework import test_util
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import gradient_checker_v2
@@ -160,12 +159,11 @@ def _GetSelfAdjointEigTest(dtype_, shape_, compute_v_):
       if compute_v_:
         tf_e, tf_v = linalg_ops.self_adjoint_eig(constant_op.constant(a))
 
-        with ops.device("/cpu:0"):
-          # Check that V*diag(E)*V^T is close to A.
-          a_ev = math_ops.matmul(
-              math_ops.matmul(tf_v, array_ops.matrix_diag(tf_e)),
-              tf_v,
-              adjoint_b=True)
+        # Check that V*diag(E)*V^T is close to A.
+        a_ev = math_ops.matmul(
+            math_ops.matmul(tf_v, array_ops.matrix_diag(tf_e)),
+            tf_v,
+            adjoint_b=True)
         self.assertAllClose(self.evaluate(a_ev), a, atol=atol)
 
         # Compare to numpy.linalg.eigh.
@@ -232,11 +230,10 @@ def _GetSelfAdjointEigGradTest(dtype_, shape_, compute_v_):
         funcs = [linalg_ops.self_adjoint_eigvals]
 
       for f in funcs:
-        with ops.device("/cpu:0"):
-          theoretical, numerical = gradient_checker_v2.compute_gradient(
-              f,
-              [RandomInput()],
-              delta=delta)
+        theoretical, numerical = gradient_checker_v2.compute_gradient(
+            f,
+            [RandomInput()],
+            delta=delta)
         self.assertAllClose(theoretical, numerical, atol=tol, rtol=tol)
 
   return Test

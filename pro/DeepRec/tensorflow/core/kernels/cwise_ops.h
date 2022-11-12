@@ -895,10 +895,10 @@ template <typename T>
 struct atan : base<T, Eigen::internal::scalar_atan_op<T>> {};
 
 template <typename T>
-struct bessel_i0e : base<T, Eigen::internal::scalar_bessel_i0e_op<T>> {};
+struct bessel_i0e : base<T, Eigen::internal::scalar_i0e_op<T>> {};
 
 template <typename T>
-struct bessel_i1e : base<T, Eigen::internal::scalar_bessel_i1e_op<T>> {};
+struct bessel_i1e : base<T, Eigen::internal::scalar_i1e_op<T>> {};
 
 struct logical_not : base<bool, Eigen::internal::scalar_boolean_not_op<bool>> {
 };
@@ -1283,15 +1283,6 @@ struct SelectFunctor {
 };
 
 template <typename Device, typename T>
-struct Select4ElementScalarFunctor {
-  void operator()(const Device& d, typename TTypes<T>::Flat out,
-                  typename TTypes<bool>::ConstFlat cond_flat,
-                  typename TTypes<T>::ConstFlat then_flat,
-                  typename TTypes<T>::ConstFlat else_flat,
-                  bool then_scalar);
-};
-
-template <typename Device, typename T>
 struct SelectScalarFunctor {
   void operator()(const Device& d, typename TTypes<T>::Flat out,
                   typename TTypes<bool>::ConstScalar cond,
@@ -1319,17 +1310,6 @@ struct BCastSelectFunctor {
                   typename Eigen::array<Eigen::DenseIndex, NDIMS> then_bcast,
                   typename Eigen::array<Eigen::DenseIndex, NDIMS> else_bcast);
 };
-
-template <typename Device, typename T>
-struct BatchSelect4BroadcastingScalarFunctor {
-  void operator()(const Device& d,
-                  typename TTypes<T>::Matrix output_flat_outer_dims,
-                  TTypes<bool>::ConstVec cond_vec,
-                  typename TTypes<T>::ConstMatrix then_flat_outer_dims,
-                  typename TTypes<T>::ConstMatrix else_flat_outer_dims,
-                  bool then_scalar);
-};
-
 
 }  // end namespace functor
 }  // end namespace tensorflow

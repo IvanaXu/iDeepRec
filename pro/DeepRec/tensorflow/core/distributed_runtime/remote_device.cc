@@ -79,20 +79,15 @@ void NewRemoteDevices(Env* env, WorkerCacheInterface* worker_cache,
     GetStatusResponse resp;
   };
   Call* call = new Call;
-  CallOptions* call_opts = new CallOptions;
-  StatusCallback* cb = new StatusCallback();
-  *cb = [env, worker_cache, worker_name, done, wi,
-         call, call_opts, cb](const Status& status) {
+  auto cb = [env, worker_cache, worker_name, done, wi,
+             call](const Status& status) {
     Status s = status;
     std::vector<Device*> remote_devices;
     auto cleanup = gtl::MakeCleanup(
-        [&worker_cache, &worker_name, &wi, &done,
-         &remote_devices, &s, call, call_opts, cb] {
+        [&worker_cache, &worker_name, &wi, &done, &remote_devices, &s, call] {
           worker_cache->ReleaseWorker(worker_name, wi);
           done(s, &remote_devices);
           delete call;
-          delete call_opts;
-          delete cb;
         });
     if (s.ok()) {
       DeviceNameUtils::ParsedName worker_name_parsed;
@@ -129,7 +124,7 @@ void NewRemoteDevices(Env* env, WorkerCacheInterface* worker_cache,
       }
     }
   };
-  wi->GetStatusAsyncWithOptions(&call->req, &call->resp, *cb, call_opts);
+  wi->GetStatusAsync(&call->req, &call->resp, cb);
 }
 
 }  // namespace tensorflow

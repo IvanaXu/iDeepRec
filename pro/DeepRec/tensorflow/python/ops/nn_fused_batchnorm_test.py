@@ -44,18 +44,14 @@ class BatchNormalizationTest(test.TestCase):
     return math_ops.cast(y, x.dtype)
 
   def _inference_ref(self, x, scale, offset, mean, var, epsilon, data_format):
-    if data_format not in ['NHWC', 'NCHW', 'NDHWC', 'NCDHW']:
-      raise ValueError('data_format must be NCHW or NHWC for 4D tensors or'
-                       'NCDHW or NDHWC for 5D tensors, got %s.' % data_format)
+    if data_format not in ['NHWC', 'NCHW']:
+      raise ValueError('data_format must be NCHW or NHWC, '
+                       'got %s.' % data_format)
     if data_format == 'NCHW':
       x = array_ops.transpose(x, [0, 2, 3, 1])
-    elif data_format == 'NCDHW':
-      x = array_ops.transpose(x, [0, 2, 3, 4, 1])
     y = self._batch_norm(x, mean, var, offset, scale, epsilon)
     if data_format == 'NCHW':
       y = array_ops.transpose(y, [0, 3, 1, 2])
-    elif data_format == 'NCDHW':
-      y = array_ops.transpose(y, [0, 4, 1, 2, 3])
     return self.evaluate(y)
 
   def _test_inference(self,
@@ -98,23 +94,16 @@ class BatchNormalizationTest(test.TestCase):
     self.assertAllClose(y_ref, y_val, atol=atol)
 
   def _training_ref(self, x, scale, offset, epsilon, data_format):
-    if data_format not in ['NHWC', 'NCHW', 'NDHWC', 'NCDHW']:
-      raise ValueError('data_format must be NCHW or NHWC for 4D tensors or'
-                       'NCDHW or NDHWC for 5D tensors, got %s.' % data_format)
-    use_4d_tensor = (x.shape.ndims == 4)
+    if data_format not in ['NHWC', 'NCHW']:
+      raise ValueError('data_format must be NCHW or NHWC, '
+                       'got %s.' % data_format)
     if data_format == 'NCHW':
       x = array_ops.transpose(x, [0, 2, 3, 1])
-    elif data_format == 'NCDHW':
-      x = array_ops.transpose(x, [0, 2, 3, 4, 1])
-
-    mean_axis = [0, 1, 2] if use_4d_tensor else [0, 1, 2, 3]
     mean, var = nn_impl.moments(
-       math_ops.cast(x, scale.dtype), mean_axis, keep_dims=False)
+        math_ops.cast(x, scale.dtype), [0, 1, 2], keep_dims=False)
     y = self._batch_norm(x, mean, var, offset, scale, epsilon)
     if data_format == 'NCHW':
       y = array_ops.transpose(y, [0, 3, 1, 2])
-    elif data_format == 'NCDHW':
-      y = array_ops.transpose(y, [0, 4, 1, 2, 3])
     return self.evaluate(y), self.evaluate(mean), self.evaluate(var)
 
   def _test_training(self,
@@ -405,18 +394,6 @@ class BatchNormalizationTest(test.TestCase):
         self._test_inference(
             x_shape, dtype, [6], np.float32, use_gpu=False, data_format='NHWC')
 
-  def testInferenceShape6(self):
-    x_shape = [1, 2, 1, 6, 3]
-    if test.is_gpu_available(cuda_only=True):
-      for dtype in [np.float16, np.float32]:
-        if test.is_gpu_available(cuda_only=True):
-          self._test_inference(x_shape, dtype, [2], np.float32, use_gpu=True,
-                               data_format='NCDHW')
-          self._test_inference(x_shape, dtype, [3], np.float32, use_gpu=True,
-                               data_format='NDHWC')
-        self._test_inference(
-            x_shape, dtype, [3], np.float32, use_gpu=False, data_format='NDHWC')
-
   def testTrainingShape1(self):
     x_shape = [1, 1, 6, 1]
     for dtype in [np.float16, np.float32]:
@@ -470,17 +447,6 @@ class BatchNormalizationTest(test.TestCase):
               x_shape, dtype, [6], np.float32, use_gpu=True, data_format='NHWC')
         self._test_training(
             x_shape, dtype, [6], np.float32, use_gpu=False, data_format='NHWC')
-
-  def testTrainingShape6(self):
-    x_shape = [1, 2, 1, 6, 3]
-    for dtype in [np.float16, np.float32]:
-      if test.is_gpu_available(cuda_only=True):
-        self._test_training(
-            x_shape, dtype, [2], np.float32, use_gpu=True, data_format='NCDHW')
-        self._test_training(
-            x_shape, dtype, [3], np.float32, use_gpu=True, data_format='NDHWC')
-      self._test_training(
-          x_shape, dtype, [3], np.float32, use_gpu=False, data_format='NDHWC')
 
   @test_util.run_deprecated_v1
   def testBatchNormGradShape1(self):
@@ -603,70 +569,34 @@ class BatchNormalizationTest(test.TestCase):
               data_format='NHWC',
               is_training=is_training)
 
-  @test_util.run_deprecated_v1
-  @test_util.disable_xla('This test never passed for XLA')
-  def testBatchNormGradShape6(self):
-    for is_training in [True, False]:
-      x_shape = [1, 2, 6, 1, 3]
-      for dtype in [np.float16, np.float32]:
-        if test.is_gpu_available(cuda_only=True):
-          self._test_gradient(
-              x_shape,
-              dtype, [2],
-              np.float32,
-              use_gpu=True,
-              data_format='NCDHW',
-              is_training=is_training)
-          self._test_gradient(
-              x_shape,
-              dtype, [3],
-              np.float32,
-              use_gpu=True,
-              data_format='NDHWC',
-              is_training=is_training)
-        self._test_gradient(
-            x_shape,
-            dtype, [3],
-            np.float32,
-            use_gpu=False,
-            data_format='NDHWC',
-            is_training=is_training)
-
   def _testBatchNormGradGrad(self, config):
     shape = config['shape']
     err_tolerance = config['err_tolerance']
     dtype = config['dtype']
-    rank = len(shape)
-    if rank == 4:
-      data_format_nhwc, features_nhwc = 'NHWC', shape[3]
-      data_format_nchw, features_nchw = 'NCHW', shape[1]
-    else:
-      data_format_nhwc, features_nhwc = 'NDHWC', shape[4]
-      data_format_nchw, features_nchw = 'NCDHW', shape[1]
     for is_training in [True, False]:
       if test.is_gpu_available(cuda_only=True):
         self._test_grad_grad(
             shape,
-            dtype, [features_nhwc],
+            dtype, [shape[3]],
             np.float32,
             use_gpu=True,
-            data_format=data_format_nhwc,
+            data_format='NHWC',
             is_training=is_training,
             err_tolerance=err_tolerance)
         self._test_grad_grad(
             shape,
-            dtype, [features_nchw],
+            dtype, [shape[1]],
             np.float32,
             use_gpu=True,
-            data_format=data_format_nchw,
+            data_format='NCHW',
             is_training=is_training,
             err_tolerance=err_tolerance)
       self._test_grad_grad(
           shape,
-          dtype, [features_nhwc],
+          dtype, [shape[3]],
           np.float32,
           use_gpu=False,
-          data_format=data_format_nhwc,
+          data_format='NHWC',
           is_training=is_training,
           err_tolerance=err_tolerance)
 
@@ -706,23 +636,6 @@ class BatchNormalizationTest(test.TestCase):
     }
     self._testBatchNormGradGrad(config)
 
-  @test_util.run_deprecated_v1
-  def testBatchNormGradGradConfig5(self):
-    config = {
-        'shape': [2, 3, 2, 2, 2],
-        'err_tolerance': 2e-3,
-        'dtype': np.float32,
-    }
-    self._testBatchNormGradGrad(config)
-
-  @test_util.run_deprecated_v1
-  def testBatchNormGradGradConfig6(self):
-    config = {
-        'shape': [2, 3, 2, 2, 2],
-        'err_tolerance': 3e-3,
-        'dtype': np.float16,
-    }
-    self._testBatchNormGradGrad(config)
 
 if __name__ == '__main__':
   test.main()

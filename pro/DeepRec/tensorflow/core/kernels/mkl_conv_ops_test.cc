@@ -28,19 +28,19 @@ limitations under the License.
 #include "tensorflow/core/public/session.h"
 
 #if defined(INTEL_MKL_DNN_ONLY)
-#include "dnnl.hpp"
+#include "mkldnn.hpp"
 #include "tensorflow/core/util/mkl_util.h"
 #endif
 
 // TODO(ezhulenev): Add numerical tests that will compare results of default
-// (aka Eigen) convolutions with OneDNN convolutions.
+// (aka Eigen) convolutions with MKL convolutions.
 
 // -------------------------------------------------------------------------- //
 // Performance Benchmarks.                                                    //
 // -------------------------------------------------------------------------- //
 
 // Compare performance of default Tensorflow convolution kernels (Eigen) with
-// OneDNN kernels on CPU.
+// MKL kernels on CPU.
 
 // Before running these benchmarks configure OpenMP environment variables:
 //   export KMP_BLOCKTIME=0

@@ -85,7 +85,8 @@ def batch_gather_with_default(params,
                                               return_dtype=True))
     # TODO(hterry): lift this restriction and support default_values of
     #               of rank > 1
-    if default_value.shape.ndims not in (0, 1):
+    if (default_value.shape.ndims is not 0
+        and default_value.shape.ndims is not 1):
       raise ValueError('"default_value" must be a scalar or vector')
     upper_bounds = None
     if indices.shape.ndims is None:

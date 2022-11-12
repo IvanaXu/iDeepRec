@@ -19,14 +19,14 @@ limitations under the License.
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/kernels/no_op.h"
 
-#ifdef INTEL_MKL
+#ifdef ENABLE_INTEL_MKL_BFLOAT16
 
 namespace tensorflow {
 
 // This file contains temporary registrations for some of the Eigen CPU backend
 // operators for BFloat16 type. The kernel registered for all these ops is a
-// NoOp. We do this so that OneDNN graph pass can rewrite these ops into
-// corresponding OneDNN ops. Without such registrations, Placer component in
+// NoOp. We do this so that MKL graph pass can rewrite these ops into
+// corresponding MKL ops. Without such registrations, Placer component in
 // TensorFlow fails because Eigen CPU backend does not support these ops in
 // BFloat16 type.
 
@@ -45,10 +45,24 @@ namespace tensorflow {
       Name("AvgPool").Device(DEVICE_CPU).TypeConstraint<T>("T"), NoOp);       \
   REGISTER_KERNEL_BUILDER(                                                    \
       Name("AvgPoolGrad").Device(DEVICE_CPU).TypeConstraint<T>("T"), NoOp);   \
+  REGISTER_KERNEL_BUILDER(Name("FusedBatchNormV3")                            \
+                              .Device(DEVICE_CPU)                             \
+                              .TypeConstraint<bfloat16>("T")                  \
+                              .TypeConstraint<float>("U"),                    \
+                          NoOp);                                              \
+  REGISTER_KERNEL_BUILDER(Name("FusedBatchNormGradV3")                        \
+                              .Device(DEVICE_CPU)                             \
+                              .TypeConstraint<bfloat16>("T")                  \
+                              .TypeConstraint<float>("U"),                    \
+                          NoOp);                                              \
+  REGISTER_KERNEL_BUILDER(                                                    \
+      Name("_FusedMatMul").Device(DEVICE_CPU).TypeConstraint<T>("T"), NoOp);  \
+  REGISTER_KERNEL_BUILDER(                                                    \
+      Name("BatchMatMulV2").Device(DEVICE_CPU).TypeConstraint<T>("T"), NoOp);
 
 TF_CALL_bfloat16(REGISTER_CPU);
 #undef REGISTER_CPU
 
 }  // namespace tensorflow
 
-#endif  // INTEL_MKL
+#endif  // ENABLE_INTEL_MKL_BFLOAT16

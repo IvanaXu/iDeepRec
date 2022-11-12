@@ -30,9 +30,9 @@ REGISTER3(SimpleBinaryOp, GPU, "InvGrad", functor::inverse_grad, float,
           Eigen::half, double);
 #endif
 
-#ifdef INTEL_MKL
+#ifdef ENABLE_INTEL_MKL_BFLOAT16
 // Since Eigen backend does not support bfloat16 ops, we are selectively
-// enabling them for OneDNN backend.
+// enabling them for MKL backend.
 REGISTER6(UnaryOp, CPU, "Reciprocal", functor::inverse, float, Eigen::half,
           double, complex64, complex128, bfloat16);
 #else

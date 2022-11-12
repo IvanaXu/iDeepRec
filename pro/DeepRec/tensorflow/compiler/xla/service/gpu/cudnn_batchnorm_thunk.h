@@ -76,10 +76,13 @@ class CudnnBatchNormForwardInferenceThunk : public Thunk {
 class CudnnBatchNormForwardTrainingThunk : public Thunk {
  public:
   CudnnBatchNormForwardTrainingThunk(
-      std::vector<BufferAllocation::Slice> operand_slices,
-      std::vector<BufferAllocation::Slice> output_slices, float epsilon,
-      int64 feature_index, const BufferAllocation::Slice& output_tuple,
-      const HloInstruction* hlo);
+      const BufferAllocation::Slice& operand,
+      const BufferAllocation::Slice& scale,
+      const BufferAllocation::Slice& offset, float epsilon, int64 feature_index,
+      const BufferAllocation::Slice& output_data,
+      const BufferAllocation::Slice& output_mean,
+      const BufferAllocation::Slice& output_inv_stddev,
+      const BufferAllocation::Slice& output_tuple, const HloInstruction* hlo);
 
   CudnnBatchNormForwardTrainingThunk(
       const CudnnBatchNormForwardTrainingThunk&) = delete;
@@ -89,20 +92,30 @@ class CudnnBatchNormForwardTrainingThunk : public Thunk {
   Status ExecuteOnStream(const ExecuteParams& params) override;
 
  private:
-  std::vector<BufferAllocation::Slice> operand_slices_;
-  std::vector<BufferAllocation::Slice> output_slices_;
-  BufferAllocation::Slice output_tuple_;
+  BufferAllocation::Slice operand_;
+  BufferAllocation::Slice scale_;
+  BufferAllocation::Slice offset_;
   float epsilon_;
   int64 feature_index_;
+  BufferAllocation::Slice output_data_;
+  BufferAllocation::Slice output_mean_;
+  BufferAllocation::Slice output_inv_stddev_;
+  BufferAllocation::Slice output_tuple_;
 };
 
 class CudnnBatchNormBackwardThunk : public Thunk {
  public:
-  CudnnBatchNormBackwardThunk(
-      std::vector<BufferAllocation::Slice> operand_slices,
-      std::vector<BufferAllocation::Slice> output_slices, float epsilon,
-      int64 feature_index, const BufferAllocation::Slice& output_tuple,
-      const HloInstruction* hlo);
+  CudnnBatchNormBackwardThunk(const BufferAllocation::Slice& operand,
+                              const BufferAllocation::Slice& scale,
+                              const BufferAllocation::Slice& mean,
+                              const BufferAllocation::Slice& inv_stddev,
+                              const BufferAllocation::Slice& grad_output,
+                              float epsilon, int64 feature_index,
+                              const BufferAllocation::Slice& output_grad_data,
+                              const BufferAllocation::Slice& output_grad_scale,
+                              const BufferAllocation::Slice& output_grad_offset,
+                              const BufferAllocation::Slice& output_tuple,
+                              const HloInstruction* hlo);
 
   CudnnBatchNormBackwardThunk(const CudnnBatchNormBackwardThunk&) = delete;
   CudnnBatchNormBackwardThunk& operator=(const CudnnBatchNormBackwardThunk&) =
@@ -111,10 +124,16 @@ class CudnnBatchNormBackwardThunk : public Thunk {
   Status ExecuteOnStream(const ExecuteParams& params) override;
 
  private:
-  std::vector<BufferAllocation::Slice> operand_slices_;
-  std::vector<BufferAllocation::Slice> output_slices_;
+  BufferAllocation::Slice operand_;
+  BufferAllocation::Slice scale_;
+  BufferAllocation::Slice mean_;
+  BufferAllocation::Slice inv_stddev_;
+  BufferAllocation::Slice grad_output_;
   float epsilon_;
   int64 feature_index_;
+  BufferAllocation::Slice output_grad_data_;
+  BufferAllocation::Slice output_grad_scale_;
+  BufferAllocation::Slice output_grad_offset_;
   BufferAllocation::Slice output_tuple_;
 };
 

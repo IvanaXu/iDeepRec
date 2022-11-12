@@ -125,11 +125,7 @@ StatusOr<std::unique_ptr<LocalExecutable>> CompileExecutable(
   }
   ExecutableBuildOptions exec_build_options;
   *exec_build_options.mutable_debug_options() = GetDebugOptionsFromFlags();
-  TF_ASSIGN_OR_RETURN(
-      auto executables,
-      client->Compile(computation, argument_layout_ptrs, exec_build_options));
-  TF_RET_CHECK(executables.size() == 1);
-  return std::move(executables[0]);
+  return client->Compile(computation, argument_layout_ptrs, exec_build_options);
 }
 
 absl::optional<Shape> GetXfeedShape(bool is_infeed,
@@ -234,13 +230,7 @@ StatusOr<Literal> ReplayComputation(const HloSnapshot& module,
     // Run fake computations with debug options ignoring XLA_FLAGS.  Users very
     // likely want XLA_FLAGS only to apply to the "real" computation being run,
     // not to the fake computations we use for generating arguments.
-    auto debug_opts_flags = GetDebugOptionsFromFlags();
     auto debug_opts = DefaultDebugOptionsIgnoringFlags();
-
-    // ptxas can be called during the generation of fake data.
-    // As it is cached, we want it to not ignore this flag.
-    debug_opts.set_xla_gpu_asm_extra_flags(debug_opts_flags.xla_gpu_asm_extra_flags());
-
     global_data_arguments =
         MakeFakeArgumentsOrDie(computation, client, &debug_opts);
     for (const auto& data : global_data_arguments) {
@@ -356,7 +346,7 @@ StatusOr<std::vector<HloSnapshot>> ParseRecordIoFile(absl::string_view filename,
 
   std::vector<HloSnapshot> snapshots;
   uint64 offset = 0;
-  tensorflow::tstring record;
+  string record;
   while (reader.ReadRecord(&offset, &record).ok()) {
     HloSnapshot snapshot;
     if (snapshot.mutable_hlo()->ParseFromString(record)) {

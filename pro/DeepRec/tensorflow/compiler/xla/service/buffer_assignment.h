@@ -200,8 +200,6 @@ class BufferAllocation {
 
     string ToString() const;
 
-    void set_size(int64 size) { size_ = size; }
-
    private:
     const BufferAllocation* allocation_ = nullptr;
     int64 offset_ = 0;
@@ -312,7 +310,7 @@ class BufferAllocation {
   LogicalBuffer::Color color_;
 
   // Whether this allocation holds an entry computation parameter. Entry
-  // computation parameters are special because they have lifetimes which may
+  // computation parameters are special be cause they have lifetimes which may
   // outlast the computation.
   bool is_entry_computation_parameter_ = false;
 
@@ -363,10 +361,6 @@ class BufferAssignment {
   // Returns the total size allocation holding all temporary buffers.
   int64 temp_allocation_total_size() const {
     return temp_allocation_total_size_;
-  }
-
-  int32 multiheap_size_constraint_per_heap() const {
-    return multiheap_size_constraint_per_heap_;
   }
 
   // Returns whether the given buffer has been assigned an allocation.
@@ -497,11 +491,7 @@ class BufferAssignment {
         buffer_size_(std::move(buffer_size)),
         color_alignment_(std::move(color_alignment)),
         alias_analysis_(std::move(alias_analysis)),
-        hlo_live_range_(std::move(hlo_live_range)),
-        multiheap_size_constraint_per_heap_(
-            module->config()
-                .debug_options()
-                .xla_multiheap_size_constraint_per_heap()) {}
+        hlo_live_range_(std::move(hlo_live_range)) {}
 
   // Creates and returns a new BufferAllocation, with no assigned
   // LogicalBuffers. Ownership is maintained internally.
@@ -545,8 +535,6 @@ class BufferAssignment {
   // The total size of all temporary buffers.
   int64 temp_allocation_total_size_ = 0;
 
-  int32 multiheap_size_constraint_per_heap_;
-
   // Maps Buffers to the index of the BufferAllocation which holds the buffer.
   absl::flat_hash_map<const HloValue*, BufferAllocation::Index>
       allocation_index_for_value_;
@@ -578,10 +566,10 @@ class BufferAssigner {
   static Colorer DefaultColorer() {
     return [](HloAliasAnalysis* alias_analysis, const HloOrdering&) {
       for (HloValue* value : alias_analysis->dataflow_analysis().values()) {
-        const HloPosition& defining_position = value->defining_position();
-        if (defining_position.shape().has_layout()) {
+        HloInstruction* defining_instruction = value->defining_instruction();
+        if (defining_instruction->shape().has_layout()) {
           value->set_color(BufferValue::Color(
-              defining_position.shape().layout().memory_space()));
+              defining_instruction->shape().layout().memory_space()));
         } else {
           value->set_color(BufferValue::Color(0));
         }

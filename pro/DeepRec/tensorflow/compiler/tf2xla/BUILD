@@ -3,11 +3,7 @@ load(
     "//tensorflow/core/platform:default/cuda_build_defs.bzl",
     "if_cuda_is_configured",
 )
-load(
-    "//tensorflow/core/platform:default/build_config.bzl",
-    "tf_proto_library_cc",
-)
-load("//tensorflow/compiler/xla:xla.bzl", "xla_py_proto_library")
+load("//tensorflow/compiler/xla:xla.bzl", "xla_proto_library", "xla_py_proto_library")
 load("//tensorflow:tensorflow.bzl", "tf_portable_proto_library")
 
 package(
@@ -61,14 +57,13 @@ tf_cc_binary(
     deps = [":tf2xla_supported_ops_lib"],
 )
 
-tf_proto_library_cc(
+xla_proto_library(
     name = "tf2xla_proto",
     srcs = ["tf2xla.proto"],
-    cc_api_version = 2,
-    protodeps = [
-        "//tensorflow/core:protos_all",
-    ],
     visibility = ["//visibility:public"],
+    deps = [
+        "//tensorflow/core:protos_all_cc",
+    ],
 )
 
 # A proto library that is minimal in size and dependencies for platforms like Android.
@@ -92,14 +87,13 @@ xla_py_proto_library(
     deps = [":tf2xla_proto"],
 )
 
-tf_proto_library_cc(
+xla_proto_library(
     name = "host_compute_metadata_proto",
     srcs = ["host_compute_metadata.proto"],
-    cc_api_version = 2,
-    protodeps = [
-        "//tensorflow/core:protos_all",
-    ],
     visibility = ["//visibility:public"],
+    deps = [
+        "//tensorflow/core:protos_all_cc",
+    ],
 )
 
 cc_library(
@@ -110,7 +104,7 @@ cc_library(
     deps = [
         ":common",
         ":functionalize_control_flow",
-        ":tf2xla_proto_cc",
+        ":tf2xla_proto",
         ":tf2xla_util",
         ":xla_compiler",
         "//tensorflow/compiler/tf2xla/kernels:xla_ops",
@@ -158,12 +152,12 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":tf2xla",
-        ":tf2xla_proto_cc",
+        ":tf2xla_proto",
         ":xla_compiled_cpu_function",
         "//tensorflow/compiler/xla:cpu_function_runtime",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:statusor",
-        "//tensorflow/compiler/xla:xla_data_proto_cc",
+        "//tensorflow/compiler/xla:xla_data_proto",
         "//tensorflow/compiler/xla/client:client_library",
         "//tensorflow/compiler/xla/client:local_client",
         "//tensorflow/compiler/xla/client:xla_computation",
@@ -209,11 +203,10 @@ cc_library(
     visibility = [":friends"],
     deps = [
         ":common",
-        ":host_compute_metadata_proto_cc",
+        ":host_compute_metadata_proto",
         ":sharding_util",
         ":side_effect_util",
         ":tf2xla_util",
-        "//tensorflow/compiler/jit/ops:async_io_ops",
         "//tensorflow/compiler/jit:flags",
         "//tensorflow/compiler/jit:shape_inference",
         "//tensorflow/compiler/jit:xla_cluster_util",
@@ -225,7 +218,7 @@ cc_library(
         "//tensorflow/compiler/xla:statusor",
         "//tensorflow/compiler/xla:types",
         "//tensorflow/compiler/xla:util",
-        "//tensorflow/compiler/xla:xla_data_proto_cc",
+        "//tensorflow/compiler/xla:xla_data_proto",
         "//tensorflow/compiler/xla/client",
         "//tensorflow/compiler/xla/client:client_library",
         "//tensorflow/compiler/xla/client:local_client",
@@ -268,7 +261,7 @@ cc_library(
         "//tensorflow/compiler/xla:literal",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:statusor",
-        "//tensorflow/compiler/xla:xla_data_proto_cc",
+        "//tensorflow/compiler/xla:xla_data_proto",
         "//tensorflow/core:core_cpu_internal",
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
@@ -318,9 +311,9 @@ cc_library(
     visibility = [":friends"],
     deps = [
         ":sharding_util",
-        ":tf2xla_proto_cc",
+        ":tf2xla_proto",
         "//tensorflow/compiler/xla:status_macros",
-        "//tensorflow/compiler/xla:xla_data_proto_cc",
+        "//tensorflow/compiler/xla:xla_data_proto",
         "//tensorflow/core:core_cpu",
         "//tensorflow/core:core_cpu_internal",
         "//tensorflow/core:framework",
@@ -360,7 +353,7 @@ tf_cc_test(
     srcs = ["tf2xla_test.cc"],
     deps = [
         ":tf2xla",
-        ":tf2xla_proto_cc",
+        ":tf2xla_proto",
         "//tensorflow/compiler/xla:literal",
         "//tensorflow/compiler/xla:literal_util",
         "//tensorflow/compiler/xla:statusor",
@@ -380,13 +373,13 @@ tf_cc_test(
     name = "xla_jit_compiled_cpu_function_test",
     srcs = ["xla_jit_compiled_cpu_function_test.cc"],
     deps = [
-        ":tf2xla_proto_cc",
+        ":tf2xla_proto",
         ":xla_jit_compiled_cpu_function",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:status_macros",
         "//tensorflow/compiler/xla:statusor",
         "//tensorflow/compiler/xla:test",
-        "//tensorflow/compiler/xla:xla_data_proto_cc",
+        "//tensorflow/compiler/xla:xla_data_proto",
         "//tensorflow/compiler/xla/client:local_client",
         "//tensorflow/compiler/xla/service:compiler",
         "//tensorflow/compiler/xla/service:platform_util",
@@ -503,9 +496,9 @@ cc_library(
     deps = [
         ":functionalize_control_flow_util",
         ":tf2xla_util",
+        "//tensorflow/compiler/jit:union_find",
         "//tensorflow/compiler/tf2xla/ops:xla_ops",
         "//tensorflow/compiler/xla:status_macros",
-        "//tensorflow/compiler/xla:union_find",
         "//tensorflow/core:core_cpu",
         "//tensorflow/core:core_cpu_internal",
         "//tensorflow/core:framework",
@@ -530,9 +523,9 @@ cc_library(
         ":functionalize_control_flow_util",
         ":functionalize_while",
         ":tf2xla_util",
+        "//tensorflow/compiler/jit:union_find",
         "//tensorflow/compiler/tf2xla/ops:xla_ops",
         "//tensorflow/compiler/xla:status_macros",
-        "//tensorflow/compiler/xla:union_find",
         "//tensorflow/core:core_cpu",
         "//tensorflow/core:core_cpu_internal",
         "//tensorflow/core:framework",
@@ -589,9 +582,9 @@ cc_library(
         ":functionalize_cond",
         ":functionalize_control_flow_util",
         ":tf2xla_util",
+        "//tensorflow/compiler/jit:union_find",
         "//tensorflow/compiler/tf2xla/ops:xla_ops",
         "//tensorflow/compiler/xla:status_macros",
-        "//tensorflow/compiler/xla:union_find",
         "//tensorflow/core:core_cpu",
         "//tensorflow/core:core_cpu_internal",
         "//tensorflow/core:framework",

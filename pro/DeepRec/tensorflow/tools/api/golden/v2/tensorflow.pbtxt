@@ -201,10 +201,6 @@ tf_module {
     mtype: "<class \'tensorflow.python.framework.dtypes.DType\'>"
   }
   member {
-    name: "hash_table"
-    mtype: "<type \'module\'>"
-  }
-  member {
     name: "image"
     mtype: "<type \'module\'>"
   }
@@ -238,6 +234,10 @@ tf_module {
   }
   member {
     name: "linalg"
+    mtype: "<type \'module\'>"
+  }
+  member {
+    name: "lite"
     mtype: "<type \'module\'>"
   }
   member {
@@ -425,24 +425,12 @@ tf_module {
     argspec: "args=[\'x\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "activate_sparse_recorder"
-    argspec: "args=[\'tensor_names\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
     name: "add"
     argspec: "args=[\'x\', \'y\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
     name: "add_n"
     argspec: "args=[\'inputs\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "apply_adagrad_decay"
-    argspec: "args=[\'var\', \'accum\', \'accum_decay_power\', \'lr\', \'accum_decay_step\', \'accum_decay_rate\', \'accum_baseline\', \'global_step\', \'grad\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "apply_adam_async"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'use_locking\', \'use_nesterov\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'False\', \'None\'], "
   }
   member_method {
     name: "argmax"
@@ -505,32 +493,8 @@ tf_module {
     argspec: "args=[\'input\', \'block_shape\', \'crops\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "batched_non_max_suppression"
-    argspec: "args=[\'boxes\', \'scores\', \'box_counts\', \'max_output_size\', \'iou_threshold\', \'score_threshold\', \'pad_to_max_output_size\', \'algorithm\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'-1\', \'None\'], "
-  }
-  member_method {
     name: "bitcast"
     argspec: "args=[\'input\', \'type\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "black_list_hash_table_admit_strategy_op"
-    argspec: "args=[\'shared_name\', \'container\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "bloom_filter_admit_op"
-    argspec: "args=[\'admit_strategy\', \'keys\', \'frequencies\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "bloom_filter_admit_strategy_op"
-    argspec: "args=[\'shared_name\', \'container\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "bloom_filter_initialize_op"
-    argspec: "args=[\'admit_strategy\', \'min_frequency\', \'num_hash_func\', \'dtype\', \'shape\', \'initialized\', \'slice_offset\', \'max_slice_size\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'1\', \'None\'], "
-  }
-  member_method {
-    name: "bloom_filter_is_initialized_op"
-    argspec: "args=[\'resource\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
     name: "boolean_mask"
@@ -569,14 +533,6 @@ tf_module {
     argspec: "args=[\'t\', \'clip_value_min\', \'clip_value_max\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "coalesced_bucketized_embedding_encode"
-    argspec: "args=[\'ids\', \'local_offset\', \'global_offset\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "collect_sparse_indices"
-    argspec: "args=[\'tensor_name\', \'ktype\', \'config\', \'part_idx\', \'part_count\', \'hash_bucket_size\', \'part_mode\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'-1\', \'0\', \'0\', \'\', \'None\'], "
-  }
-  member_method {
     name: "complex"
     argspec: "args=[\'real\', \'imag\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
@@ -601,10 +557,6 @@ tf_module {
     argspec: "args=[\'value\', \'dtype\', \'dtype_hint\', \'name\'], varargs=None, keywords=None, defaults=[\'None\', \'None\', \'None\'], "
   }
   member_method {
-    name: "copy_tensor"
-    argspec: "args=[\'src\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
     name: "cos"
     argspec: "args=[\'x\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
@@ -613,40 +565,12 @@ tf_module {
     argspec: "args=[\'x\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "ctc_loss_v2"
-    argspec: "args=[\'inputs\', \'labels_indices\', \'labels_values\', \'sequence_length\', \'preprocess_collapse_repeated\', \'ctc_merge_repeated\', \'ignore_longer_outputs_than_inputs\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'True\', \'False\', \'None\'], "
-  }
-  member_method {
     name: "cumsum"
     argspec: "args=[\'x\', \'axis\', \'exclusive\', \'reverse\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'False\', \'False\', \'None\'], "
   }
   member_method {
     name: "custom_gradient"
     argspec: "args=[\'f\'], varargs=None, keywords=None, defaults=None"
-  }
-  member_method {
-    name: "decode_dense"
-    argspec: "args=[\'values\', \'dtype\', \'name\'], varargs=None, keywords=None, defaults=[\"<dtype: \'float32\'>\", \'None\'], "
-  }
-  member_method {
-    name: "decode_dense_int32"
-    argspec: "args=[\'values\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "decode_kv2dense"
-    argspec: "args=[\'values\', \'max_col\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "decode_kv2sparse"
-    argspec: "args=[\'values\', \'max_id\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "decode_sparse"
-    argspec: "args=[\'values\', \'max_id\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "destroy_kv_resource_op"
-    argspec: "args=[\'resource\', \'ignore_lookup_error\', \'name\'], varargs=None, keywords=None, defaults=[\'True\', \'None\'], "
   }
   member_method {
     name: "device"
@@ -661,15 +585,7 @@ tf_module {
     argspec: "args=[\'data\', \'partitions\', \'num_partitions\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "dynamic_partition_fuse"
-    argspec: "args=[\'data\', \'num_total_ids\', \'num_partitions\', \'name\'], varargs=None, keywords=None, defaults=[\'1\', \'None\'], "
-  }
-  member_method {
     name: "dynamic_stitch"
-    argspec: "args=[\'indices\', \'data\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "dynamic_stitch_fast"
     argspec: "args=[\'indices\', \'data\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
@@ -733,34 +649,6 @@ tf_module {
     argspec: "args=[\'func\', \'input_signature\', \'autograph\', \'experimental_autograph_options\', \'experimental_relax_shapes\', \'experimental_compile\'], varargs=None, keywords=None, defaults=[\'None\', \'None\', \'True\', \'None\', \'False\', \'None\'], "
   }
   member_method {
-    name: "fused_embedding_local_sparse_look_up"
-    argspec: "args=[\'sp_values\', \'sp_indices\', \'sp_dense_shape\', \'emb_variable\', \'combiner\', \'max_norm\', \'name\'], varargs=None, keywords=None, defaults=[\'-1\', \'None\'], "
-  }
-  member_method {
-    name: "fused_embedding_local_sparse_look_up_grad"
-    argspec: "args=[\'top_grad\', \'emb_variable\', \'sp_values\', \'sp_values_offset\', \'combiner\', \'max_norm\', \'name\'], varargs=None, keywords=None, defaults=[\'-1\', \'None\'], "
-  }
-  member_method {
-    name: "fused_embedding_sparse_post_look_up"
-    argspec: "args=[\'emb_shards\', \'partitioned_indices\', \'sp_dense_shape\', \'row_empty_and_invalid_flags\', \'partitioned_values\', \'combiner\', \'default_id\', \'partition_axis\', \'max_norm\', \'name\'], varargs=None, keywords=None, defaults=[\'-1\', \'0\', \'-1\', \'None\'], "
-  }
-  member_method {
-    name: "fused_embedding_sparse_post_look_up_grad"
-    argspec: "args=[\'top_grad\', \'emb_shards\', \'partitioned_indices\', \'feature_nums\', \'row_empty_and_invalid_flags\', \'combiner\', \'partition_axis\', \'default_id\', \'max_norm\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'-1\', \'-1\', \'None\'], "
-  }
-  member_method {
-    name: "fused_embedding_sparse_pre_look_up"
-    argspec: "args=[\'partition_shapes\', \'sp_values\', \'sp_indices\', \'sp_dense_shape\', \'partition_axis\', \'fill_empty_row\', \'prune_invalid_id\', \'default_id\', \'partition_strategy\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'False\', \'False\', \'-1\', \'div\', \'None\'], "
-  }
-  member_method {
-    name: "fused_safe_embedding_lookup_sparse_local"
-    argspec: "args=[\'weight\', \'id_input\', \'dense_shape\', \'indice\', \'weight_input\', \'combiner\', \'prune\', \'max_norm\', \'default_id\', \'partition_strategy\', \'T\', \'name\'], varargs=None, keywords=None, defaults=[\'mean\', \'True\', \'-1\', \'-1\', \'div\', \"<dtype: \'float32\'>\", \'None\'], "
-  }
-  member_method {
-    name: "fused_safe_embedding_lookup_sparse_local_grad"
-    argspec: "args=[\'gradients\', \'input\', \'indices\', \'dense_shape\', \'combiner\', \'name\'], varargs=None, keywords=None, defaults=[\'mean\', \'None\'], "
-  }
-  member_method {
     name: "gather"
     argspec: "args=[\'params\', \'indices\', \'validate_indices\', \'axis\', \'batch_dims\', \'name\'], varargs=None, keywords=None, defaults=[\'None\', \'None\', \'0\', \'None\'], "
   }
@@ -809,50 +697,6 @@ tf_module {
     argspec: "args=[\'input\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "hash_slice"
-    argspec: "args=[\'slicer\', \'keys\', \'segment_size\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "hash_table_delete_key_op"
-    argspec: "args=[\'hashtable\', \'keys\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "hash_table_direct_restore_op"
-    argspec: "args=[\'keys\', \'ids\', \'exts\', \'hashtable\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "hash_table_filter_op"
-    argspec: "args=[\'hashtable\', \'other_arguments\', \'f\', \'block_size\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "hash_table_initialize_op"
-    argspec: "args=[\'hashtable\', \'initialized\', \'concurrent_read\', \'children\', \'name\'], varargs=None, keywords=None, defaults=[\'True\', \'[]\', \'None\'], "
-  }
-  member_method {
-    name: "hash_table_lookup_op"
-    argspec: "args=[\'hashtable\', \'keys\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "hash_table_lookup_with_admit_op"
-    argspec: "args=[\'hashtable\', \'keys\', \'admit_strategy\', \'freq\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "hash_table_map_op"
-    argspec: "args=[\'hashtable\', \'mapper_other_args\', \'mapper\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "hash_table_op"
-    argspec: "args=[\'shared_name\', \'container\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "hash_table_size_op"
-    argspec: "args=[\'hashtable\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "hash_table_snapshot_op"
-    argspec: "args=[\'hashtable\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
     name: "hessians"
     argspec: "args=[\'ys\', \'xs\', \'gate_gradients\', \'aggregation_method\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\', \'hessians\'], "
   }
@@ -877,144 +721,12 @@ tf_module {
     argspec: "args=[\'graph_def\', \'input_map\', \'return_elements\', \'name\', \'op_dict\', \'producer_op_list\'], varargs=None, keywords=None, defaults=[\'None\', \'None\', \'None\', \'None\', \'None\'], "
   }
   member_method {
-    name: "incr_restore"
-    argspec: "args=[\'prefix\', \'tensor_names\', \'shape_and_slices\', \'is_sparse\', \'in_tensors\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "incr_save"
-    argspec: "args=[\'prefix\', \'tensor_names\', \'shape_and_slices\', \'is_sparse\', \'tensors\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "init_black_list"
-    argspec: "args=[\'strategies\', \'fea_names\', \'slices\', \'thresholds\', \'file_names\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
     name: "init_scope"
     argspec: "args=[], varargs=None, keywords=None, defaults=None"
   }
   member_method {
-    name: "initialize_kv_variable_op"
-    argspec: "args=[\'resource_self\', \'resource_primary\', \'value\', \'empty_key\', \'shape\', \'counter_type\', \'slot_num\', \'initial_num_buckets\', \'max_load_factor\', \'steps_to_live\', \'ht_type\', \'emb_index\', \'block_num\', \'slot_index\', \'ht_partition_num\', \'filter_freq\', \'max_freq\', \'max_element_size\', \'false_positive_probability\', \'l2_weight_threshold\', \'layout\', \'storage_type\', \'storage_path\', \'storage_size\', \'default_value_dim\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'131072\', \'0.8\', \'0\', \'\', \'0\', \'1\', \'0\', \'1000\', \'0\', \'999999\', \'0\', \'-1\', \'-1\', \'normal\', \'1\', \'.\', \'[]\', \'4096\', \'None\'], "
-  }
-  member_method {
-    name: "io_kafka_dataset"
-    argspec: "args=[\'topics\', \'servers\', \'group\', \'eof\', \'timeout\', \'config_global\', \'config_topic\', \'message_key\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "io_kafka_group_readable_init"
-    argspec: "args=[\'topics\', \'metadata\', \'container\', \'shared_name\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "io_kafka_group_readable_next"
-    argspec: "args=[\'input\', \'index\', \'message_poll_timeout\', \'stream_timeout\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "io_kafka_iterable_init"
-    argspec: "args=[\'topic\', \'partition\', \'offset\', \'metadata\', \'container\', \'shared_name\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "io_kafka_readable_init"
-    argspec: "args=[\'topic\', \'partition\', \'offset\', \'metadata\', \'container\', \'shared_name\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "io_kafka_readable_next"
-    argspec: "args=[\'input\', \'index\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "io_kafka_readable_read"
-    argspec: "args=[\'input\', \'start\', \'stop\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "io_kafka_readable_spec"
-    argspec: "args=[\'input\', \'start\', \'stop\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "io_layer_kafka_call"
-    argspec: "args=[\'input\', \'content\', \'resource\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "io_layer_kafka_init"
-    argspec: "args=[\'topic\', \'partition\', \'metadata\', \'container\', \'shared_name\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "io_layer_kafka_sync"
-    argspec: "args=[\'resource\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "io_write_kafka"
-    argspec: "args=[\'message\', \'topic\', \'servers\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
     name: "is_tensor"
     argspec: "args=[\'x\'], varargs=None, keywords=None, defaults=None"
-  }
-  member_method {
-    name: "kv_resource_export"
-    argspec: "args=[\'resource_handle\', \'Tkeys\', \'Tvalues\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "kv_resource_gather"
-    argspec: "args=[\'resource\', \'indices\', \'default_value\', \'is_use_default_value_tensor\', \'validate_indices\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'True\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_gather_v1"
-    argspec: "args=[\'resource\', \'indices\', \'default_value\', \'counts\', \'validate_indices\', \'is_use_default_value_tensor\', \'name\'], varargs=None, keywords=None, defaults=[\'True\', \'False\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_import"
-    argspec: "args=[\'resource_handle\', \'value\', \'empty_key\', \'keys\', \'values\', \'versions\', \'shape\', \'steps_to_live\', \'ht_type\', \'ht_partition_num\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'\', \'1000\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_import_v2"
-    argspec: "args=[\'prefix\', \'resource_self\', \'resource_primary\', \'value\', \'tensor_names\', \'empty_key\', \'shape\', \'counter_type\', \'slot_num\', \'emb_index\', \'slot_index\', \'block_num\', \'steps_to_live\', \'partition_id\', \'partition_num\', \'ht_type\', \'filter_freq\', \'ht_partition_num\', \'max_element_size\', \'false_positive_probability\', \'l2_weight_threshold\', \'layout\', \'max_freq\', \'storage_type\', \'storage_path\', \'storage_size\', \'default_value_dim\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'0\', \'0\', \'1\', \'0\', \'0\', \'1\', \'\', \'0\', \'1000\', \'0\', \'-1\', \'-1\', \'normal\', \'999999\', \'1\', \'.\', \'[]\', \'4096\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_incr_import"
-    argspec: "args=[\'prefix\', \'resource_handle\', \'tensor_names\', \'empty_key\', \'value\', \'partition_id\', \'partition_num\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'1\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_scatter_add"
-    argspec: "args=[\'resource\', \'indices\', \'updates\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "kv_resource_sparse_apply_adagrad"
-    argspec: "args=[\'var\', \'accum\', \'lr\', \'grad\', \'indices\', \'global_step\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_sparse_apply_adagrad_decay"
-    argspec: "args=[\'var\', \'accum\', \'accum_decay_power\', \'lr\', \'accum_decay_step\', \'accum_decay_rate\', \'accum_baseline\', \'global_step\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_sparse_apply_adam"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'indices\', \'global_step\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_sparse_apply_adam_async"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'indices\', \'global_step\', \'use_locking\', \'apply_sparse_rmsprop\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'False\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_sparse_apply_ftrl"
-    argspec: "args=[\'var\', \'accum\', \'linear\', \'grad\', \'indices\', \'lr\', \'l1\', \'l2\', \'lr_power\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_sparse_apply_ftrl_v2"
-    argspec: "args=[\'var\', \'accum\', \'linear\', \'grad\', \'indices\', \'lr\', \'l1\', \'l2\', \'l2_shrinkage\', \'lr_power\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "kv_resource_sparse_apply_gradient_descent"
-    argspec: "args=[\'var\', \'alpha\', \'grad\', \'indices\', \'global_step\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "kv_var_handle_op"
-    argspec: "args=[\'dtype\', \'shape\', \'Tkeys\', \'container\', \'shared_name\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "kv_var_is_initialized_op"
-    argspec: "args=[\'resource\', \'Tkeys\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "kv_variable_shape"
-    argspec: "args=[\'input\', \'Tkeys\', \'out_type\', \'name\'], varargs=None, keywords=None, defaults=[\"<dtype: \'int32\'>\", \'None\'], "
   }
   member_method {
     name: "less"
@@ -1047,10 +759,6 @@ tf_module {
   member_method {
     name: "logical_or"
     argspec: "args=[\'x\', \'y\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "logical_sum"
-    argspec: "args=[\'q_input\', \'k_input\', \'T\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
     name: "make_ndarray"
@@ -1137,10 +845,6 @@ tf_module {
     argspec: "args=[\'values\', \'name\'], varargs=None, keywords=None, defaults=[\'parallel_stack\'], "
   }
   member_method {
-    name: "parquet_tabular_dataset_v1"
-    argspec: "args=[\'filename\', \'batch_size\', \'field_names\', \'field_dtypes\', \'field_ragged_ranks\', \'partition_count\', \'partition_index\', \'drop_remainder\', \'name\'], varargs=None, keywords=None, defaults=[\'1\', \'0\', \'False\', \'None\'], "
-  }
-  member_method {
     name: "pow"
     argspec: "args=[\'x\', \'y\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
@@ -1161,24 +865,12 @@ tf_module {
     argspec: "args=[\'input\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "read_kv_variable_op"
-    argspec: "args=[\'resource\', \'dtype\', \'Tkeys\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "read_only_hash_table_admit_strategy_op"
-    argspec: "args=[\'shared_name\', \'container\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
     name: "realdiv"
     argspec: "args=[\'x\', \'y\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
     name: "recompute_grad"
     argspec: "args=[\'f\'], varargs=None, keywords=None, defaults=None"
-  }
-  member_method {
-    name: "record_sparse_indices"
-    argspec: "args=[\'keys\', \'var_name\', \'auto_record\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'False\', \'None\'], "
   }
   member_method {
     name: "reduce_all"
@@ -1227,34 +919,6 @@ tf_module {
   member_method {
     name: "reshape"
     argspec: "args=[\'tensor\', \'shape\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "resource_apply_adagrad_decay"
-    argspec: "args=[\'var\', \'accum\', \'accum_decay_power\', \'lr\', \'accum_decay_step\', \'accum_decay_rate\', \'accum_baseline\', \'global_step\', \'grad\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "resource_apply_adam_async"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'use_locking\', \'use_nesterov\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'False\', \'None\'], "
-  }
-  member_method {
-    name: "resource_sparse_apply_adagrad_decay"
-    argspec: "args=[\'var\', \'accum\', \'accum_decay_power\', \'lr\', \'accum_decay_step\', \'accum_decay_rate\', \'accum_baseline\', \'global_step\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "resource_sparse_apply_adam"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "resource_sparse_apply_adam_async"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'indices\', \'use_locking\', \'apply_sparse_rmsprop\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'False\', \'None\'], "
-  }
-  member_method {
-    name: "restore_bloom_filter"
-    argspec: "args=[\'file_pattern\', \'tensor_name\', \'shape_and_slice\', \'handle\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "restore_hash_table"
-    argspec: "args=[\'file_pattern\', \'tensor_name\', \'shape_and_slices\', \'handles\', \'clear\', \'name\'], varargs=None, keywords=None, defaults=[\'True\', \'None\'], "
   }
   member_method {
     name: "reverse"
@@ -1341,34 +1005,6 @@ tf_module {
     argspec: "args=[\'input\', \'block_shape\', \'paddings\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
   member_method {
-    name: "sparse_apply_adagrad_decay"
-    argspec: "args=[\'var\', \'accum\', \'accum_decay_power\', \'lr\', \'accum_decay_step\', \'accum_decay_rate\', \'accum_baseline\', \'global_step\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "sparse_apply_adam"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "sparse_apply_adam_async"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'indices\', \'use_locking\', \'apply_sparse_rmsprop\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'False\', \'None\'], "
-  }
-  member_method {
-    name: "sparse_conditional_accumulator_multi_map"
-    argspec: "args=[\'dtype\', \'shape\', \'container\', \'shared_name\', \'reduction_type\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'MEAN\', \'None\'], "
-  }
-  member_method {
-    name: "sparse_inner_flatten"
-    argspec: "args=[\'indices\', \'dense_shape\', \'new_rank\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "sparse_reverse"
-    argspec: "args=[\'indices\', \'values\', \'dense_shape\', \'axis\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "sparse_valid_cutoff"
-    argspec: "args=[\'indices\', \'values\', \'dense_shape\', \'axis\', \'length\', \'side\', \'name\'], varargs=None, keywords=None, defaults=[\'right\', \'None\'], "
-  }
-  member_method {
     name: "split"
     argspec: "args=[\'value\', \'num_or_size_splits\', \'axis\', \'num\', \'name\'], varargs=None, keywords=None, defaults=[\'0\', \'None\', \'split\'], "
   }
@@ -1397,18 +1033,6 @@ tf_module {
     argspec: "args=[\'input_\', \'begin\', \'end\', \'strides\', \'begin_mask\', \'end_mask\', \'ellipsis_mask\', \'new_axis_mask\', \'shrink_axis_mask\', \'var\', \'name\'], varargs=None, keywords=None, defaults=[\'None\', \'0\', \'0\', \'0\', \'0\', \'0\', \'None\', \'None\'], "
   }
   member_method {
-    name: "string_split_and_pad"
-    argspec: "args=[\'source\', \'max_length\', \'delimiter\', \'default_value\'], varargs=None, keywords=None, defaults=[\' \', \'</s>\'], "
-  }
-  member_method {
-    name: "string_to_hash"
-    argspec: "args=[\'input\', \'hash_type\', \'allow_neg\', \'num_buckets\', \'name\'], varargs=None, keywords=None, defaults=[\'farm\', \'True\', \'0\', \'None\'], "
-  }
-  member_method {
-    name: "string_to_hash64"
-    argspec: "args=[\'input\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
     name: "subtract"
     argspec: "args=[\'x\', \'y\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
   }
@@ -1423,114 +1047,6 @@ tf_module {
   member_method {
     name: "tanh"
     argspec: "args=[\'x\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_adadelta"
-    argspec: "args=[\'var\', \'accum\', \'accum_update\', \'lr\', \'rho\', \'epsilon\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_adagrad"
-    argspec: "args=[\'var\', \'accum\', \'lr\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_adagrad_da"
-    argspec: "args=[\'var\', \'gradient_accumulator\', \'gradient_squared_accumulator\', \'grad\', \'indices\', \'lr\', \'l1\', \'l2\', \'global_step\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_adam"
-    argspec: "args=[\'var\', \'m\', \'v\', \'beta1_power\', \'beta2_power\', \'lr\', \'beta1\', \'beta2\', \'epsilon\', \'grad\', \'indices\', \'use_locking\', \'use_nesterov\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_centered_rms_prop"
-    argspec: "args=[\'var\', \'mg\', \'ms\', \'mom\', \'lr\', \'rho\', \'momentum\', \'epsilon\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_ftrl"
-    argspec: "args=[\'var\', \'accum\', \'linear\', \'grad\', \'indices\', \'lr\', \'l1\', \'l2\', \'lr_power\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_ftrl_v2"
-    argspec: "args=[\'var\', \'accum\', \'linear\', \'grad\', \'indices\', \'lr\', \'l1\', \'l2\', \'l2_shrinkage\', \'lr_power\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_gradient_descent"
-    argspec: "args=[\'var\', \'alpha\', \'delta\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_momentum"
-    argspec: "args=[\'var\', \'accum\', \'lr\', \'grad\', \'indices\', \'momentum\', \'use_locking\', \'use_nesterov\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_proximal_adagrad"
-    argspec: "args=[\'var\', \'accum\', \'lr\', \'l1\', \'l2\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_proximal_gradient_descent"
-    argspec: "args=[\'var\', \'alpha\', \'l1\', \'l2\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_apply_rms_prop"
-    argspec: "args=[\'var\', \'ms\', \'mom\', \'lr\', \'rho\', \'momentum\', \'epsilon\', \'grad\', \'indices\', \'use_locking\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_direct_restore_op"
-    argspec: "args=[\'value\', \'resource\', \'hashtable\', \'dtype\', \'shape\', \'factory\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_gather"
-    argspec: "args=[\'resource\', \'indices\', \'default_value\', \'validate_indices\', \'name\'], varargs=None, keywords=None, defaults=[\'True\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_initialize_op"
-    argspec: "args=[\'resource\', \'hashtable\', \'dtype\', \'shape\', \'factory\', \'initialized\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_is_initialized_op"
-    argspec: "args=[\'resource\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_op"
-    argspec: "args=[\'dtype\', \'shape\', \'shared_name\', \'container\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_scatter_add"
-    argspec: "args=[\'resource\', \'indices\', \'updates\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_scatter_div"
-    argspec: "args=[\'resource\', \'indices\', \'updates\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_scatter_mul"
-    argspec: "args=[\'resource\', \'indices\', \'updates\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_scatter_sub"
-    argspec: "args=[\'resource\', \'indices\', \'updates\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensible_variable_scatter_update"
-    argspec: "args=[\'resource\', \'indices\', \'updates\', \'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "tensor_buffer_cancel"
-    argspec: "args=[\'container\', \'is_cancelled\', \'shared_name\', \'shared_capacity\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'True\', \'\', \'1\', \'None\'], "
-  }
-  member_method {
-    name: "tensor_buffer_close"
-    argspec: "args=[\'container\', \'shared_name\', \'shared_capacity\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'1\', \'None\'], "
-  }
-  member_method {
-    name: "tensor_buffer_put"
-    argspec: "args=[\'record\', \'container\', \'shared_name\', \'shared_capacity\', \'timeout_millis\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'1\', \'1000\', \'None\'], "
-  }
-  member_method {
-    name: "tensor_buffer_size"
-    argspec: "args=[\'container\', \'shared_name\', \'shared_capacity\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'1\', \'None\'], "
-  }
-  member_method {
-    name: "tensor_buffer_take"
-    argspec: "args=[\'dtypes\', \'container\', \'shared_name\', \'shared_capacity\', \'shared_threads\', \'name\'], varargs=None, keywords=None, defaults=[\'\', \'\', \'1\', \'1\', \'None\'], "
   }
   member_method {
     name: "tensor_scatter_nd_add"
@@ -1555,26 +1071,6 @@ tf_module {
   member_method {
     name: "timestamp"
     argspec: "args=[\'name\'], varargs=None, keywords=None, defaults=[\'None\'], "
-  }
-  member_method {
-    name: "trans_csv_id2dense"
-    argspec: "args=[\'records\', \'max_id\', \'id_as_value\', \'field_delim\', \'default_value\', \'name\'], varargs=None, keywords=None, defaults=[\'False\', \',\', \'1\', \'None\'], "
-  }
-  member_method {
-    name: "trans_csv_id2sparse"
-    argspec: "args=[\'records\', \'max_id\', \'id_as_value\', \'field_delim\', \'default_value\', \'name\'], varargs=None, keywords=None, defaults=[\'True\', \',\', \'1\', \'None\'], "
-  }
-  member_method {
-    name: "trans_csv_kv2dense"
-    argspec: "args=[\'records\', \'max_id\', \'field_delim\', \'outtype\', \'name\'], varargs=None, keywords=None, defaults=[\',\', \"<dtype: \'float32\'>\", \'None\'], "
-  }
-  member_method {
-    name: "trans_csv_kv2sparse"
-    argspec: "args=[\'records\', \'max_id\', \'field_delim\', \'outtype\', \'name\'], varargs=None, keywords=None, defaults=[\',\', \"<dtype: \'float32\'>\", \'None\'], "
-  }
-  member_method {
-    name: "trans_csv_to_dense"
-    argspec: "args=[\'records\', \'max_id\', \'field_delim\', \'outtype\', \'name\'], varargs=None, keywords=None, defaults=[\',\', \"<dtype: \'float32\'>\", \'None\'], "
   }
   member_method {
     name: "transpose"

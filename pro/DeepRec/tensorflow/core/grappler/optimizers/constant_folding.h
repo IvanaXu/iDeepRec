@@ -145,8 +145,7 @@ class ConstantFolding : public GraphOptimizer {
 
   // Pushes down constants on '+' and '*' operators if applicable. Returns true
   // the transformation applied successfully.
-  bool ConstantPushDown(const GraphProperties& properties,
-                        GraphDef* optimized_graph, NodeDef* node);
+  bool ConstantPushDown(GraphDef* optimized_graph, NodeDef* node);
 
   // Aggregate constants present around a conv operator. Returns true if the
   // transformation was applied successfully.

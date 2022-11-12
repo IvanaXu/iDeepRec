@@ -84,7 +84,7 @@ rm -rf "${BUILD_DIR}"
 
 # Run the docker image with the GCS key file mapped and the gcloud-required
 # environment variables set.
-docker run --init --rm \
+docker run --rm \
     -v ${GCLOUD_JSON_KEY_PATH}:/gcloud-key.json \
     -e "GOOGLE_APPLICATION_CREDENTIALS=/gcloud-key.json" \
     "${DOCKER_IMG}" \

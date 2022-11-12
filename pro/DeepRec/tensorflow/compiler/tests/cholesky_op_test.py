@@ -24,7 +24,6 @@ from six.moves import xrange  # pylint: disable=redefined-builtin
 from tensorflow.compiler.tests import xla_test
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
-from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import linalg_ops
 from tensorflow.python.ops import math_ops
@@ -60,8 +59,7 @@ class CholeskyOpTest(xla_test.XLATestCase):
           dtypes.as_dtype(x.dtype), shape=x.shape)
       with self.test_scope():
         chol = linalg_ops.cholesky(placeholder)
-      with ops.device('/cpu:0'):
-        verification = math_ops.matmul(chol, chol, adjoint_b=True)
+      verification = math_ops.matmul(chol, chol, adjoint_b=True)
       self._verifyCholeskyBase(sess, placeholder, x, chol, verification, atol)
 
   def testBasic(self):

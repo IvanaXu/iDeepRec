@@ -549,10 +549,9 @@ class MapAndBatchDatasetOp : public UnaryDatasetOpKernel {
         auto busy = [this]() EXCLUSIVE_LOCKS_REQUIRED(*mu_) -> bool {
           int64 num_parallel_calls = num_parallel_calls_->value;
           return num_calls_ >= num_parallel_calls ||
-              (static_cast<int64>(batch_results_.size()) > max_batch_results_ ||
-              (static_cast<int64>(batch_results_.size()) ==
-	      max_batch_results_ &&
-              call_counter_ % dataset()->batch_size_ == 0));
+                 (batch_results_.size() > max_batch_results_ ||
+                  (batch_results_.size() == max_batch_results_ &&
+                   call_counter_ % dataset()->batch_size_ == 0));
         };
         while (true) {
           {
