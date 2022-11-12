@@ -2,41 +2,44 @@
 > Run
 
 >> STEP@1
-total 228
--rw-rw-rw-   1 1000 1000  2219 Nov 12 09:06 ACKNOWLEDGMENTS
--rw-rw-rw-   1 1000 1000   542 Nov 12 09:06 ADOPTERS.md
--rw-rw-rw-   1 1000 1000   349 Nov 12 09:06 AUTHORS
--rw-rw-rw-   1 1000 1000   122 Nov 12 09:06 BUILD
--rw-rw-rw-   1 1000 1000  5293 Nov 12 09:06 CODE_OF_CONDUCT.md
--rw-rw-rw-   1 1000 1000  9339 Nov 12 09:06 CONTRIBUTING.md
--rw-rw-rw-   1 1000 1000   598 Nov 12 09:06 ISSUES.md
--rw-rw-rw-   1 1000 1000  2088 Nov 12 09:06 ISSUE_TEMPLATE.md
--rw-rw-rw-   1 1000 1000 11419 Nov 12 09:06 LICENSE
--rw-rw-rw-   1 1000 1000  9093 Nov 12 09:06 README.md
--rw-rw-rw-   1 1000 1000  1666 Nov 12 09:06 RELEASE.md
--rw-rw-rw-   1 1000 1000 11443 Nov 12 09:06 WORKSPACE
--rw-rw-rw-   1 1000 1000  1218 Nov 12 09:06 arm_compiler.BUILD
-lrwxrwxrwx   1 root root    87 Nov 12 09:21 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
-lrwxrwxrwx   1 root root   108 Nov 12 09:21 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
-lrwxrwxrwx   1 root root   108 Nov 12 09:21 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
-lrwxrwxrwx   1 root root    97 Nov 12 09:21 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
-lrwxrwxrwx   1 root root   113 Nov 12 09:21 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
-drwxrwxrwx+  6 1000 root  4096 Nov 12 09:06 cibuild
--rwxrwxrwx   1 1000 1000   380 Nov 12 09:06 configure
--rw-rw-rw-   1 1000 1000   780 Nov 12 09:06 configure.cmd
--rw-rw-rw-   1 1000 1000 58216 Nov 12 09:06 configure.py
-drwxrwxrwx+ 16 1000 root  4096 Nov 12 09:06 docs
--rw-rw-rw-   1 1000 1000   328 Nov 12 09:06 models.BUILD
-drwxrwxrwx+ 15 1000 root  4096 Nov 12 09:06 modelzoo
-drwxrwxrwx+  2 1000 root  4096 Nov 12 09:06 scripts
-drwxrwxrwx+  5 1000 root  4096 Nov 12 09:06 serving
-drwxrwxrwx+  9 1000 root  4096 Nov 12 09:06 sparse_operation_kit
-drwxrwxrwx+ 18 1000 root  4096 Nov 12 09:06 tensorflow
-drwxrwxrwx+  3 1000 root  4096 Nov 12 08:42 tests
-drwxrwxrwx+ 43 1000 root  4096 Nov 12 09:06 third_party
-drwxrwxrwx+  8 1000 root  4096 Nov 12 09:06 tianchi
-drwxrwxrwx+  2 1000 root  4096 Nov 12 09:20 tools
-drwxrwxrwx+  2 1000 root  4096 Nov 12 09:06 triton
+total 252
+-rw-r--r--   1 1000 1000  2219 Nov 12 11:50 ACKNOWLEDGMENTS
+-rw-r--r--   1 1000 1000   542 Nov 12 11:50 ADOPTERS.md
+-rw-r--r--   1 1000 1000   349 Nov 12 11:50 AUTHORS
+-rw-r--r--   1 1000 1000   122 Nov 12 11:50 BUILD
+-rw-r--r--   1 1000 1000  3058 Jul  2  2021 CODEOWNERS
+-rw-r--r--   1 1000 1000  5293 Nov 12 11:50 CODE_OF_CONDUCT.md
+-rw-r--r--   1 1000 1000  9339 Nov 12 11:50 CONTRIBUTING.md
+-rw-r--r--   1 1000 1000   598 Nov 12 11:50 ISSUES.md
+-rw-r--r--   1 1000 1000  2088 Nov 12 11:50 ISSUE_TEMPLATE.md
+-rw-r--r--   1 1000 1000 11419 Nov 12 11:50 LICENSE
+-rw-r--r--   1 1000 1000  9093 Nov 12 11:50 README.md
+-rw-r--r--   1 1000 1000  3245 Jul  2  2021 README_ONEDNN.md
+-rw-r--r--   1 1000 1000  1666 Nov 12 11:50 RELEASE.md
+-rw-r--r--   1 1000 1000 13161 Jul  2  2021 SECURITY.md
+-rw-r--r--   1 1000 1000 11443 Nov 12 11:50 WORKSPACE
+-rw-r--r--   1 1000 1000  1218 Nov 12 11:50 arm_compiler.BUILD
+lrwxrwxrwx   1 root root    87 Nov 12 11:59 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
+lrwxrwxrwx   1 root root   108 Nov 12 11:59 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx   1 root root   108 Nov 12 11:59 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx   1 root root    97 Nov 12 11:59 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
+lrwxrwxrwx   1 root root   113 Nov 12 11:59 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
+drwxr-xr-x+  6 1000 1000  4096 Nov 12 11:50 cibuild
+-rwxr-xr-x   1 1000 1000   380 Nov 12 11:50 configure
+-rw-r--r--   1 1000 1000   780 Nov 12 11:50 configure.cmd
+-rw-r--r--   1 1000 1000 58216 Nov 12 11:50 configure.py
+drwxr-xr-x+ 16 1000 1000  4096 Nov 12 11:50 docs
+-rw-r--r--   1 1000 1000   328 Nov 12 11:50 models.BUILD
+drwxr-xr-x+ 15 1000 1000  4096 Nov 12 11:50 modelzoo
+drwxr-xr-x+  2 1000 1000  4096 Nov 12 11:50 scripts
+drwxr-xr-x+  5 1000 1000  4096 Nov 12 11:50 serving
+drwxr-xr-x+  9 1000 1000  4096 Nov 12 11:50 sparse_operation_kit
+drwxr-xr-x+ 18 1000 1000  4096 Jul  2  2021 tensorflow
+drwxr-xr-x+  3 1000 1000  4096 Nov 12 11:50 tests
+drwxr-xr-x+ 43 1000 1000  4096 Nov 12 11:50 third_party
+drwxr-xr-x+  8 1000 1000  4096 Nov 12 11:50 tianchi
+drwxr-xr-x+  2 1000 1000  4096 Nov 12 11:58 tools
+drwxr-xr-x+  2 1000 1000  4096 Nov 12 11:50 triton
 
 >> STEP@5
 Found existing installation: tensorflow 1.15.5+deeprec2206
@@ -44,33 +47,6 @@ Uninstalling tensorflow-1.15.5+deeprec2206:
   Successfully uninstalled tensorflow-1.15.5+deeprec2206
 Looking in indexes: http://mirrors.aliyun.com/pypi/simple/
 Processing /pkg/tensorflow_pkg/tensorflow-1.15.5+deeprec2206-cp36-cp36m-linux_x86_64.whl
-Requirement already satisfied: opt-einsum>=2.3.2 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (3.3.0)
-Requirement already satisfied: tensorboard<1.16.0,>=1.15.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.0)
-Requirement already satisfied: h5py<=2.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (2.10.0)
-Requirement already satisfied: google-pasta>=0.1.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.2.0)
-Requirement already satisfied: protobuf>=3.6.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (4.21.0)
-Requirement already satisfied: keras-applications>=1.0.8 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.0.8)
-Requirement already satisfied: absl-py>=0.9.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
-Requirement already satisfied: astor==0.8.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.8.1)
-Requirement already satisfied: keras-preprocessing>=1.0.5 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.2)
-Requirement already satisfied: six>=1.10.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.16.0)
-Requirement already satisfied: numpy<1.19.0,>=1.16.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.18.5)
-Requirement already satisfied: grpcio>=1.8.6 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.47.0)
-Requirement already satisfied: termcolor>=1.1.0 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.1.0)
-Requirement already satisfied: gast==0.3.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.3.3)
-Requirement already satisfied: astunparse==1.6.3 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.6.3)
-Requirement already satisfied: tensorflow-estimator<1.15.5,>=1.15.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.15.2)
-Requirement already satisfied: wrapt>=1.11.1 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (1.14.1)
-Requirement already satisfied: wheel>=0.26 in /home/pai/lib/python3.6/site-packages (from tensorflow==1.15.5+deeprec2206) (0.37.1)
-Requirement already satisfied: setuptools>=41.0.0 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (59.6.0)
-Requirement already satisfied: werkzeug>=0.11.15 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (2.0.3)
-Requirement already satisfied: markdown>=2.6.8 in /home/pai/lib/python3.6/site-packages (from tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.3.7)
-Requirement already satisfied: importlib-metadata>=4.4 in /home/pai/lib/python3.6/site-packages (from markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (4.8.3)
-Requirement already satisfied: zipp>=0.5 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (3.6.0)
-Requirement already satisfied: typing-extensions>=3.6.4 in /home/pai/lib/python3.6/site-packages (from importlib-metadata>=4.4->markdown>=2.6.8->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (4.1.1)
-Requirement already satisfied: dataclasses in /home/pai/lib/python3.6/site-packages (from werkzeug>=0.11.15->tensorboard<1.16.0,>=1.15.0->tensorflow==1.15.5+deeprec2206) (0.8)
-Installing collected packages: tensorflow
-Successfully installed tensorflow-1.15.5+deeprec2206
 
 >> STEP@6
 > Run
