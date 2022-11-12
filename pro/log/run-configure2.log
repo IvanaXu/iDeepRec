@@ -78,3 +78,6 @@ Preconfigured Bazel build configs to DISABLE default on features:
 Configuration finished
 
 >> STEP@3
+
+>> STEP@4
+> Run
