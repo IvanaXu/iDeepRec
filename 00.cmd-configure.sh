@@ -3,7 +3,7 @@
 clear
 
 # devp=/root/data/code/iDeepRec
-mainp=/root/data/code/iDeepRec
+mainp=/workspaces/iDeepRec
 
 # 
 echo "> Git"
