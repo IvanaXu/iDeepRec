@@ -18,7 +18,7 @@ echo ">> STEP@2"
 # 
 echo
 echo ">> STEP@3"
-bazel build  -c opt --config=opt  --config=mkl_threadpool --define build_with_mkl_dnn_v1_only=true //tensorflow/tools/pip_package:build_pip_package
+bazel build --cxxopt=-D_GLIBCXX_USE_CXX11_ABI=0 --config=opt --copt=-O3 --copt=-Wformat --copt=-Wformat-security --copt=-fstack-protector --copt=-fPIC --copt=-fpic --linkopt=-znoexecstack --linkopt=-zrelro --linkopt=-znow --linkopt=-fstack-protector --config=mkl --copt=-march=native --define=tensorflow_mkldnn_contraction_kernel=1 //tensorflow/tools/pip_package:build_pip_package
 
 echo
 echo ">> STEP@4"

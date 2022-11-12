@@ -2,7 +2,7 @@
 > Run
 
 >> STEP@1
-total 232
+total 252
 -rw-r--r--   1 1000 1000  2219 Nov 12 11:50 ACKNOWLEDGMENTS
 -rw-r--r--   1 1000 1000   542 Nov 12 11:50 ADOPTERS.md
 -rw-r--r--   1 1000 1000   349 Nov 12 11:50 AUTHORS
@@ -19,6 +19,11 @@ total 232
 -rw-r--r--   1 1000 1000 13161 Jul  2  2021 SECURITY.md
 -rw-r--r--   1 1000 1000 11443 Nov 12 11:50 WORKSPACE
 -rw-r--r--   1 1000 1000  1218 Nov 12 11:50 arm_compiler.BUILD
+lrwxrwxrwx   1 root root    87 Nov 12 11:59 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
+lrwxrwxrwx   1 root root   108 Nov 12 11:59 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx   1 root root   108 Nov 12 11:59 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx   1 root root    97 Nov 12 11:59 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
+lrwxrwxrwx   1 root root   113 Nov 12 11:59 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
 drwxr-xr-x+  6 1000 1000  4096 Nov 12 11:50 cibuild
 -rwxr-xr-x   1 1000 1000   380 Nov 12 11:50 configure
 -rw-r--r--   1 1000 1000   780 Nov 12 11:50 configure.cmd
@@ -33,7 +38,7 @@ drwxr-xr-x+ 18 1000 1000  4096 Jul  2  2021 tensorflow
 drwxr-xr-x+  3 1000 1000  4096 Nov 12 11:50 tests
 drwxr-xr-x+ 43 1000 1000  4096 Nov 12 11:50 third_party
 drwxr-xr-x+  8 1000 1000  4096 Nov 12 11:50 tianchi
-drwxr-xr-x+  2 1000 1000  4096 Jul  2  2021 tools
+drwxr-xr-x+  2 1000 1000  4096 Nov 12 11:58 tools
 drwxr-xr-x+  2 1000 1000  4096 Nov 12 11:50 triton
 
 >> STEP@2
@@ -75,6 +80,5 @@ Configuration finished
 >> STEP@3
 
 >> STEP@4
-Sat Nov 12 12:06:04 UTC 2022 : === Preparing sources in dir: /tmp/tmp.Yg0yJYywTP
-/pro/DeepRec /pro/DeepRec
+Sat Nov 12 12:14:19 UTC 2022 : === Preparing sources in dir: /tmp/tmp.jhSzSJ3S0N
 > Run
