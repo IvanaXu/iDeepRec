@@ -80,7 +80,7 @@ struct PartitionOptions {
   std::vector<Microseconds> start_times;
 
   // Fuse recv ops or not
-  bool tensor_fuse = false;
+  bool tensor_fuse = true;
 };
 
 namespace {
