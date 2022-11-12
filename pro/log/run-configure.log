@@ -2,7 +2,7 @@
 > Run
 
 >> STEP@1
-total 208
+total 228
 -rw-rw-rw-   1 1000 1000  2219 Nov 12 09:06 ACKNOWLEDGMENTS
 -rw-rw-rw-   1 1000 1000   542 Nov 12 09:06 ADOPTERS.md
 -rw-rw-rw-   1 1000 1000   349 Nov 12 09:06 AUTHORS
@@ -16,6 +16,11 @@ total 208
 -rw-rw-rw-   1 1000 1000  1666 Nov 12 09:06 RELEASE.md
 -rw-rw-rw-   1 1000 1000 11443 Nov 12 09:06 WORKSPACE
 -rw-rw-rw-   1 1000 1000  1218 Nov 12 09:06 arm_compiler.BUILD
+lrwxrwxrwx   1 root root    87 Nov 12 09:21 bazel-DeepRec -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow
+lrwxrwxrwx   1 root root   108 Nov 12 09:21 bazel-bin -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx   1 root root   108 Nov 12 09:21 bazel-genfiles -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/bin
+lrwxrwxrwx   1 root root    97 Nov 12 09:21 bazel-out -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out
+lrwxrwxrwx   1 root root   113 Nov 12 09:21 bazel-testlogs -> /root/.cache/bazel/_bazel_root/6765af20e976177b6e84412db20e0c14/execroot/org_tensorflow/bazel-out/k8-opt/testlogs
 drwxrwxrwx+  6 1000 root  4096 Nov 12 09:06 cibuild
 -rwxrwxrwx   1 1000 1000   380 Nov 12 09:06 configure
 -rw-rw-rw-   1 1000 1000   780 Nov 12 09:06 configure.cmd
@@ -30,7 +35,7 @@ drwxrwxrwx+ 18 1000 root  4096 Nov 12 09:06 tensorflow
 drwxrwxrwx+  3 1000 root  4096 Nov 12 08:42 tests
 drwxrwxrwx+ 43 1000 root  4096 Nov 12 09:06 third_party
 drwxrwxrwx+  8 1000 root  4096 Nov 12 09:06 tianchi
-drwxrwxrwx+  2 1000 root  4096 Nov 12 09:06 tools
+drwxrwxrwx+  2 1000 root  4096 Nov 12 09:20 tools
 drwxrwxrwx+  2 1000 root  4096 Nov 12 09:06 triton
 
 >> STEP@2
@@ -70,3 +75,13 @@ Preconfigured Bazel build configs to DISABLE default on features:
 Configuration finished
 
 >> STEP@3
+
+>> STEP@4
+Sat Nov 12 11:13:33 UTC 2022 : === Preparing sources in dir: /tmp/tmp.qQE9oiFJNE
+/pro/DeepRec /pro/DeepRec
+/pro/DeepRec
+/tmp/tmp.qQE9oiFJNE/tensorflow/include /pro/DeepRec
+/pro/DeepRec
+Sat Nov 12 11:13:47 UTC 2022 : === Building wheel
+Sat Nov 12 11:14:14 UTC 2022 : === Output wheel file is in: /pkg/tensorflow_pkg
+> Run
