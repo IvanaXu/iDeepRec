@@ -355,7 +355,7 @@ def build_feature_cols():
                 '''Feature Elimination of EmbeddingVariable Feature'''
                 if args.ev_elimination == 'gstep':
                     # Feature elimination based on global steps
-                    evict_opt = tf.GlobalStepEvict(steps_to_live=2000)
+                    evict_opt = tf.GlobalStepEvict(steps_to_live=4000)
                 elif args.ev_elimination == 'l2':
                     # Feature elimination based on l2 weight
                     evict_opt = tf.L2WeightEvict(l2_weigt_threshold=1.0)
@@ -584,17 +584,8 @@ def main(tf_config=None, server=None):
     
     # Session config
     sess_config = tf.ConfigProto()
-    sess_config.executor_policy = tf.ExecutorPolicy.USE_COST_MODEL_EXECUTOR
-    sess_config.graph_options.optimizer_options.micro_batch_num = 4
-    #
-    sess_config.graph_options.optimizer_options.do_smart_stage = True
-    sess_config.graph_options.optimizer_options.do_op_fusion = True
-    sess_config.graph_options.optimizer_options.do_async_embedding = True
-    sess_config.graph_options.optimizer_options.async_embedding_threads_num = 4
-    sess_config.graph_options.optimizer_options.async_embedding_capacity = 4
-    sess_config.executor_policy = tf.ExecutorPolicy.USE_INLINE_EXECUTOR
-    sess_config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
-    #
+    if tf_config:
+        sess_config.device_filters.append("/job:ps")
     sess_config.inter_op_parallelism_threads = args.inter
     sess_config.intra_op_parallelism_threads = args.intra
 
@@ -765,7 +756,7 @@ def get_arg_parser():
     parser.add_argument('--workqueue', \
                         help='Whether to enable Work Queue. Default to False.',
                         type=boolean_string,
-                        default=True)
+                        default=False)
     return parser
 
 # parse distributed training configuration and generate cluster information
@@ -833,8 +824,8 @@ def set_env_for_DeepRec():
     MALLOC_CONF: On CPU platform, DeepRec can use memory optimization with the jemalloc library.
         Please preload libjemalloc.so by `LD_PRELOAD=./libjemalloc.so.2 python ...`
     '''
-    os.environ['START_STATISTIC_STEP'] = '200'
-    os.environ['STOP_STATISTIC_STEP'] = '500'
+    os.environ['START_STATISTIC_STEP'] = '100'
+    os.environ['STOP_STATISTIC_STEP'] = '110'
     os.environ['MALLOC_CONF']= \
         'background_thread:true,metadata_thp:auto,dirty_decay_ms:20000,muzzy_decay_ms:20000'
 
@@ -865,4 +856,5 @@ if __name__ == '__main__':
         main()
     else:
         tf_config, server, tf_device = generate_cluster_info(TF_CONFIG)
-        main(tf_config, server)
+        with tf_device:
+            main(tf_config, server)
