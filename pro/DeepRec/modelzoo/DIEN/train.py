@@ -580,7 +580,7 @@ class DIEN():
                 learning_rate=self._learning_rate,
                 global_step=self.global_step)
         else:
-            raise ValueError("Optimzier type error.")
+            raise ValueError("Optimizer type error.")
 
         gradients = optimizer.compute_gradients(self.loss)
         clipped_gradients = [(tf.clip_by_norm(grad, 5), var)
@@ -666,7 +666,7 @@ def build_feature_columns(data_location=None):
         '''Feature Elimination of EmbeddingVariable Feature'''
         if args.ev_elimination == 'gstep':
             # Feature elimination based on global steps
-            evict_opt = tf.GlobalStepEvict(steps_to_live=2000)
+            evict_opt = tf.GlobalStepEvict(steps_to_live=4000)
         elif args.ev_elimination == 'l2':
             # Feature elimination based on l2 weight
             evict_opt = tf.L2WeightEvict(l2_weight_threshold=1.0)
@@ -818,12 +818,12 @@ def eval(sess_config, input_hooks, model, data_init_op, steps, checkpoint_dir):
             if (_in != steps):
                 sess.run([model.acc_op, model.auc_op])
                 if (_in % 100 == 0):
-                    print("Evaluation complate:[{}/{}]".format(_in, steps))
+                    print("Evaluation complete:[{}/{}]".format(_in, steps))
             else:
                 eval_acc, eval_auc, events = sess.run(
                     [model.acc_op, model.auc_op, merged])
                 writer.add_summary(events, _in)
-                print("Evaluation complate:[{}/{}]".format(_in, steps))
+                print("Evaluation complete:[{}/{}]".format(_in, steps))
                 print("ACC = {}\nAUC = {}".format(eval_acc, eval_auc))
 
 
@@ -895,17 +895,8 @@ def main(tf_config=None, server=None):
 
     # Session config
     sess_config = tf.ConfigProto()
-    sess_config.executor_policy = tf.ExecutorPolicy.USE_COST_MODEL_EXECUTOR
-    sess_config.graph_options.optimizer_options.micro_batch_num = 4
-    #
-    sess_config.graph_options.optimizer_options.do_smart_stage = True
-    sess_config.graph_options.optimizer_options.do_op_fusion = True
-    sess_config.graph_options.optimizer_options.do_async_embedding = True
-    sess_config.graph_options.optimizer_options.async_embedding_threads_num = 4
-    sess_config.graph_options.optimizer_options.async_embedding_capacity = 4
-    sess_config.executor_policy = tf.ExecutorPolicy.USE_INLINE_EXECUTOR
-    sess_config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
-    #
+    if tf_config:
+        sess_config.device_filters.append("/job:ps")
     sess_config.inter_op_parallelism_threads = args.inter
     sess_config.intra_op_parallelism_threads = args.intra
 
@@ -1082,7 +1073,7 @@ def get_arg_parser():
     parser.add_argument('--workqueue', \
                         help='Whether to enable Work Queue. Default to False.',
                         type=boolean_string,
-                        default=True)
+                        default=False)
     parser.add_argument('--multihash', \
                         help='Whether to enable Multi-Hash Variable. Default to False.',
                         type=boolean_string,
@@ -1159,8 +1150,8 @@ def set_env_for_DeepRec():
     MALLOC_CONF: On CPU platform, DeepRec can use memory optimization with the jemalloc library.
         Please preload libjemalloc.so by `LD_PRELOAD=./libjemalloc.so.2 python ...`
     '''
-    os.environ['START_STATISTIC_STEP'] = '200'
-    os.environ['STOP_STATISTIC_STEP'] = '500'
+    os.environ['START_STATISTIC_STEP'] = '100'
+    os.environ['STOP_STATISTIC_STEP'] = '110'
     os.environ['MALLOC_CONF']= \
         'background_thread:true,metadata_thp:auto,dirty_decay_ms:20000,muzzy_decay_ms:20000'
 
@@ -1177,4 +1168,5 @@ if __name__ == '__main__':
         main()
     else:
         tf_config, server, tf_device = generate_cluster_info(TF_CONFIG)
-        main(tf_config, server)
+        with tf_device:
+            main(tf_config, server)
