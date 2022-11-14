@@ -22,7 +22,7 @@ tree -L 2
 echo
 echo "> Docker"
 docker stop tianchi_test
-docker rm tianchi_test
+docker rm tianchi_test -f
 
 
 # docker run -ti \
