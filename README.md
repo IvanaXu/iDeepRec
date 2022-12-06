@@ -1,5 +1,12 @@
 
 ![DeepRec Logo](https://github.com/alibaba/DeepRec/blob/main/docs/deeprec_logo.png)
+> https://tianchi.aliyun.com/competition/entrance/532005/introduction
+
+![](99.temp/1.png)
+
+![](99.temp/2.png)
+
+![](99.temp/16700567447325107AA0BA3BE-CA1F-48F7-8511-2D85C2A0320E.png)
 
 --------------------------------------------------------------------------------
 
