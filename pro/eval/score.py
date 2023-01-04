@@ -1,9 +1,10 @@
 import sys
 import json
 import numpy as np
-M=sys.argv[1]
 
-N = 5
+M = sys.argv[1]
+N = 5 # 5 
+
 result = []
 for n in range(1, N+1):
     _r = "{}"
@@ -22,6 +23,7 @@ result = np.array([
 ])
 
 print(f"\nEND result CNT: {len(result)} AVG: {np.mean(result):.4f}, MAX: {np.max(result):.4f}, MIN: {np.min(result):.4f}")
+
 result = [_r for _r in result if _r != 864000.0]
 if result:
     print("DEL 864000.0")
